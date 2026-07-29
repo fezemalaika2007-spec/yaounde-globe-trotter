@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
-import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../utils/image_paths.dart';
 import '../widgets/app_footer.dart';
 import '../widgets/asset_image.dart';
-import '../widgets/destination_card.dart';
-import '../widgets/empty_state.dart';
 
 /// Callback type for requesting a tab switch from within a child widget.
 typedef OnSwitchTab = void Function(int index);
@@ -25,87 +22,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _api = ApiService();
-  List<dynamic> _featured = [];
-  List<String> _favoriteNames = [];
-  bool _loading = true;
-  String? _error;
-  final _pageCtrl = PageController();
-  int _heroPage = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchFeatured();
-    _startHeroAutoPlay();
-  }
-
-  @override
-  void dispose() {
-    _pageCtrl.dispose();
-    super.dispose();
-  }
-
-  void _startHeroAutoPlay() {
-    Future.delayed(const Duration(seconds: 5), () {
-      if (!mounted) return;
-      setState(() => _heroPage = (_heroPage + 1) % 5);
-      _pageCtrl.animateToPage(
-        _heroPage,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOut,
-      );
-      _startHeroAutoPlay();
-    });
-  }
-
-  Future<void> _fetchFeatured() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      final results = await Future.wait([
-        _api.getDestinations(),
-        _api.getFavorites(),
-      ]);
-      if (mounted) {
-        setState(() {
-          _featured = results[0].take(4).toList();
-          _favoriteNames = results[1].cast<String>();
-        });
-      }
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
-    } catch (_) {
-      if (mounted) {
-        setState(() => _error = 'Failed to load destinations');
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _toggleFavorite(String destinationName) async {
-    try {
-      final updated = await _api.toggleFavorite(destinationName);
-      setState(() => _favoriteNames = updated);
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update favorites')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -119,24 +35,19 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Hero Banner Carousel ---
+              // --- Hero Banner ---
               SizedBox(
                 width: double.infinity,
-                height: 340,
+                height: 280,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    PageView.builder(
-                      controller: _pageCtrl,
-                      itemCount: 5,
-                      onPageChanged: (i) => setState(() => _heroPage = i),
-                      itemBuilder: (_, i) => AssetImageWidget(
-                        path: ImagePaths.homeHero(i),
-                        width: double.infinity,
-                        height: 340,
-                        fit: BoxFit.cover,
-                        fallbackIcon: Icons.landscape,
-                      ),
+                    AssetImageWidget(
+                      path: ImagePaths.homeHero(0),
+                      width: double.infinity,
+                      height: 280,
+                      fit: BoxFit.cover,
+                      fallbackIcon: Icons.landscape,
                     ),
                     // Gradient overlay
                     Container(
@@ -152,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    // Text & Action overlay
+                    // Text overlay
                     Positioned(
                       left: 24,
                       right: 24,
@@ -238,37 +149,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
-                    // Page dots
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 12,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(
-                          5,
-                          (i) => AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: _heroPage == i ? 28 : 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(
-                                alpha: _heroPage == i ? 0.95 : 0.45,
-                              ),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
 
-              // --- Quick Navigation Section ---
+              // --- Welcome / Intro Section ---
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -278,109 +165,129 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 12),
                     Text(
-                      l10n.exploreSubtitle,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 10,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: () => widget.onSwitchTab?.call(1),
-                          icon: const Icon(Icons.explore_outlined),
-                          label: Text(l10n.destinations),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: () => widget.onSwitchTab?.call(2),
-                          icon: const Icon(Icons.star_outline),
-                          label: Text(l10n.recommendations),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: () => widget.onSwitchTab?.call(3),
-                          icon: const Icon(Icons.map_outlined),
-                          label: Text(l10n.itineraries),
-                        ),
-                      ],
+                      l10n.homeIntroText,
+                      style: theme.textTheme.bodyLarge?.copyWith(height: 1.6),
                     ),
                   ],
                 ),
               ),
 
-              // --- Featured Destinations Header ---
+              // --- Feature Cards (What you can do) ---
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Text(
+                  l10n.homeWhatYouCanDo,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: const Column(
                   children: [
-                    Text(
-                      l10n.featuredDestinations,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    _FeatureCard(
+                      icon: Icons.explore,
+                      title: 'Discover Destinations',
+                      description:
+                          'Browse Yaoundé\'s top attractions — from Mont Fébé to Mefou National Park — with photos, ratings, costs, and tags.',
+                      tabIndex: 1,
                     ),
-                    TextButton.icon(
-                      onPressed: () => widget.onSwitchTab?.call(1),
-                      icon: const Icon(Icons.arrow_forward, size: 18),
-                      label: Text(l10n.viewAll),
+                    _FeatureCard(
+                      icon: Icons.star,
+                      title: 'Get Personalized Recommendations',
+                      description:
+                          'Let our smart matching engine suggest destinations based on your interests and preferences.',
+                      tabIndex: 2,
+                    ),
+                    _FeatureCard(
+                      icon: Icons.map,
+                      title: 'Plan & Manage Itineraries',
+                      description:
+                          'Create custom trip itineraries, add destinations, set dates, and keep all your travel plans in one place.',
+                      tabIndex: 4,
+                    ),
+                    _FeatureCard(
+                      icon: Icons.favorite,
+                      title: 'Save Your Favorites',
+                      description:
+                          'Bookmark destinations you love and find them quickly in your favorites list.',
+                      tabIndex: 3,
                     ),
                   ],
                 ),
               ),
 
-              // --- Featured List ---
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: EmptyState(
-                    icon: Icons.cloud_off,
-                    title: l10n.noDestinations,
-                    message: _error!,
-                    onAction: _fetchFeatured,
-                    actionLabel: l10n.tryAgain,
+              // --- Supporting Images (just a few, not a full gallery) ---
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
+                child: Text(
+                  l10n.homeGlimpseYaounde,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                )
-              else if (_featured.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: EmptyState(
-                    icon: Icons.explore_outlined,
-                    title: l10n.nothingHere,
-                    message: l10n.noDestinations,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  height: 180,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      _SupportingImage(
+                        path: ImagePaths.homeHero(1),
+                        label: 'Yaoundé Cityscape',
+                      ),
+                      _SupportingImage(
+                        path: ImagePaths.homeHero(2),
+                        label: 'Local Culture',
+                      ),
+                      _SupportingImage(
+                        path: ImagePaths.homeHero(3),
+                        label: 'Nature & Wildlife',
+                      ),
+                      _SupportingImage(
+                        path: ImagePaths.homeHero(4),
+                        label: 'Historic Landmarks',
+                      ),
+                    ],
                   ),
-                )
-              else
-                ...List.generate(_featured.length, (i) {
-                  final d = _featured[i];
-                  final imageIndex = d['image_index'] ?? i;
-                  final name = d['name'] ?? '';
-                  return DestinationCard(
-                    imagePath: ImagePaths.destination(imageIndex),
-                    name: name,
-                    country: d['country'] ?? '',
-                    city: d['city'],
-                    cost: d['avg_cost_per_day'],
-                    tags: d['tags'] ?? [],
-                    description: d['description'],
-                    rating: (d['rating'] ?? 0).toDouble(),
-                    bestTimeToVisit: d['best_time_to_visit'],
-                    duration: d['duration'],
-                    location: d['location'],
-                    highlights: d['highlights'],
-                    currency: d['currency'],
-                    isFavorite: _favoriteNames.contains(name),
-                    onFavoriteToggle: () => _toggleFavorite(name),
-                  );
-                }),
+                ),
+              ),
+
+              // --- Quick Navigation Buttons ---
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () => widget.onSwitchTab?.call(1),
+                      icon: const Icon(Icons.explore_outlined),
+                      label: Text(l10n.destinations),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => widget.onSwitchTab?.call(2),
+                      icon: const Icon(Icons.star_outline),
+                      label: Text(l10n.recommendations),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => widget.onSwitchTab?.call(3),
+                      icon: const Icon(Icons.favorite_border),
+                      label: Text(l10n.favorites),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => widget.onSwitchTab?.call(4),
+                      icon: const Icon(Icons.map_outlined),
+                      label: Text(l10n.itineraries),
+                    ),
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 32),
 
@@ -391,6 +298,138 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A feature card explaining what the user can do in the app.
+class _FeatureCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+  final int tabIndex;
+
+  const _FeatureCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.tabIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () {
+          // Navigate to the relevant tab
+          // We use a callback pattern via the widget tree
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 28,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small supporting image with a label overlay.
+class _SupportingImage extends StatelessWidget {
+  final String path;
+  final String label;
+
+  const _SupportingImage({required this.path, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 240,
+      margin: const EdgeInsets.only(right: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AssetImageWidget(
+              path: path,
+              fit: BoxFit.cover,
+              fallbackIcon: Icons.landscape,
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.6),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              bottom: 12,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  shadows: [
+                    Shadow(
+                      offset: Offset(0, 1),
+                      blurRadius: 0.0,
+                      color: Colors.black,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

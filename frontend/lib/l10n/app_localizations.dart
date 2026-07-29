@@ -100,6 +100,11 @@ class AppLocalizations {
   String get featuredDestinations => _t('Featured Destinations');
   String get startExploring => _t('Start Exploring');
   String get viewAll => _t('View All');
+  String get homeIntroText => _t(
+    'Yaounde.Trip is your smart travel companion for exploring Cameroon\'s vibrant capital. Discover the best destinations, get personalized recommendations based on your interests, plan and manage your itineraries, and save your favorite spots — all in one place.',
+  );
+  String get homeWhatYouCanDo => _t('What you can do');
+  String get homeGlimpseYaounde => _t('A glimpse of Yaoundé');
 
   // Destinations
   String get search => _t('Search');
@@ -242,6 +247,10 @@ class AppLocalizations {
     'Featured Destinations': 'Destinations en vedette',
     'Start Exploring': 'Commencer à explorer',
     'View All': 'Voir tout',
+    'Yaounde.Trip is your smart travel companion for exploring Cameroon\'s vibrant capital. Discover the best destinations, get personalized recommendations based on your interests, plan and manage your itineraries, and save your favorite spots — all in one place.':
+        'Yaounde.Trip est votre compagnon de voyage intelligent pour explorer la vibrante capitale du Cameroun. Découvrez les meilleures destinations, obtenez des recommandations personnalisées selon vos centres d\'intérêt, planifiez et gérez vos itinéraires, et enregistrez vos lieux préférés — tout en un seul endroit.',
+    'What you can do': 'Ce que vous pouvez faire',
+    'A glimpse of Yaoundé': 'Un aperçu de Yaoundé',
 
     // Destinations
     'Search': 'Rechercher',

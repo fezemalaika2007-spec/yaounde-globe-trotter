@@ -14,9 +14,8 @@ import 'favorites_screen.dart';
 
 /// Main app shell shown after login.
 ///
-/// Uses a bottom navigation bar with 5 tabs: Home, Destinations,
-/// Recommendations, Favorites, and Itineraries. An overflow menu provides
-/// logout and settings.
+/// Uses a navigation drawer (sidebar) accessible from every page.
+/// Home is always the first screen shown post-authentication.
 class MainShell extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
   const MainShell({super.key, required this.onLocaleChanged});
@@ -63,18 +62,45 @@ class _MainShellState extends State<MainShell> {
     await AuthProvider().logout();
   }
 
+  void _navigateTo(int index) {
+    setState(() => _currentIndex = index);
+    Navigator.of(context).pop(); // Close the drawer
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = ThemeProvider();
 
-    final titles = [
-      l10n.home,
-      l10n.destinations,
-      l10n.recommendations,
-      l10n.favorites,
-      l10n.itineraries,
+    final navItems = [
+      _NavItem(
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+        label: l10n.home,
+      ),
+      _NavItem(
+        icon: Icons.explore_outlined,
+        selectedIcon: Icons.explore,
+        label: l10n.destinations,
+      ),
+      _NavItem(
+        icon: Icons.star_outline,
+        selectedIcon: Icons.star,
+        label: l10n.recommendations,
+      ),
+      _NavItem(
+        icon: Icons.favorite_border,
+        selectedIcon: Icons.favorite,
+        label: l10n.favorites,
+      ),
+      _NavItem(
+        icon: Icons.map_outlined,
+        selectedIcon: Icons.map,
+        label: l10n.itineraries,
+      ),
     ];
+
+    final titles = navItems.map((n) => n.label).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -154,38 +180,109 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.home_outlined),
-            selectedIcon: const Icon(Icons.home),
-            label: l10n.home,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.explore_outlined),
-            selectedIcon: const Icon(Icons.explore),
-            label: l10n.destinations,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.star_outline),
-            selectedIcon: const Icon(Icons.star),
-            label: l10n.recommendations,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.favorite_border),
-            selectedIcon: const Icon(Icons.favorite),
-            label: l10n.favorites,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.map_outlined),
-            selectedIcon: const Icon(Icons.map),
-            label: l10n.itineraries,
-          ),
-        ],
+      // --- Navigation Drawer (Sidebar) ---
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            // Drawer header with branding
+            DrawerHeader(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.8),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(
+                    Icons.travel_explore,
+                    size: 40,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Yaounde.Trip',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.exploreSubtitle,
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onPrimary.withValues(alpha: 0.9),
+                      fontSize: 12,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            // Navigation items
+            ...List.generate(navItems.length, (i) {
+              final item = navItems[i];
+              return ListTile(
+                leading: Icon(
+                  _currentIndex == i ? item.selectedIcon : item.icon,
+                  color: _currentIndex == i
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                title: Text(
+                  item.label,
+                  style: TextStyle(
+                    fontWeight: _currentIndex == i
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: _currentIndex == i
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                ),
+                selected: _currentIndex == i,
+                onTap: () => _navigateTo(i),
+              );
+            }),
+            const Divider(),
+            // Profile
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: Text(l10n.profile),
+              onTap: () {
+                Navigator.of(context).pop();
+                _showProfileSheet();
+              },
+            ),
+            // Logout
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: Text(
+                l10n.logout,
+                style: const TextStyle(color: Colors.red),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                _logout();
+              },
+            ),
+          ],
+        ),
       ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
     );
   }
 
@@ -210,7 +307,20 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-/// A destinations-only tab extracted from the former HomeScreen.
+/// Simple data class for navigation items.
+class _NavItem {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+
+  const _NavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+  });
+}
+
+/// A destinations-only tab — the image-heavy discovery page.
 class _DestinationsTab extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
   const _DestinationsTab({required this.onLocaleChanged});

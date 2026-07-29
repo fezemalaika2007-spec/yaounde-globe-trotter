@@ -12,8 +12,6 @@ class DestinationCard extends StatefulWidget {
   final Widget? trailing;
   final VoidCallback? onViewDetails;
   final VoidCallback? onTap;
-
-  // Richer data fields
   final String? city;
   final double? rating;
   final String? bestTimeToVisit;
@@ -21,8 +19,6 @@ class DestinationCard extends StatefulWidget {
   final String? location;
   final List<dynamic>? highlights;
   final String? currency;
-
-  // Favorites
   final bool isFavorite;
   final VoidCallback? onFavoriteToggle;
 
@@ -84,7 +80,7 @@ class _DestinationCardState extends State<DestinationCard> {
                     ),
                     child: SizedBox(
                       width: double.infinity,
-                      height: 280,
+                      height: 200,
                       child: FittedBox(
                         fit: BoxFit.cover,
                         child: AssetImageWidget(
@@ -194,7 +190,6 @@ class _DestinationCardState extends State<DestinationCard> {
                           ),
                       ],
                     ),
-                    // Rating
                     if (widget.rating != null) ...[
                       const SizedBox(height: 12),
                       Row(
@@ -226,7 +221,6 @@ class _DestinationCardState extends State<DestinationCard> {
                             .toList(),
                       ),
                     ],
-                    // Info grid
                     if (widget.bestTimeToVisit != null ||
                         widget.duration != null ||
                         widget.location != null) ...[
@@ -247,7 +241,6 @@ class _DestinationCardState extends State<DestinationCard> {
                         value: widget.location,
                       ),
                     ],
-                    // Highlights
                     if (widget.highlights != null &&
                         widget.highlights!.isNotEmpty) ...[
                       const SizedBox(height: 20),
@@ -360,132 +353,144 @@ class _DestinationCardState extends State<DestinationCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                // Fixed-height image with proper fit
-                SizedBox(
-                  width: double.infinity,
-                  height: 200,
-                  child: FittedBox(
-                    fit: BoxFit.cover,
-                    child: AssetImageWidget(
-                      path: widget.imagePath,
-                      fit: BoxFit.cover,
-                      fallbackIcon: Icons.place_outlined,
-                    ),
-                  ),
-                ),
-                // Gradient overlay for better text readability
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.3),
-                        ],
-                        stops: const [0.5, 1.0],
+            // --- Image section with horizontal padding ---
+            // Padding on left/right so image doesn't span full screen width.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 130,
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: AssetImageWidget(
+                          path: widget.imagePath,
+                          fit: BoxFit.cover,
+                          fallbackIcon: Icons.place_outlined,
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                // Favorite button
-                if (widget.onFavoriteToggle != null)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Material(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () => widget.onFavoriteToggle!(),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Icon(
-                            widget.isFavorite
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            color: widget.isFavorite
-                                ? Colors.red
-                                : Colors.white,
-                            size: 22,
+                    // Gradient overlay
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.3),
+                            ],
+                            stops: const [0.5, 1.0],
                           ),
                         ),
                       ),
                     ),
-                  ),
-                // Rating badge
-                if (widget.rating != null)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            widget.rating!.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                    // Favorite button
+                    if (widget.onFavoriteToggle != null)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Material(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () => widget.onFavoriteToggle!(),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Icon(
+                                widget.isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: widget.isFavorite
+                                    ? Colors.red
+                                    : Colors.white,
+                                size: 22,
+                              ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                // Cost badge
-                if (l10nCost != null)
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.attach_money,
-                            size: 16,
-                            color: Colors.amber,
+                    // Rating badge
+                    if (widget.rating != null)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                          Text(
-                            l10nCost.replaceAll('\$', ''),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.star,
+                                color: Colors.amber,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                widget.rating!.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-              ],
+                    // Cost badge
+                    if (l10nCost != null)
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.attach_money,
+                                size: 16,
+                                color: Colors.amber,
+                              ),
+                              Text(
+                                l10nCost.replaceAll('\$', ''),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
+            // --- Content below image ---
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

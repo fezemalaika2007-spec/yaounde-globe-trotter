@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config/api_config.dart';
 
 /// Centralized service for all HTTP calls to the GlobeTrotter backend.
@@ -15,25 +17,44 @@ class ApiService {
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   static const String _tokenKey = 'jwt_token';
+  static const String _prefsTokenKey = 'jwt_token_prefs';
 
   // ---------------------------------------------------------------------------
   // Token management
   // ---------------------------------------------------------------------------
 
   /// Persist the JWT so it survives app restarts.
+  ///
+  /// On web, flutter_secure_storage may not persist reliably, so we also
+  /// store a copy in SharedPreferences as a fallback.
   Future<void> saveToken(String token) async {
     try {
       await _secureStorage.write(key: _tokenKey, value: token);
     } catch (_) {}
+    // Fallback for web — SharedPreferences works reliably on web
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefsTokenKey, token);
+      } catch (_) {}
+    }
   }
 
   /// Retrieve the stored JWT, or `null` if the user is not logged in.
   Future<String?> getToken() async {
+    // Try secure storage first
     try {
-      return await _secureStorage.read(key: _tokenKey);
-    } catch (_) {
-      return null;
+      final token = await _secureStorage.read(key: _tokenKey);
+      if (token != null) return token;
+    } catch (_) {}
+    // Fallback to SharedPreferences (especially for web)
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        return prefs.getString(_prefsTokenKey);
+      } catch (_) {}
     }
+    return null;
   }
 
   /// Remove the stored JWT (logout).
@@ -41,6 +62,12 @@ class ApiService {
     try {
       await _secureStorage.delete(key: _tokenKey);
     } catch (_) {}
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_prefsTokenKey);
+      } catch (_) {}
+    }
   }
 
   // ---------------------------------------------------------------------------

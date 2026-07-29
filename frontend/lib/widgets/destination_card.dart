@@ -337,7 +337,6 @@ class _DestinationCardState extends State<DestinationCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final l10nCost = widget.cost != null ? '\$${widget.cost}/day' : null;
     final handleTap =
         widget.onTap ??
         widget.onViewDetails ??
@@ -353,262 +352,158 @@ class _DestinationCardState extends State<DestinationCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Image section with horizontal padding ---
-            // Padding on left/right so image doesn't span full screen width.
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
+            // --- Image and content in a centered fixed-width column ---
+            Center(
+              child: SizedBox(
+                width: 280,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 130,
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        child: AssetImageWidget(
-                          path: widget.imagePath,
-                          fit: BoxFit.cover,
-                          fallbackIcon: Icons.place_outlined,
-                        ),
-                      ),
-                    ),
-                    // Gradient overlay
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.3),
-                            ],
-                            stops: const [0.5, 1.0],
+                    // Image
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          width: 280,
+                          height: 160,
+                          child: AssetImageWidget(
+                            path: widget.imagePath,
+                            fit: BoxFit.cover,
+                            fallbackIcon: Icons.place_outlined,
                           ),
                         ),
                       ),
                     ),
-                    // Favorite button
-                    if (widget.onFavoriteToggle != null)
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Material(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: () => widget.onFavoriteToggle!(),
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Icon(
-                                widget.isFavorite
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: widget.isFavorite
-                                    ? Colors.red
-                                    : Colors.white,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    // Rating badge
-                    if (widget.rating != null)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                    // Content below image — same width as image
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
-                                Icons.star,
-                                color: Colors.amber,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                widget.rating!.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      widget.name,
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.location_on_outlined,
+                                          size: 16,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            widget.city != null
+                                                ? '${widget.city}, ${widget.country}'
+                                                : widget.country,
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
+                              widget.trailing ?? const SizedBox.shrink(),
                             ],
                           ),
-                        ),
-                      ),
-                    // Cost badge
-                    if (l10nCost != null)
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.attach_money,
-                                size: 16,
-                                color: Colors.amber,
-                              ),
-                              Text(
-                                l10nCost.replaceAll('\$', ''),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            // --- Content below image ---
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.name,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
+                          if (widget.duration != null) ...[
+                            const SizedBox(height: 8),
                             Row(
                               children: [
                                 Icon(
-                                  Icons.location_on_outlined,
+                                  Icons.schedule,
                                   size: 16,
-                                  color: theme.colorScheme.primary,
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
                                 const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    widget.city != null
-                                        ? '${widget.city}, ${widget.country}'
-                                        : widget.country,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                Text(
+                                  widget.duration!,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
                             ),
                           ],
-                        ),
-                      ),
-                      widget.trailing ?? const SizedBox.shrink(),
-                    ],
-                  ),
-                  if (widget.duration != null) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.schedule,
-                          size: 16,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          widget.duration!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (widget.subtitle != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.subtitle!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                  if (widget.tags.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: widget.tags
-                          .map(
-                            (t) => Chip(
-                              label: Text(
-                                '#$t',
-                                style: const TextStyle(fontSize: 11),
+                          if (widget.subtitle != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.subtitle!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w500,
                               ),
-                              visualDensity: VisualDensity.compact,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              padding: EdgeInsets.zero,
                             ),
-                          )
-                          .toList(),
-                    ),
-                  ],
-                  if (widget.description != null &&
-                      widget.description!.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      widget.description!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.4,
+                          ],
+                          if (widget.tags.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: widget.tags
+                                  .map(
+                                    (t) => Chip(
+                                      label: Text(
+                                        '#$t',
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                      visualDensity: VisualDensity.compact,
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                          if (widget.description != null &&
+                              widget.description!.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              widget.description!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: handleTap,
+                              icon: const Icon(Icons.arrow_forward, size: 16),
+                              label: const Text('View Details'),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: handleTap,
-                      icon: const Icon(Icons.arrow_forward, size: 16),
-                      label: const Text('View Details'),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],

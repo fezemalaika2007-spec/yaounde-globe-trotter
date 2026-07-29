@@ -3,7 +3,6 @@ import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../services/theme_provider.dart';
-import '../utils/image_paths.dart';
 import '../widgets/destination_card.dart';
 import '../widgets/empty_state.dart';
 import 'home_screen.dart';
@@ -13,9 +12,6 @@ import 'itineraries_screen.dart';
 import 'favorites_screen.dart';
 
 /// Main app shell shown after login.
-///
-/// Uses a navigation drawer (sidebar) accessible from every page.
-/// Home is always the first screen shown post-authentication.
 class MainShell extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
   const MainShell({super.key, required this.onLocaleChanged});
@@ -64,7 +60,7 @@ class _MainShellState extends State<MainShell> {
 
   void _navigateTo(int index) {
     setState(() => _currentIndex = index);
-    Navigator.of(context).pop(); // Close the drawer
+    Navigator.of(context).pop();
   }
 
   @override
@@ -109,19 +105,18 @@ class _MainShellState extends State<MainShell> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) async {
-              if (value == 'profile') {
+              if (value == 'profile')
                 _showProfileSheet();
-              } else if (value == 'logout') {
+              else if (value == 'logout')
                 _logout();
-              } else if (value == 'en') {
+              else if (value == 'en') {
                 await AppLocalizations.persistLocale(const Locale('en'));
                 widget.onLocaleChanged(const Locale('en'));
               } else if (value == 'fr') {
                 await AppLocalizations.persistLocale(const Locale('fr'));
                 widget.onLocaleChanged(const Locale('fr'));
-              } else if (value == 'toggle_theme') {
+              } else if (value == 'toggle_theme')
                 await theme.toggleTheme();
-              }
             },
             itemBuilder: (_) => [
               PopupMenuItem(
@@ -180,12 +175,10 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      // --- Navigation Drawer (Sidebar) ---
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // Drawer header with branding
             DrawerHeader(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -232,7 +225,6 @@ class _MainShellState extends State<MainShell> {
                 ],
               ),
             ),
-            // Navigation items
             ...List.generate(navItems.length, (i) {
               final item = navItems[i];
               return ListTile(
@@ -258,7 +250,6 @@ class _MainShellState extends State<MainShell> {
               );
             }),
             const Divider(),
-            // Profile
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: Text(l10n.profile),
@@ -267,7 +258,6 @@ class _MainShellState extends State<MainShell> {
                 _showProfileSheet();
               },
             ),
-            // Logout
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: Text(
@@ -307,12 +297,10 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-/// Simple data class for navigation items.
 class _NavItem {
   final IconData icon;
   final IconData selectedIcon;
   final String label;
-
   const _NavItem({
     required this.icon,
     required this.selectedIcon,
@@ -320,7 +308,7 @@ class _NavItem {
   });
 }
 
-/// A destinations-only tab — the image-heavy discovery page.
+/// Destinations tab — now dynamically loaded from backend (Overpass data).
 class _DestinationsTab extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
   const _DestinationsTab({required this.onLocaleChanged});
@@ -333,15 +321,17 @@ class _DestinationsTabState extends State<_DestinationsTab> {
   final _api = ApiService();
   final _tagCtrl = TextEditingController();
   final _costCtrl = TextEditingController();
+  final _searchCtrl = TextEditingController();
 
-  List<dynamic> _destinations = [];
-  List<String> _favoriteNames = [];
+  List<dynamic> _allDestinations = [];
+  List<dynamic> _filteredDestinations = [];
   bool _loading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(_applyLocalFilters);
     _fetch();
   }
 
@@ -349,6 +339,7 @@ class _DestinationsTabState extends State<_DestinationsTab> {
   void dispose() {
     _tagCtrl.dispose();
     _costCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -357,22 +348,17 @@ class _DestinationsTabState extends State<_DestinationsTab> {
       _loading = true;
       _error = null;
     });
-
     try {
       int? maxCost;
       if (_costCtrl.text.trim().isNotEmpty) {
         maxCost = int.tryParse(_costCtrl.text.trim());
       }
-
-      final results = await Future.wait([
-        _api.getDestinations(
-          tag: _tagCtrl.text.trim().isEmpty ? null : _tagCtrl.text.trim(),
-          maxCost: maxCost,
-        ),
-        _api.getFavorites(),
-      ]);
-      _destinations = results[0];
-      _favoriteNames = results[1].cast<String>();
+      final results = await _api.getDestinations(
+        tag: _tagCtrl.text.trim().isEmpty ? null : _tagCtrl.text.trim(),
+        maxCost: maxCost,
+      );
+      _allDestinations = results;
+      _applyLocalFilters();
     } on ApiException catch (e) {
       _error = e.message;
     } catch (_) {
@@ -382,33 +368,43 @@ class _DestinationsTabState extends State<_DestinationsTab> {
     }
   }
 
-  Future<void> _toggleFavorite(String destinationName) async {
-    try {
-      final updated = await _api.toggleFavorite(destinationName);
-      setState(() => _favoriteNames = updated);
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update favorites')),
-        );
-      }
+  void _applyLocalFilters() {
+    final query = _searchCtrl.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      _filteredDestinations = List.from(_allDestinations);
+    } else {
+      _filteredDestinations = _allDestinations.where((d) {
+        final name = (d['name'] ?? '').toString().toLowerCase();
+        final desc = (d['description'] ?? '').toString().toLowerCase();
+        return name.contains(query) || desc.contains(query);
+      }).toList();
     }
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: TextField(
+            controller: _searchCtrl,
+            decoration: InputDecoration(
+              labelText: l10n.search,
+              hintText: 'Search by name or description...',
+              prefixIcon: const Icon(Icons.search),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
           child: Row(
             children: [
               Expanded(
@@ -470,7 +466,7 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                     ],
                   ),
                 )
-              : _destinations.isEmpty
+              : _filteredDestinations.isEmpty
               ? EmptyState(
                   icon: Icons.explore_outlined,
                   title: l10n.noDestinations,
@@ -479,28 +475,23 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                   actionLabel: l10n.refresh,
                 )
               : ListView.builder(
-                  itemCount: _destinations.length,
+                  itemCount: _filteredDestinations.length,
                   padding: const EdgeInsets.only(top: 4, bottom: 16),
                   itemBuilder: (_, i) {
-                    final d = _destinations[i];
-                    final imageIndex = d['image_index'] ?? i;
+                    final d = _filteredDestinations[i];
                     final name = d['name'] ?? '';
+                    final imageUrl = d['image'] ?? '';
+                    final cost = d['cost'];
+                    final avgRating = (d['average_rating'] ?? 0).toDouble();
                     return DestinationCard(
-                      imagePath: ImagePaths.destination(imageIndex),
+                      imagePath: imageUrl,
                       name: name,
-                      country: d['country'] ?? '',
-                      city: d['city'],
-                      cost: d['avg_cost_per_day'],
+                      country: d['area'] ?? 'Yaoundé',
+                      city: null,
+                      cost: cost,
                       tags: d['tags'] ?? [],
                       description: d['description'],
-                      rating: (d['rating'] ?? 0).toDouble(),
-                      bestTimeToVisit: d['best_time_to_visit'],
-                      duration: d['duration'],
-                      location: d['location'],
-                      highlights: d['highlights'],
-                      currency: d['currency'],
-                      isFavorite: _favoriteNames.contains(name),
-                      onFavoriteToggle: () => _toggleFavorite(name),
+                      rating: avgRating,
                     );
                   },
                 ),

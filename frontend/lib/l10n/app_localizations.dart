@@ -122,6 +122,10 @@ class AppLocalizations {
   String get noRecommendations => _t('No recommendations available');
   String get matchScore => _t('Match score');
   String get personalizedForYou => _t('Personalized for you');
+  String get recommendationsComingSoon => _t('Coming Soon');
+  String get recommendationsPlaceholder => _t(
+    'Your personalized recommendations will appear here soon. They will be based on your searches, favorites, and popular destinations that match your taste.',
+  );
 
   // Itineraries
   String get createItinerary => _t('Create Itinerary');
@@ -268,6 +272,9 @@ class AppLocalizations {
     'No recommendations available': 'Aucune recommandation disponible',
     'Match score': 'Score de correspondance',
     'Personalized for you': 'Personnalisé pour vous',
+    'Coming Soon': 'Bientôt disponible',
+    'Your personalized recommendations will appear here soon. They will be based on your searches, favorites, and popular destinations that match your taste.':
+        'Vos recommandations personnalisées apparaîtront bientôt ici. Elles seront basées sur vos recherches, vos favoris et les destinations populaires qui correspondent à vos goûts.',
 
     // Itineraries
     'Create Itinerary': 'Créer un itinéraire',

@@ -181,6 +181,46 @@ class ApiService {
   }
 
   // ---------------------------------------------------------------------------
+  // Favorites (protected)
+  // ---------------------------------------------------------------------------
+
+  /// GET /favorites – list the user's favorite destination names.
+  Future<List<String>> getFavorites() async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.favorites}');
+    final response = await http.get(uri, headers: _authHeaders(token));
+
+    final body = _decode(response);
+    if (response.statusCode == 200) {
+      return (body as List<dynamic>).cast<String>();
+    }
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// POST /favorites – toggle a destination in the user's favorites.
+  ///
+  /// Returns the updated list of favorite destination names.
+  Future<List<String>> toggleFavorite(String destinationName) async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.favorites}');
+    final response = await http.post(
+      uri,
+      headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
+      body: jsonEncode({'destination': destinationName}),
+    );
+
+    final body = _decode(response);
+    if (response.statusCode == 200) {
+      return (body as List<dynamic>).cast<String>();
+    }
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 

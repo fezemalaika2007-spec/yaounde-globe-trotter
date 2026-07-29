@@ -7,17 +7,15 @@ class AppTheme {
   static const double screenPadding = 16;
 
   static ThemeData light() {
-    return _base(ColorScheme.fromSeed(
-      seedColor: seedColor,
-      brightness: Brightness.light,
-    ));
+    return _base(
+      ColorScheme.fromSeed(seedColor: seedColor, brightness: Brightness.light),
+    );
   }
 
   static ThemeData dark() {
-    return _base(ColorScheme.fromSeed(
-      seedColor: seedColor,
-      brightness: Brightness.dark,
-    ));
+    return _base(
+      ColorScheme.fromSeed(seedColor: seedColor, brightness: Brightness.dark),
+    );
   }
 
   static ThemeData _base(ColorScheme scheme) {
@@ -56,12 +54,16 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(double.infinity, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
         ),
       ),

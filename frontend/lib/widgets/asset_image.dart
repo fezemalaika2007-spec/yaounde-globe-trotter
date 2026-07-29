@@ -24,14 +24,17 @@ class AssetImageWidget extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
+      filterQuality: FilterQuality.medium,
       errorBuilder: (context, error, stackTrace) => Container(
         width: width,
         height: height,
         color: theme.colorScheme.primaryContainer,
-        child: Icon(
-          fallbackIcon,
-          size: 48,
-          color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
+        child: Center(
+          child: Icon(
+            fallbackIcon,
+            size: 48,
+            color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
+          ),
         ),
       ),
     );

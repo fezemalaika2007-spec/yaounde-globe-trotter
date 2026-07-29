@@ -33,9 +33,24 @@ class AuthBackground extends StatelessWidget {
             letterSpacing: 0.5,
             shadows: [
               Shadow(
-                offset: Offset(0, 2),
-                blurRadius: 4.0,
-                color: Colors.black87,
+                offset: Offset(0, 1),
+                blurRadius: 0.0,
+                color: Colors.black,
+              ),
+              Shadow(
+                offset: Offset(1, 0),
+                blurRadius: 0.0,
+                color: Colors.black,
+              ),
+              Shadow(
+                offset: Offset(-1, 0),
+                blurRadius: 0.0,
+                color: Colors.black,
+              ),
+              Shadow(
+                offset: Offset(0, -1),
+                blurRadius: 0.0,
+                color: Colors.black,
               ),
             ],
           ),

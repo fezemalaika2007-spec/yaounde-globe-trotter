@@ -67,6 +67,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _passwordCtrl.text,
         List.from(_selectedTags),
       );
+      if (mounted) {
+        // Show success message and navigate to login screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).registrationSuccess),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pushReplacementNamed(
+          context,
+          '/login',
+          arguments: widget.onLocaleChanged,
+        );
+      }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {

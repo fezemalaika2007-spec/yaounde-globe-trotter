@@ -5,18 +5,18 @@ import '../utils/image_paths.dart';
 import '../widgets/destination_card.dart';
 import '../widgets/empty_state.dart';
 
-class RecommendationsScreen extends StatefulWidget {
+class FavoritesScreen extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
-  const RecommendationsScreen({super.key, required this.onLocaleChanged});
+  const FavoritesScreen({super.key, required this.onLocaleChanged});
 
   @override
-  State<RecommendationsScreen> createState() => _RecommendationsScreenState();
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
 }
 
-class _RecommendationsScreenState extends State<RecommendationsScreen> {
+class _FavoritesScreenState extends State<FavoritesScreen> {
   final _api = ApiService();
-  List<dynamic> _recommendations = [];
   List<String> _favoriteNames = [];
+  List<dynamic> _allDestinations = [];
   bool _loading = true;
   String? _error;
 
@@ -33,22 +33,17 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     });
 
     try {
+      // Fetch all destinations and favorites in parallel
       final results = await Future.wait([
-        _api.getRecommendations(),
+        _api.getDestinations(),
         _api.getFavorites(),
       ]);
-      if (mounted) {
-        setState(() {
-          _recommendations = results[0];
-          _favoriteNames = results[1].cast<String>();
-        });
-      }
+      _allDestinations = results[0];
+      _favoriteNames = results[1].cast<String>();
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      _error = e.message;
     } catch (_) {
-      if (mounted) {
-        setState(() => _error = 'Failed to load recommendations');
-      }
+      _error = 'Failed to load favorites';
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -78,6 +73,11 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
+    // Filter destinations to only show favorites
+    final favoriteDestinations = _allDestinations
+        .where((d) => _favoriteNames.contains(d['name']))
+        .toList();
+
     return Column(
       children: [
         Padding(
@@ -85,7 +85,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
           child: Row(
             children: [
               Text(
-                l10n.personalizedForYou,
+                l10n.favorites,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -119,55 +119,36 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                     ],
                   ),
                 )
-              : _recommendations.isEmpty
+              : favoriteDestinations.isEmpty
               ? EmptyState(
-                  icon: Icons.star_outline,
-                  title: l10n.noRecommendations,
-                  message: l10n.nothingHere,
+                  icon: Icons.favorite_border,
+                  title: l10n.noFavorites,
+                  message: l10n.noFavoritesMessage,
                   onAction: _fetch,
                   actionLabel: l10n.refresh,
                 )
               : ListView.builder(
-                  itemCount: _recommendations.length,
+                  itemCount: favoriteDestinations.length,
                   padding: const EdgeInsets.only(top: 4, bottom: 16),
                   itemBuilder: (_, i) {
-                    final r = _recommendations[i];
-                    final score = r['match_score'] ?? 0;
-                    final imageIndex = r['image_index'] ?? i;
-                    final name = r['name'] ?? '';
+                    final d = favoriteDestinations[i];
+                    final imageIndex = d['image_index'] ?? i;
                     return DestinationCard(
-                      imagePath: ImagePaths.recommendation(imageIndex),
-                      name: name,
-                      country: r['country'] ?? '',
-                      city: r['city'],
-                      cost: r['avg_cost_per_day'],
-                      tags: r['tags'] ?? [],
-                      description: r['description'],
-                      rating: (r['rating'] ?? 0).toDouble(),
-                      bestTimeToVisit: r['best_time_to_visit'],
-                      duration: r['duration'],
-                      location: r['location'],
-                      highlights: r['highlights'],
-                      currency: r['currency'],
-                      isFavorite: _favoriteNames.contains(name),
-                      onFavoriteToggle: () => _toggleFavorite(name),
-                      trailing: Chip(
-                        label: Text(
-                          '$score',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: score > 0
-                                ? Colors.white
-                                : Colors.grey.shade700,
-                          ),
-                        ),
-                        backgroundColor: score > 0
-                            ? theme.colorScheme.primary
-                            : Colors.grey.shade300,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                      ),
+                      imagePath: ImagePaths.destination(imageIndex),
+                      name: d['name'] ?? '',
+                      country: d['country'] ?? '',
+                      city: d['city'],
+                      cost: d['avg_cost_per_day'],
+                      tags: d['tags'] ?? [],
+                      description: d['description'],
+                      rating: (d['rating'] ?? 0).toDouble(),
+                      bestTimeToVisit: d['best_time_to_visit'],
+                      duration: d['duration'],
+                      location: d['location'],
+                      highlights: d['highlights'],
+                      currency: d['currency'],
+                      isFavorite: true,
+                      onFavoriteToggle: () => _toggleFavorite(d['name'] ?? ''),
                     );
                   },
                 ),

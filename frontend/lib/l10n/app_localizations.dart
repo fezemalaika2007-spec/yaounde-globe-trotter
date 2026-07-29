@@ -34,11 +34,11 @@ class AppLocalizations {
 
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    AppLocalizationsDelegate(),
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-  ];
+        AppLocalizationsDelegate(),
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ];
 
   static const supportedLocales = [Locale('en'), Locale('fr')];
 
@@ -80,12 +80,15 @@ class AppLocalizations {
   );
   String get backToLogin => _t('Back to Login');
   String get orContinueAsGuest => _t('Or continue as guest');
+  String get registrationSuccess =>
+      _t('Registration successful! Please log in.');
 
   // Navigation
   String get home => _t('Home');
   String get destinations => _t('Destinations');
   String get recommendations => _t('Recommendations');
   String get itineraries => _t('Itineraries');
+  String get favorites => _t('Favorites');
   String get logout => _t('Logout');
   String get profile => _t('Profile');
 
@@ -149,8 +152,28 @@ class AppLocalizations {
   // Empty states
   String get nothingHere => _t('Nothing here yet');
   String get tryAgain => _t('Try again');
+  String get noFavorites => _t('No favorites yet');
+  String get noFavoritesMessage =>
+      _t('Tap the heart icon on any destination to save it here.');
 
   String get failedToLoad => _t('Failed to load data');
+
+  // Footer
+  String get footerTagline =>
+      _t('Your smart travel companion for exploring Yaoundé and beyond.');
+  String get footerQuickLinks => _t('Quick Links');
+  String get footerContact => _t('Contact');
+  String get footerAddress => _t('Yaoundé, Centre Region, Cameroon');
+  String get footerAbout => _t('About');
+  String get footerAboutText => _t(
+    'Yaounde.Trip is a smart travel planner that helps you discover the best destinations, create itineraries, and get personalized recommendations for Yaoundé, Cameroon.',
+  );
+  String get footerCopyright => _t('© 2026 Yaounde.Trip. All rights reserved.');
+  String get footerPrivacy => _t('Privacy Policy');
+  String get footerTerms => _t('Terms of Service');
+  String get footerCookies => _t('Cookie Policy');
+  String get footerMadeWith => _t('Made with');
+  String get footerInCameroon => _t('in Cameroon');
 
   // ---- Lookup helper -----------------------------------------------------
 
@@ -200,12 +223,15 @@ class AppLocalizations {
         'Ceci est un flux UI uniquement. Le point de terminaison de réinitialisation du backend n\'est pas connecté.',
     'Back to Login': 'Retour à la connexion',
     'Or continue as guest': 'Ou continuer en tant qu\'invité',
+    'Registration successful! Please log in.':
+        'Inscription réussie ! Veuillez vous connecter.',
 
     // Navigation
     'Home': 'Accueil',
     'Destinations': 'Destinations',
     'Recommendations': 'Recommandations',
     'Itineraries': 'Itinéraires',
+    'Favorites': 'Favoris',
     'Logout': 'Déconnexion',
     'Profile': 'Profil',
 
@@ -264,10 +290,30 @@ class AppLocalizations {
     // Empty states
     'Nothing here yet': 'Rien ici pour le moment',
     'Try again': 'Réessayer',
+    'No favorites yet': 'Pas de favoris pour le moment',
+    'Tap the heart icon on any destination to save it here.':
+        'Touchez l\'icône cœur sur n\'importe quelle destination pour l\'enregistrer ici.',
 
     // Error
     'An unexpected error occurred': 'Une erreur inattendue s\'est produite',
     'Failed to load data': 'Échec du chargement des données',
+
+    // Footer
+    'Your smart travel companion for exploring Yaoundé and beyond.':
+        'Votre compagnon de voyage intelligent pour explorer Yaoundé et au-delà.',
+    'Quick Links': 'Liens rapides',
+    'Contact': 'Contact',
+    'Yaoundé, Centre Region, Cameroon': 'Yaoundé, Région du Centre, Cameroun',
+    'About': 'À propos',
+    'Yaounde.Trip is a smart travel planner that helps you discover the best destinations, create itineraries, and get personalized recommendations for Yaoundé, Cameroon.':
+        'Yaounde.Trip est un planificateur de voyage intelligent qui vous aide à découvrir les meilleures destinations, créer des itinéraires et obtenir des recommandations personnalisées pour Yaoundé, Cameroun.',
+    '© 2026 Yaounde.Trip. All rights reserved.':
+        '© 2026 Yaounde.Trip. Tous droits réservés.',
+    'Privacy Policy': 'Politique de confidentialité',
+    'Terms of Service': "Conditions d'utilisation",
+    'Cookie Policy': 'Politique des cookies',
+    'Made with': 'Fait avec',
+    'in Cameroon': 'au Cameroun',
   };
 }
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../services/auth_provider.dart';
 import '../utils/image_paths.dart';
+import '../widgets/app_footer.dart';
 import '../widgets/asset_image.dart';
 import '../widgets/destination_card.dart';
 import '../widgets/empty_state.dart';
@@ -25,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _api = ApiService();
   List<dynamic> _featured = [];
+  List<String> _favoriteNames = [];
   bool _loading = true;
   String? _error;
   final _pageCtrl = PageController();
@@ -63,9 +66,15 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final data = await _api.getDestinations();
+      final results = await Future.wait([
+        _api.getDestinations(),
+        _api.getFavorites(),
+      ]);
       if (mounted) {
-        setState(() => _featured = data.take(4).toList());
+        setState(() {
+          _featured = results[0].take(4).toList();
+          _favoriteNames = results[1].cast<String>();
+        });
       }
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -75,6 +84,25 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _toggleFavorite(String destinationName) async {
+    try {
+      final updated = await _api.toggleFavorite(destinationName);
+      setState(() => _favoriteNames = updated);
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update favorites')),
+        );
+      }
     }
   }
 
@@ -88,6 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // --- Hero Banner Carousel ---
@@ -134,14 +163,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             'Yaounde.Trip',
                             style: theme.textTheme.headlineLarge?.copyWith(
-                              fontWeight: FontWeight.extrabold,
+                              fontWeight: FontWeight.w800,
                               color: Colors.white,
                               letterSpacing: 0.5,
-                              shadows: [
-                                const Shadow(
-                                  offset: Offset(0, 2),
-                                  blurRadius: 6.0,
-                                  color: Colors.black87,
+                              shadows: const [
+                                Shadow(
+                                  offset: Offset(0, 1),
+                                  blurRadius: 0.0,
+                                  color: Colors.black,
+                                ),
+                                Shadow(
+                                  offset: Offset(1, 0),
+                                  blurRadius: 0.0,
+                                  color: Colors.black,
+                                ),
+                                Shadow(
+                                  offset: Offset(-1, 0),
+                                  blurRadius: 0.0,
+                                  color: Colors.black,
+                                ),
+                                Shadow(
+                                  offset: Offset(0, -1),
+                                  blurRadius: 0.0,
+                                  color: Colors.black,
                                 ),
                               ],
                             ),
@@ -151,11 +195,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             l10n.exploreSubtitle,
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: Colors.white.withValues(alpha: 0.95),
-                              shadows: [
-                                const Shadow(
+                              shadows: const [
+                                Shadow(
                                   offset: Offset(0, 1),
-                                  blurRadius: 4.0,
-                                  color: Colors.black87,
+                                  blurRadius: 0.0,
+                                  color: Colors.black,
+                                ),
+                                Shadow(
+                                  offset: Offset(1, 0),
+                                  blurRadius: 0.0,
+                                  color: Colors.black,
+                                ),
+                                Shadow(
+                                  offset: Offset(-1, 0),
+                                  blurRadius: 0.0,
+                                  color: Colors.black,
+                                ),
+                                Shadow(
+                                  offset: Offset(0, -1),
+                                  blurRadius: 0.0,
+                                  color: Colors.black,
                                 ),
                               ],
                             ),
@@ -302,17 +361,34 @@ class _HomeScreenState extends State<HomeScreen> {
               else
                 ...List.generate(_featured.length, (i) {
                   final d = _featured[i];
+                  final imageIndex = d['image_index'] ?? i;
+                  final name = d['name'] ?? '';
                   return DestinationCard(
-                    imagePath: ImagePaths.destination(i),
-                    name: d['name'] ?? '',
+                    imagePath: ImagePaths.destination(imageIndex),
+                    name: name,
                     country: d['country'] ?? '',
+                    city: d['city'],
                     cost: d['avg_cost_per_day'],
                     tags: d['tags'] ?? [],
                     description: d['description'],
+                    rating: (d['rating'] ?? 0).toDouble(),
+                    bestTimeToVisit: d['best_time_to_visit'],
+                    duration: d['duration'],
+                    location: d['location'],
+                    highlights: d['highlights'],
+                    currency: d['currency'],
+                    isFavorite: _favoriteNames.contains(name),
+                    onFavoriteToggle: () => _toggleFavorite(name),
                   );
                 }),
 
               const SizedBox(height: 32),
+
+              // --- Footer ---
+              AppFooter(
+                onNavigate: widget.onSwitchTab,
+                onLogout: () => AuthProvider().logout(),
+              ),
             ],
           ),
         ),

@@ -38,6 +38,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await AuthProvider().login(_usernameCtrl.text.trim(), _passwordCtrl.text);
+      // If we were navigated to /login as a named route (e.g. after
+      // registration), pop back to the home route where AuthGate will
+      // detect the login and show MainShell.
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
+      // If we can't pop, we're already on the home route — AuthGate
+      // will handle the transition automatically via its listener.
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {

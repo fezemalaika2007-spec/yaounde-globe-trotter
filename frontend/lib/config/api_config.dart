@@ -16,4 +16,5 @@ class ApiConfig {
   static const String destinations = '/destinations';
   static const String recommendations = '/recommendations';
   static const String itineraries = '/itineraries';
+  static const String favorites = '/favorites';
 }

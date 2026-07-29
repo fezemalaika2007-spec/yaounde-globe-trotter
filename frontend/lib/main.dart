@@ -85,24 +85,21 @@ class _YaoundeTripAppState extends State<YaoundeTripApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeProvider().themeMode,
       onGenerateRoute: (settings) {
-        final args = settings.arguments;
+        final args = settings.arguments as void Function(Locale)?;
+        final localeCallback = args ?? _setLocale;
         switch (settings.name) {
           case '/login':
             return MaterialPageRoute(
-              builder: (_) =>
-                  LoginScreen(onLocaleChanged: args as void Function(Locale)),
+              builder: (_) => LoginScreen(onLocaleChanged: localeCallback),
             );
           case '/register':
             return MaterialPageRoute(
-              builder: (_) => RegisterScreen(
-                onLocaleChanged: args as void Function(Locale),
-              ),
+              builder: (_) => RegisterScreen(onLocaleChanged: localeCallback),
             );
           case '/forgot-password':
             return MaterialPageRoute(
-              builder: (_) => ForgotPasswordScreen(
-                onLocaleChanged: args as void Function(Locale),
-              ),
+              builder: (_) =>
+                  ForgotPasswordScreen(onLocaleChanged: localeCallback),
             );
           default:
             return MaterialPageRoute(

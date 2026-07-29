@@ -36,7 +36,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Register a new user and immediately log them in.
+  /// Register a new user account.
+  ///
+  /// After successful registration the user is redirected to the login
+  /// screen so they can log in with their new credentials.
   Future<void> register(
     String username,
     String password,
@@ -47,10 +50,7 @@ class AuthProvider extends ChangeNotifier {
       password: password,
       preferences: preferences,
     );
-    await _api.login(username: username, password: password);
-    _username = username;
-    _isLoggedIn = true;
-    notifyListeners();
+    // Do NOT auto-login — user should log in manually.
   }
 
   /// Log out: clear the stored token.

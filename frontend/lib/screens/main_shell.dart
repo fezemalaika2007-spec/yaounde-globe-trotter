@@ -10,12 +10,13 @@ import 'home_screen.dart';
 import 'profile_screen.dart';
 import 'recommendations_screen.dart';
 import 'itineraries_screen.dart';
+import 'favorites_screen.dart';
 
 /// Main app shell shown after login.
 ///
-/// Uses a bottom navigation bar with 4 tabs: Home, Destinations,
-/// Recommendations, and Itineraries. An overflow menu provides logout
-/// and settings.
+/// Uses a bottom navigation bar with 5 tabs: Home, Destinations,
+/// Recommendations, Favorites, and Itineraries. An overflow menu provides
+/// logout and settings.
 class MainShell extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
   const MainShell({super.key, required this.onLocaleChanged});
@@ -39,6 +40,7 @@ class _MainShellState extends State<MainShell> {
       ),
       _DestinationsTab(onLocaleChanged: widget.onLocaleChanged),
       RecommendationsScreen(onLocaleChanged: widget.onLocaleChanged),
+      FavoritesScreen(onLocaleChanged: widget.onLocaleChanged),
       ItinerariesScreen(onLocaleChanged: widget.onLocaleChanged),
     ];
     AuthProvider().addListener(_onAuthChange);
@@ -70,6 +72,7 @@ class _MainShellState extends State<MainShell> {
       l10n.home,
       l10n.destinations,
       l10n.recommendations,
+      l10n.favorites,
       l10n.itineraries,
     ];
 
@@ -172,6 +175,11 @@ class _MainShellState extends State<MainShell> {
             label: l10n.recommendations,
           ),
           NavigationDestination(
+            icon: const Icon(Icons.favorite_border),
+            selectedIcon: const Icon(Icons.favorite),
+            label: l10n.favorites,
+          ),
+          NavigationDestination(
             icon: const Icon(Icons.map_outlined),
             selectedIcon: const Icon(Icons.map),
             label: l10n.itineraries,
@@ -217,6 +225,7 @@ class _DestinationsTabState extends State<_DestinationsTab> {
   final _costCtrl = TextEditingController();
 
   List<dynamic> _destinations = [];
+  List<String> _favoriteNames = [];
   bool _loading = true;
   String? _error;
 
@@ -245,19 +254,40 @@ class _DestinationsTabState extends State<_DestinationsTab> {
         maxCost = int.tryParse(_costCtrl.text.trim());
       }
 
-      final data = await _api.getDestinations(
-        tag: _tagCtrl.text.trim().isEmpty ? null : _tagCtrl.text.trim(),
-        maxCost: maxCost,
-      );
-      if (mounted) setState(() => _destinations = data);
+      final results = await Future.wait([
+        _api.getDestinations(
+          tag: _tagCtrl.text.trim().isEmpty ? null : _tagCtrl.text.trim(),
+          maxCost: maxCost,
+        ),
+        _api.getFavorites(),
+      ]);
+      _destinations = results[0];
+      _favoriteNames = results[1].cast<String>();
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      _error = e.message;
     } catch (_) {
-      if (mounted) {
-        setState(() => _error = 'Failed to load destinations');
-      }
+      _error = 'Failed to load destinations';
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _toggleFavorite(String destinationName) async {
+    try {
+      final updated = await _api.toggleFavorite(destinationName);
+      setState(() => _favoriteNames = updated);
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update favorites')),
+        );
+      }
     }
   }
 
@@ -343,13 +373,24 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                   padding: const EdgeInsets.only(top: 4, bottom: 16),
                   itemBuilder: (_, i) {
                     final d = _destinations[i];
+                    final imageIndex = d['image_index'] ?? i;
+                    final name = d['name'] ?? '';
                     return DestinationCard(
-                      imagePath: ImagePaths.destination(i),
-                      name: d['name'] ?? '',
+                      imagePath: ImagePaths.destination(imageIndex),
+                      name: name,
                       country: d['country'] ?? '',
+                      city: d['city'],
                       cost: d['avg_cost_per_day'],
                       tags: d['tags'] ?? [],
                       description: d['description'],
+                      rating: (d['rating'] ?? 0).toDouble(),
+                      bestTimeToVisit: d['best_time_to_visit'],
+                      duration: d['duration'],
+                      location: d['location'],
+                      highlights: d['highlights'],
+                      currency: d['currency'],
+                      isFavorite: _favoriteNames.contains(name),
+                      onFavoriteToggle: () => _toggleFavorite(name),
                     );
                   },
                 ),

@@ -22,17 +22,25 @@ class ApiService {
 
   /// Persist the JWT so it survives app restarts.
   Future<void> saveToken(String token) async {
-    await _secureStorage.write(key: _tokenKey, value: token);
+    try {
+      await _secureStorage.write(key: _tokenKey, value: token);
+    } catch (_) {}
   }
 
   /// Retrieve the stored JWT, or `null` if the user is not logged in.
   Future<String?> getToken() async {
-    return await _secureStorage.read(key: _tokenKey);
+    try {
+      return await _secureStorage.read(key: _tokenKey);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Remove the stored JWT (logout).
   Future<void> deleteToken() async {
-    await _secureStorage.delete(key: _tokenKey);
+    try {
+      await _secureStorage.delete(key: _tokenKey);
+    } catch (_) {}
   }
 
   // ---------------------------------------------------------------------------

@@ -2,25 +2,27 @@ import 'package:flutter/material.dart';
 import 'l10n/app_localizations.dart';
 import 'services/auth_provider.dart';
 import 'services/theme_provider.dart';
+import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
+import 'screens/forgot_password_screen.dart';
 import 'screens/main_shell.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Eagerly initialise singletons.
   AuthProvider();
   ThemeProvider();
-  runApp(const GlobeTrotterApp());
+  runApp(const YaoundeTripApp());
 }
 
-class GlobeTrotterApp extends StatefulWidget {
-  const GlobeTrotterApp({super.key});
+class YaoundeTripApp extends StatefulWidget {
+  const YaoundeTripApp({super.key});
 
   @override
-  State<GlobeTrotterApp> createState() => _GlobeTrotterAppState();
+  State<YaoundeTripApp> createState() => _YaoundeTripAppState();
 }
 
-class _GlobeTrotterAppState extends State<GlobeTrotterApp> {
+class _YaoundeTripAppState extends State<YaoundeTripApp> {
   Locale _locale = const Locale('en');
   bool _ready = false;
 
@@ -42,13 +44,22 @@ class _GlobeTrotterAppState extends State<GlobeTrotterApp> {
   }
 
   Future<void> _init() async {
-    final locale = await AppLocalizations.getPersistedLocale();
-    await ThemeProvider().loadTheme();
-    if (mounted) {
-      setState(() {
-        _locale = locale;
-        _ready = true;
-      });
+    try {
+      final locale = await AppLocalizations.getPersistedLocale();
+      await ThemeProvider().loadTheme();
+      if (mounted) {
+        setState(() {
+          _locale = locale;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error during init: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _ready = true;
+        });
+      }
     }
   }
 
@@ -65,26 +76,40 @@ class _GlobeTrotterAppState extends State<GlobeTrotterApp> {
     }
 
     return MaterialApp(
-      title: 'GlobeTrotter',
+      title: 'Yaounde.Trip',
       debugShowCheckedModeBanner: false,
       locale: _locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: ThemeProvider().themeMode,
+      onGenerateRoute: (settings) {
+        final args = settings.arguments;
+        switch (settings.name) {
+          case '/login':
+            return MaterialPageRoute(
+              builder: (_) =>
+                  LoginScreen(onLocaleChanged: args as void Function(Locale)),
+            );
+          case '/register':
+            return MaterialPageRoute(
+              builder: (_) => RegisterScreen(
+                onLocaleChanged: args as void Function(Locale),
+              ),
+            );
+          case '/forgot-password':
+            return MaterialPageRoute(
+              builder: (_) => ForgotPasswordScreen(
+                onLocaleChanged: args as void Function(Locale),
+              ),
+            );
+          default:
+            return MaterialPageRoute(
+              builder: (_) => _AppContents(onLocaleChanged: _setLocale),
+            );
+        }
+      },
       home: _AppContents(onLocaleChanged: _setLocale),
     );
   }
@@ -153,8 +178,13 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _check() async {
-    await AuthProvider().checkAuthStatus();
-    if (mounted) setState(() => _checking = false);
+    try {
+      await AuthProvider().checkAuthStatus();
+    } catch (e) {
+      debugPrint('Error during auth check: $e');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
   }
 
   @override

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../utils/image_paths.dart';
+import '../widgets/destination_card.dart';
+import '../widgets/empty_state.dart';
 
 class RecommendationsScreen extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
@@ -45,16 +48,22 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
 
     return Column(
       children: [
-        // Refresh button row
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: Row(
             children: [
+              Text(
+                l10n.personalizedForYou,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const Spacer(),
-              FilledButton.icon(
+              FilledButton.tonalIcon(
                 onPressed: _fetch,
                 icon: const Icon(Icons.refresh, size: 18),
                 label: Text(l10n.refresh),
@@ -62,7 +71,6 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
             ],
           ),
         ),
-        // Results
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
@@ -71,38 +79,55 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Icon(
+                        Icons.cloud_off,
+                        size: 48,
+                        color: theme.colorScheme.error,
+                      ),
+                      const SizedBox(height: 8),
                       Text(_error!, style: const TextStyle(color: Colors.red)),
                       const SizedBox(height: 8),
-                      TextButton(onPressed: _fetch, child: Text(l10n.refresh)),
+                      TextButton(onPressed: _fetch, child: Text(l10n.tryAgain)),
                     ],
                   ),
                 )
               : _recommendations.isEmpty
-              ? Center(child: Text(l10n.noRecommendations))
+              ? EmptyState(
+                  icon: Icons.star_outline,
+                  title: l10n.noRecommendations,
+                  message: l10n.nothingHere,
+                  onAction: _fetch,
+                  actionLabel: l10n.refresh,
+                )
               : ListView.builder(
                   itemCount: _recommendations.length,
+                  padding: const EdgeInsets.only(top: 4, bottom: 16),
                   itemBuilder: (_, i) {
                     final r = _recommendations[i];
                     final score = r['match_score'] ?? 0;
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: score > 0
-                              ? Colors.green
-                              : Colors.grey,
-                          child: Text('$score'),
+                    return DestinationCard(
+                      imagePath: ImagePaths.recommendation(i),
+                      name: r['name'] ?? '',
+                      country: r['country'] ?? '',
+                      cost: r['avg_cost_per_day'],
+                      tags: r['tags'] ?? [],
+                      description: r['description'],
+                      trailing: Chip(
+                        label: Text(
+                          '$score',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: score > 0
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                          ),
                         ),
-                        title: Text(r['name'] ?? ''),
-                        subtitle: Text(
-                          '${r['country']} · ${r['continent']}\n'
-                          '\$${r['avg_cost_per_day']}/day · '
-                          '${(r['tags'] as List).join(', ')}',
-                        ),
-                        isThreeLine: true,
+                        backgroundColor: score > 0
+                            ? theme.colorScheme.primary
+                            : Colors.grey.shade300,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
                       ),
                     );
                   },

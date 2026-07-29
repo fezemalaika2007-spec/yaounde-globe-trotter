@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Simple in-app translation for English and French.
@@ -31,25 +32,27 @@ class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const _delegates = [AppLocalizationsDelegate()];
-
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
-      _delegates;
+      <LocalizationsDelegate<dynamic>>[
+    AppLocalizationsDelegate(),
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ];
 
   static const supportedLocales = [Locale('en'), Locale('fr')];
 
-  // ---- Translation keys ---------------------------------------------------
-
-  String get appTitle => _t('GlobeTrotter');
+  // App
+  String get appName => _t('Yaounde.Trip');
 
   // Auth
   String get login => _t('Login');
   String get register => _t('Register');
+  String get welcomeBack => _t('Welcome back!');
+  String get createAccount => _t('Create your account');
   String get username => _t('Username');
   String get password => _t('Password');
   String get confirmPassword => _t('Confirm password');
-  String get welcomeBack => _t('Welcome back!');
-  String get createAccount => _t('Create your account');
   String get enterUsername => _t('Enter username');
   String get enterPassword => _t('Enter password');
   String get confirmYourPassword => _t('Confirm your password');
@@ -61,12 +64,39 @@ class AppLocalizations {
   String get noAccount => _t("Don't have an account? Register");
   String get loginFailed => _t('Connection failed. Is the server running?');
   String get invalidCredentials => _t('Invalid credentials');
+  String get forgotPassword => _t('Forgot Password');
+  String get forgotPasswordSubtitle => _t(
+    "Enter your username or email address and we'll send you a reset link.",
+  );
+  String get usernameOrEmail => _t('Username or Email');
+  String get enterUsernameOrEmail => _t('Enter your username or email');
+  String get resetPassword => _t('Reset Password');
+  String get resetLinkSent => _t('Reset link sent');
+  String get resetLinkSentMessage => _t(
+    'If an account exists with that email, you will receive a password reset link shortly.',
+  );
+  String get resetUINotice => _t(
+    'This is a UI-only flow. The backend reset endpoint is not connected.',
+  );
+  String get backToLogin => _t('Back to Login');
+  String get orContinueAsGuest => _t('Or continue as guest');
 
   // Navigation
+  String get home => _t('Home');
   String get destinations => _t('Destinations');
   String get recommendations => _t('Recommendations');
   String get itineraries => _t('Itineraries');
   String get logout => _t('Logout');
+  String get profile => _t('Profile');
+
+  // Home
+  String get welcomeToYaounde => _t('Welcome to Yaoundé');
+  String get exploreSubtitle => _t(
+    'Discover the best places to visit, eat, and explore in Cameroon\'s vibrant capital.',
+  );
+  String get featuredDestinations => _t('Featured Destinations');
+  String get startExploring => _t('Start Exploring');
+  String get viewAll => _t('View All');
 
   // Destinations
   String get search => _t('Search');
@@ -74,11 +104,16 @@ class AppLocalizations {
   String get maxCost => _t('Max cost');
   String get noDestinations => _t('No destinations found');
   String get avgCostPerDay => _t('Avg. cost / day');
+  String get filterByTag => _t('Filter by tag');
+  String get allTags => _t('All');
+  String get viewDetails => _t('View Details');
+  String get perDay => _t('/day');
 
   // Recommendations
   String get refresh => _t('Refresh');
   String get noRecommendations => _t('No recommendations available');
   String get matchScore => _t('Match score');
+  String get personalizedForYou => _t('Personalized for you');
 
   // Itineraries
   String get createItinerary => _t('Create Itinerary');
@@ -89,17 +124,33 @@ class AppLocalizations {
   String get notes => _t('Notes');
   String get cancel => _t('Cancel');
   String get save => _t('Save');
+  String get required => _t('Required');
   String get noItineraries => _t('No itineraries yet');
   String get enterTitle => _t('Enter a title');
   String get enterDestinations => _t('Enter at least one destination');
+  String get newItinerary => _t('New Itinerary');
+  String get create => _t('Create');
 
   // Settings
+  String get settings => _t('Settings');
   String get appearance => _t('Appearance');
   String get language => _t('Language');
   String get darkMode => _t('Dark mode');
   String get lightMode => _t('Light mode');
   String get english => _t('English');
   String get french => _t('French');
+  String get loggedInAs => _t('Logged in as');
+
+  // Additional strings
+  String get yourItineraries => _t('Your itineraries');
+  String get createFirstItinerary =>
+      _t("Create your first itinerary to start planning your trip.");
+
+  // Empty states
+  String get nothingHere => _t('Nothing here yet');
+  String get tryAgain => _t('Try again');
+
+  String get failedToLoad => _t('Failed to load data');
 
   // ---- Lookup helper -----------------------------------------------------
 
@@ -113,15 +164,17 @@ class AppLocalizations {
   static const _englishTranslations = <String, String>{};
 
   static const _frenchTranslations = <String, String>{
+    // App
+    'Yaounde.Trip': 'Yaounde.Trip',
+
     // Auth
-    'GlobeTrotter': 'GlobeTrotter',
     'Login': 'Connexion',
     'Register': "S'inscrire",
+    'Welcome back!': 'Bon retour !',
+    'Create your account': 'Créez votre compte',
     'Username': "Nom d'utilisateur",
     'Password': 'Mot de passe',
     'Confirm password': 'Confirmer le mot de passe',
-    'Welcome back!': 'Bon retour !',
-    'Create your account': 'Créez votre compte',
     'Enter username': "Entrez votre nom d'utilisateur",
     'Enter password': 'Entrez votre mot de passe',
     'Confirm your password': 'Confirmez votre mot de passe',
@@ -134,12 +187,35 @@ class AppLocalizations {
     'Connection failed. Is the server running?':
         'Échec de connexion. Le serveur est-il en cours d\'exécution ?',
     'Invalid credentials': 'Identifiants invalides',
+    'Forgot Password': 'Mot de passe oublié',
+    "Enter your username or email address and we'll send you a reset link.":
+        'Entrez votre nom d\'utilisateur ou votre email et nous vous enverrons un lien de réinitialisation.',
+    'Username or Email': "Nom d'utilisateur ou Email",
+    'Enter your username or email': 'Entrez votre nom d\'utilisateur ou email',
+    'Reset Password': 'Réinitialiser le mot de passe',
+    'Reset link sent': 'Lien de réinitialisation envoyé',
+    'If an account exists with that email, you will receive a password reset link shortly.':
+        'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation sous peu.',
+    'This is a UI-only flow. The backend reset endpoint is not connected.':
+        'Ceci est un flux UI uniquement. Le point de terminaison de réinitialisation du backend n\'est pas connecté.',
+    'Back to Login': 'Retour à la connexion',
+    'Or continue as guest': 'Ou continuer en tant qu\'invité',
 
     // Navigation
+    'Home': 'Accueil',
     'Destinations': 'Destinations',
     'Recommendations': 'Recommandations',
     'Itineraries': 'Itinéraires',
     'Logout': 'Déconnexion',
+    'Profile': 'Profil',
+
+    // Home
+    'Welcome to Yaoundé': 'Bienvenue à Yaoundé',
+    'Discover the best places to visit, eat, and explore in Cameroon\'s vibrant capital.':
+        'Découvrez les meilleurs endroits à visiter, manger et explorer dans la vibrante capitale du Cameroun.',
+    'Featured Destinations': 'Destinations en vedette',
+    'Start Exploring': 'Commencer à explorer',
+    'View All': 'Voir tout',
 
     // Destinations
     'Search': 'Rechercher',
@@ -147,11 +223,16 @@ class AppLocalizations {
     'Max cost': 'Coût max',
     'No destinations found': 'Aucune destination trouvée',
     'Avg. cost / day': 'Coût moyen / jour',
+    'Filter by tag': 'Filtrer par tag',
+    'All': 'Tous',
+    'View Details': 'Voir les détails',
+    '/day': '/jour',
 
     // Recommendations
     'Refresh': 'Actualiser',
     'No recommendations available': 'Aucune recommandation disponible',
     'Match score': 'Score de correspondance',
+    'Personalized for you': 'Personnalisé pour vous',
 
     // Itineraries
     'Create Itinerary': 'Créer un itinéraire',
@@ -163,17 +244,30 @@ class AppLocalizations {
     'Notes': 'Notes',
     'Cancel': 'Annuler',
     'Save': 'Enregistrer',
+    'Required': 'Requis',
     'No itineraries yet': 'Aucun itinéraire pour le moment',
     'Enter a title': 'Entrez un titre',
     'Enter at least one destination': 'Entrez au moins une destination',
+    'New Itinerary': 'Nouvel itinéraire',
+    'Create': 'Créer',
 
     // Settings
+    'Settings': 'Paramètres',
     'Appearance': 'Apparence',
     'Language': 'Langue',
     'Dark mode': 'Mode sombre',
     'Light mode': 'Mode clair',
     'English': 'Anglais',
     'French': 'Français',
+    'Logged in as': 'Connecté en tant que',
+
+    // Empty states
+    'Nothing here yet': 'Rien ici pour le moment',
+    'Try again': 'Réessayer',
+
+    // Error
+    'An unexpected error occurred': 'Une erreur inattendue s\'est produite',
+    'Failed to load data': 'Échec du chargement des données',
   };
 }
 

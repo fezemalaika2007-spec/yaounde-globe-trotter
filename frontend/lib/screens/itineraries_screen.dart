@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../widgets/empty_state.dart';
 
 class ItinerariesScreen extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
@@ -50,6 +51,7 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
 
     return Stack(
       children: [
@@ -59,8 +61,14 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Row(
                 children: [
+                  Text(
+                    l10n.yourItineraries,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const Spacer(),
-                  FilledButton.icon(
+                  FilledButton.tonalIcon(
                     onPressed: _fetch,
                     icon: const Icon(Icons.refresh, size: 18),
                     label: Text(l10n.refresh),
@@ -76,6 +84,12 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          Icon(
+                            Icons.cloud_off,
+                            size: 48,
+                            color: theme.colorScheme.error,
+                          ),
+                          const SizedBox(height: 8),
                           Text(
                             _error!,
                             style: const TextStyle(color: Colors.red),
@@ -83,31 +97,105 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
                           const SizedBox(height: 8),
                           TextButton(
                             onPressed: _fetch,
-                            child: Text(l10n.refresh),
+                            child: Text(l10n.tryAgain),
                           ),
                         ],
                       ),
                     )
                   : _itineraries.isEmpty
-                  ? Center(child: Text(l10n.noItineraries))
+                  ? EmptyState(
+                      icon: Icons.map_outlined,
+                      title: l10n.noItineraries,
+                      message: l10n.createFirstItinerary,
+                      onAction: _openCreateForm,
+                      actionLabel: l10n.createItinerary,
+                    )
                   : ListView.builder(
                       itemCount: _itineraries.length,
+                      padding: const EdgeInsets.only(top: 4, bottom: 88),
                       itemBuilder: (_, i) {
                         final it = _itineraries[i];
                         return Card(
                           margin: const EdgeInsets.symmetric(
                             horizontal: 12,
-                            vertical: 4,
+                            vertical: 6,
                           ),
-                          child: ListTile(
-                            leading: const Icon(Icons.map, color: Colors.blue),
-                            title: Text(it['title'] ?? ''),
-                            subtitle: Text(
-                              '${(it['destinations'] as List).join(', ')}\n'
-                              '${it['start_date']} \u2192 ${it['end_date']}\n'
-                              '${it['notes'] ?? ''}',
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.map,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        it['title'] ?? '',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      size: 16,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${it['start_date']} \u2192 ${it['end_date']}',
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: (it['destinations'] as List)
+                                      .map(
+                                        (d) => Chip(
+                                          label: Text(
+                                            '$d',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          visualDensity: VisualDensity.compact,
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                          padding: EdgeInsets.zero,
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                                if ((it['notes'] ?? '').isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    it['notes'],
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
-                            isThreeLine: true,
                           ),
                         );
                       },
@@ -129,7 +217,7 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Create Itinerary Dialog
+// Create Itinerary Dialog with Date Pickers
 // ---------------------------------------------------------------------------
 
 class _CreateItineraryDialog extends StatefulWidget {
@@ -160,21 +248,31 @@ class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
     super.dispose();
   }
 
+  Future<void> _pickDate(TextEditingController ctrl) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+    );
+    if (date != null) {
+      ctrl.text =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() {
       _submitting = true;
       _error = null;
     });
-
     try {
       final destinations = _destinationsCtrl.text
           .split(',')
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
           .toList();
-
       await ApiService().createItinerary(
         title: _titleCtrl.text.trim(),
         destinations: destinations,
@@ -195,8 +293,11 @@ class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
     return AlertDialog(
-      title: const Text('New Itinerary'),
+      title: Text(l10n.newItinerary),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -205,56 +306,96 @@ class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
             children: [
               TextFormField(
                 controller: _titleCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.title,
+                  prefixIcon: const Icon(Icons.title),
                 ),
                 validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Required' : null,
+                    v == null || v.trim().isEmpty ? l10n.enterTitle : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _destinationsCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Destinations (comma-separated)',
-                  hintText: 'Bali, Santorini',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.destinationsList,
+                  hintText: 'Mont Fébé, Mvog-Betsi',
+                  prefixIcon: const Icon(Icons.place_outlined),
                 ),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? l10n.enterDestinations
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _startCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Start date (YYYY-MM-DD)',
-                  border: OutlineInputBorder(),
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: l10n.startDate,
+                  prefixIcon: const Icon(Icons.calendar_today),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.date_range),
+                    onPressed: () => _pickDate(_startCtrl),
+                  ),
                 ),
+                onTap: () => _pickDate(_startCtrl),
                 validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Required' : null,
+                    v == null || v.trim().isEmpty ? l10n.required : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _endCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'End date (YYYY-MM-DD)',
-                  border: OutlineInputBorder(),
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: l10n.endDate,
+                  prefixIcon: const Icon(Icons.calendar_today),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.date_range),
+                    onPressed: () => _pickDate(_endCtrl),
+                  ),
                 ),
+                onTap: () => _pickDate(_endCtrl),
                 validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Required' : null,
+                    v == null || v.trim().isEmpty ? l10n.required : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _notesCtrl,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.notes,
+                  prefixIcon: const Icon(Icons.notes),
                 ),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 8),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 20,
+                        color: theme.colorScheme.onErrorContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                            color: theme.colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ],
           ),
@@ -263,9 +404,9 @@ class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
-        ElevatedButton(
+        FilledButton(
           onPressed: _submitting ? null : _submit,
           child: _submitting
               ? const SizedBox(
@@ -273,7 +414,7 @@ class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Create'),
+              : Text(l10n.create),
         ),
       ],
     );

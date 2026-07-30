@@ -23,7 +23,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _api = ApiService();
   List<dynamic> _featuredDestinations = [];
-  bool _loading = true;
 
   @override
   void initState() {
@@ -39,11 +38,10 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           // Take first 3-4 destinations to feature on home
           _featuredDestinations = destinations.take(4).toList();
-          _loading = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      // Silently handle — home will just show no featured destinations
     }
   }
 
@@ -287,21 +285,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: 'Discover Destinations',
                       description:
                           'Browse Yaoundé\'s top attractions — from Mont Fébé to Mefou National Park — with photos, ratings, costs, and tags.',
-                      tabIndex: 1,
+                      onTap: () => widget.onSwitchTab?.call(1),
                     ),
                     _FeatureCard(
                       icon: Icons.star,
                       title: 'Get Personalized Recommendations',
                       description:
                           'Let our smart matching engine suggest destinations based on your interests and preferences.',
-                      tabIndex: 2,
+                      onTap: () => widget.onSwitchTab?.call(2),
                     ),
                     _FeatureCard(
                       icon: Icons.map,
                       title: 'Plan & Manage Itineraries',
                       description:
                           'Create custom trip itineraries, add destinations, set dates, and keep all your travel plans in one place.',
-                      tabIndex: 4,
+                      onTap: () => widget.onSwitchTab?.call(4),
                     ),
                   ],
                 ),
@@ -353,13 +351,13 @@ class _FeatureCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String description;
-  final int tabIndex;
+  final VoidCallback? onTap;
 
   const _FeatureCard({
     required this.icon,
     required this.title,
     required this.description,
-    required this.tabIndex,
+    this.onTap,
   });
 
   @override
@@ -368,7 +366,7 @@ class _FeatureCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),

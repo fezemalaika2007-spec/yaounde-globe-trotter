@@ -21,6 +21,4 @@ def create_app():
     app.register_blueprint(gateway_bp)
 
     return app
-</｜DSML｜parameter>
-</｜DSML｜invoke>
-</｜DSML｜tool_calls>
+

@@ -4,6 +4,7 @@ api-gateway/app/routes.py
 Proxy routes — forwards each request to the correct backend microservice.
 Contains no business logic, only routing/forwarding.
 """
+
 import os
 import requests
 from flask import Blueprint, request, jsonify, Response
@@ -11,9 +12,9 @@ from flask import Blueprint, request, jsonify, Response
 gateway_bp = Blueprint("gateway", __name__)
 
 # Service URLs from environment variables (set in docker-compose.yml)
-USER_SERVICE_URL = os.environ.get("USER_SERVICE_URL", "http://localhost:5001")
-ITINERARY_SERVICE_URL = os.environ.get("ITINERARY_SERVICE_URL", "http://localhost:5002")
-RECOMMENDATION_SERVICE_URL = os.environ.get("RECOMMENDATION_SERVICE_URL", "http://localhost:5003")
+USER_SERVICE_URL = os.environ.get("USER_SERVICE_URL", "http://user-service:5001")
+ITINERARY_SERVICE_URL = os.environ.get("ITINERARY_SERVICE_URL", "http://itinerary-service:5002")
+RECOMMENDATION_SERVICE_URL = os.environ.get("RECOMMENDATION_SERVICE_URL", "http://recommendation-service:5003")
 
 
 def _proxy(method: str, target_url: str) -> Response:
@@ -48,6 +49,33 @@ def _proxy(method: str, target_url: str) -> Response:
         return jsonify({"error": "service unavailable"}), 503
     except requests.exceptions.Timeout:
         return jsonify({"error": "service timeout"}), 504
+
+
+# ---------------------------------------------------------------------------
+# Health check
+# ---------------------------------------------------------------------------
+
+@gateway_bp.route("/health", methods=["GET"])
+def health():
+    """Check all backend services are reachable."""
+    services = {
+        "user-service": USER_SERVICE_URL,
+        "itinerary-service": ITINERARY_SERVICE_URL,
+        "recommendation-service": RECOMMENDATION_SERVICE_URL,
+    }
+    statuses = {}
+    all_ok = True
+    for name, url in services.items():
+        try:
+            r = requests.get(url, timeout=5)
+            statuses[name] = "ok" if r.ok else f"error {r.status_code}"
+            if not r.ok:
+                all_ok = False
+        except requests.exceptions.RequestException as e:
+            statuses[name] = f"unreachable: {str(e)}"
+            all_ok = False
+    overall = "ok" if all_ok else "degraded"
+    return jsonify({"status": overall, "services": statuses}), 200 if all_ok else 503
 
 
 # ---------------------------------------------------------------------------

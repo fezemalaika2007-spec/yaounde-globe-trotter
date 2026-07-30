@@ -58,44 +58,32 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Hero Banner (gradient only, no static image) ---
-              Container(
+              // --- Hero Banner (background image + gradient overlay) ---
+              SizedBox(
                 width: double.infinity,
                 height: 280,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.9),
-                      Theme.of(
-                        context,
-                      ).colorScheme.secondary.withValues(alpha: 0.6),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Decorative pattern
-                    Positioned(
-                      right: -40,
-                      top: -40,
-                      child: Icon(
-                        Icons.travel_explore,
-                        size: 200,
-                        color: Colors.white.withValues(alpha: 0.1),
-                      ),
+                    // Background image — upload your image to
+                    // assets/images/home/hero_1.jpg
+                    Image.asset(
+                      'assets/images/home/hero_1.jpg',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
-                    Positioned(
-                      left: -20,
-                      bottom: -20,
-                      child: Icon(
-                        Icons.map,
-                        size: 150,
-                        color: Colors.white.withValues(alpha: 0.08),
+                    // Gradient overlay for readability
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withValues(alpha: 0.7),
+                            Colors.black.withValues(alpha: 0.3),
+                            Colors.black.withValues(alpha: 0.5),
+                          ],
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                        ),
                       ),
                     ),
                     // Text overlay
@@ -112,6 +100,13 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                               letterSpacing: 0.5,
+                              shadows: const [
+                                Shadow(
+                                  offset: Offset(0, 1),
+                                  blurRadius: 2,
+                                  color: Colors.black,
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -119,6 +114,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             l10n.exploreSubtitle,
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: Colors.white.withValues(alpha: 0.95),
+                              shadows: const [
+                                Shadow(
+                                  offset: Offset(0, 1),
+                                  blurRadius: 2,
+                                  color: Colors.black,
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 16),

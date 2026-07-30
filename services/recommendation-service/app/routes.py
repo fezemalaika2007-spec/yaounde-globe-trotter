@@ -7,14 +7,14 @@ Routes:
   POST /sync-destinations             — Trigger Overpass sync (admin)
 """
 import json
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 
 from app.auth_middleware import token_required
 from app.models import (
     get_all_destinations, get_destination_by_id,
     upsert_rating, get_user_rating
 )
-from app.overpass_sync import sync_destinations
+from app.overpass_sync import sync_destinations as _sync_destinations
 
 recommendation_bp = Blueprint("recommendation", __name__)
 
@@ -127,15 +127,7 @@ def get_recommendations():
 
     Requires: Authorization: Bearer <token>
     """
-    # This is wired up structurally for future use.
-    # For now, returns empty result as specified.
     username = g.current_user
-
-    # In the future, this will:
-    # 1. Call user-service internal endpoint for user preferences
-    # 2. Call itinerary-service internal endpoint for past itineraries
-    # 3. Score destinations based on preferences + history
-    # 4. Return top matches
 
     return jsonify({
         "recommendations": [],
@@ -147,7 +139,7 @@ def get_recommendations():
 def trigger_sync():
     """Manually trigger an Overpass sync to refresh destination data."""
     try:
-        count = sync_destinations()
+        count = _sync_destinations(app=current_app._get_current_object())
         return jsonify({"message": f"Synchronized {count} destinations from Overpass"}), 200
     except Exception as e:
         return jsonify({"error": f"Sync failed: {str(e)}"}), 500

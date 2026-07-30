@@ -34,9 +34,8 @@ def create_itinerary_route():
     Returns 201 with the created itinerary.
     """
     username = g.current_user
-    user_id = request.get_json(silent=True) or {}
-
     data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id", username)
     title = data.get("title", "").strip() if data.get("title") else ""
     destinations = data.get("destinations")
     start_date = data.get("start_date")
@@ -54,7 +53,7 @@ def create_itinerary_route():
 
     itinerary = create_itinerary(
         username=username,
-        user_id=user_id.get("user_id", username),
+        user_id=user_id,
         title=title,
         destinations=destinations,
         start_date=start_date.strip(),
@@ -91,4 +90,3 @@ def internal_get_user_itineraries(user_id):
             except (json.JSONDecodeError, TypeError):
                 it["destinations"] = []
     return jsonify(itineraries), 200
-

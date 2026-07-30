@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
-import '../utils/image_paths.dart';
-import '../widgets/asset_image.dart';
 import '../widgets/empty_state.dart';
 
 class ItinerariesScreen extends StatefulWidget {
@@ -117,121 +115,90 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
                       padding: const EdgeInsets.only(top: 4, bottom: 88),
                       itemBuilder: (_, i) {
                         final it = _itineraries[i];
-                        // Use a small representative image based on index
-                        final imageIndex = i % 6;
                         return Card(
                           margin: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 6,
                           ),
                           clipBehavior: Clip.antiAlias,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Small representative image
-                              SizedBox(
-                                width: 100,
-                                height: 140,
-                                child: FittedBox(
-                                  fit: BoxFit.cover,
-                                  child: AssetImageWidget(
-                                    path: ImagePaths.destination(imageIndex),
-                                    fit: BoxFit.cover,
-                                    fallbackIcon: Icons.map_outlined,
-                                  ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.map,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        it['title'] ?? '',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              // Content
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.map,
-                                            color: theme.colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              it['title'] ?? '',
-                                              style: theme.textTheme.titleMedium
-                                                  ?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      size: 16,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        '${it['start_date']} \u2192 ${it['end_date']}',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: (it['destinations'] as List)
+                                      .map(
+                                        (d) => Chip(
+                                          label: Text(
+                                            '$d',
+                                            style: const TextStyle(
+                                              fontSize: 12,
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.calendar_today,
-                                            size: 16,
-                                            color: theme
-                                                .colorScheme
-                                                .onSurfaceVariant,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              '${it['start_date']} \u2192 ${it['end_date']}',
-                                              style: theme.textTheme.bodySmall
-                                                  ?.copyWith(
-                                                    color: theme
-                                                        .colorScheme
-                                                        .onSurfaceVariant,
-                                                  ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 4,
-                                        children: (it['destinations'] as List)
-                                            .map(
-                                              (d) => Chip(
-                                                label: Text(
-                                                  '$d',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                                visualDensity:
-                                                    VisualDensity.compact,
-                                                materialTapTargetSize:
-                                                    MaterialTapTargetSize
-                                                        .shrinkWrap,
-                                                padding: EdgeInsets.zero,
-                                              ),
-                                            )
-                                            .toList(),
-                                      ),
-                                      if ((it['notes'] ?? '').isNotEmpty) ...[
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          it['notes'],
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                                color: theme
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
-                                                fontStyle: FontStyle.italic,
-                                              ),
+                                          visualDensity: VisualDensity.compact,
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                          padding: EdgeInsets.zero,
                                         ),
-                                      ],
-                                    ],
-                                  ),
+                                      )
+                                      .toList(),
                                 ),
-                              ),
-                            ],
+                                if ((it['notes'] ?? '').isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    it['notes'],
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         );
                       },

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
-import '../utils/image_paths.dart';
 import '../widgets/destination_card.dart';
 import '../widgets/empty_state.dart';
 
@@ -33,7 +32,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     });
 
     try {
-      // Fetch all destinations and favorites in parallel
       final results = await Future.wait([
         _api.getDestinations(),
         _api.getFavorites(),
@@ -73,7 +71,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    // Filter destinations to only show favorites
     final favoriteDestinations = _allDestinations
         .where((d) => _favoriteNames.contains(d['name']))
         .toList();
@@ -132,23 +129,21 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   padding: const EdgeInsets.only(top: 4, bottom: 16),
                   itemBuilder: (_, i) {
                     final d = favoriteDestinations[i];
-                    final imageIndex = d['image_index'] ?? i;
+                    final name = d['name'] ?? '';
+                    final imageUrl = d['image'] ?? '';
+                    final cost = d['cost'];
+                    final avgRating = (d['average_rating'] ?? 0).toDouble();
                     return DestinationCard(
-                      imagePath: ImagePaths.destination(imageIndex),
-                      name: d['name'] ?? '',
-                      country: d['country'] ?? '',
-                      city: d['city'],
-                      cost: d['avg_cost_per_day'],
+                      imagePath: imageUrl,
+                      name: name,
+                      country: d['area'] ?? 'Yaoundé',
+                      city: null,
+                      cost: cost,
                       tags: d['tags'] ?? [],
                       description: d['description'],
-                      rating: (d['rating'] ?? 0).toDouble(),
-                      bestTimeToVisit: d['best_time_to_visit'],
-                      duration: d['duration'],
-                      location: d['location'],
-                      highlights: d['highlights'],
-                      currency: d['currency'],
+                      rating: avgRating,
                       isFavorite: true,
-                      onFavoriteToggle: () => _toggleFavorite(d['name'] ?? ''),
+                      onFavoriteToggle: () => _toggleFavorite(name),
                     );
                   },
                 ),

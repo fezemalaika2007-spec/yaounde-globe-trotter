@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
+import '../services/api_service.dart';
 import '../services/auth_provider.dart';
-import '../utils/image_paths.dart';
 import '../widgets/app_footer.dart';
-import '../widgets/asset_image.dart';
 
 /// Callback type for requesting a tab switch from within a child widget.
 typedef OnSwitchTab = void Function(int index);
@@ -22,6 +21,32 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final _api = ApiService();
+  List<dynamic> _featuredDestinations = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeatured();
+  }
+
+  Future<void> _loadFeatured() async {
+    try {
+      // Pull a few real destinations from the API for the home screen
+      final destinations = await _api.getDestinations();
+      if (mounted) {
+        setState(() {
+          // Take first 3-4 destinations to feature on home
+          _featuredDestinations = destinations.take(4).toList();
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -35,32 +60,44 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Hero Banner ---
-              SizedBox(
+              // --- Hero Banner (gradient only, no static image) ---
+              Container(
                 width: double.infinity,
                 height: 280,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.9),
+                      Theme.of(
+                        context,
+                      ).colorScheme.secondary.withValues(alpha: 0.6),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    AssetImageWidget(
-                      path: ImagePaths.homeHero(0),
-                      width: double.infinity,
-                      height: 280,
-                      fit: BoxFit.cover,
-                      fallbackIcon: Icons.landscape,
+                    // Decorative pattern
+                    Positioned(
+                      right: -40,
+                      top: -40,
+                      child: Icon(
+                        Icons.travel_explore,
+                        size: 200,
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
                     ),
-                    // Gradient overlay
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.black.withValues(alpha: 0.75),
-                            Colors.black.withValues(alpha: 0.15),
-                            Colors.black.withValues(alpha: 0.4),
-                          ],
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                        ),
+                    Positioned(
+                      left: -20,
+                      bottom: -20,
+                      child: Icon(
+                        Icons.map,
+                        size: 150,
+                        color: Colors.white.withValues(alpha: 0.08),
                       ),
                     ),
                     // Text overlay
@@ -77,28 +114,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                               letterSpacing: 0.5,
-                              shadows: const [
-                                Shadow(
-                                  offset: Offset(0, 1),
-                                  blurRadius: 0.0,
-                                  color: Colors.black,
-                                ),
-                                Shadow(
-                                  offset: Offset(1, 0),
-                                  blurRadius: 0.0,
-                                  color: Colors.black,
-                                ),
-                                Shadow(
-                                  offset: Offset(-1, 0),
-                                  blurRadius: 0.0,
-                                  color: Colors.black,
-                                ),
-                                Shadow(
-                                  offset: Offset(0, -1),
-                                  blurRadius: 0.0,
-                                  color: Colors.black,
-                                ),
-                              ],
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -106,28 +121,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             l10n.exploreSubtitle,
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: Colors.white.withValues(alpha: 0.95),
-                              shadows: const [
-                                Shadow(
-                                  offset: Offset(0, 1),
-                                  blurRadius: 0.0,
-                                  color: Colors.black,
-                                ),
-                                Shadow(
-                                  offset: Offset(1, 0),
-                                  blurRadius: 0.0,
-                                  color: Colors.black,
-                                ),
-                                Shadow(
-                                  offset: Offset(-1, 0),
-                                  blurRadius: 0.0,
-                                  color: Colors.black,
-                                ),
-                                Shadow(
-                                  offset: Offset(0, -1),
-                                  blurRadius: 0.0,
-                                  color: Colors.black,
-                                ),
-                              ],
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -174,6 +167,107 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
+              // --- Featured Destinations (from API) ---
+              if (_featuredDestinations.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                  child: Text(
+                    'Featured Destinations',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 240,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    itemCount: _featuredDestinations.length,
+                    itemBuilder: (_, i) {
+                      final d = _featuredDestinations[i];
+                      return SizedBox(
+                        width: 280,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Card(
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  height: 140,
+                                  width: double.infinity,
+                                  child:
+                                      d['image'] != null &&
+                                          d['image'].toString().isNotEmpty
+                                      ? Image.network(
+                                          d['image'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              Container(
+                                                color: theme
+                                                    .colorScheme
+                                                    .primaryContainer,
+                                                child: const Icon(
+                                                  Icons.place,
+                                                  size: 48,
+                                                ),
+                                              ),
+                                        )
+                                      : Container(
+                                          color: theme
+                                              .colorScheme
+                                              .primaryContainer,
+                                          child: const Icon(
+                                            Icons.place,
+                                            size: 48,
+                                          ),
+                                        ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        d['name'] ?? '',
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.star,
+                                            size: 16,
+                                            color: Colors.amber,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${(d['average_rating'] ?? 0).toStringAsFixed(1)}',
+                                            style: theme.textTheme.bodySmall,
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+
               // --- Feature Cards (What you can do) ---
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
@@ -186,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: const Column(
+                child: Column(
                   children: [
                     _FeatureCard(
                       icon: Icons.explore,
@@ -209,52 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           'Create custom trip itineraries, add destinations, set dates, and keep all your travel plans in one place.',
                       tabIndex: 4,
                     ),
-                    _FeatureCard(
-                      icon: Icons.favorite,
-                      title: 'Save Your Favorites',
-                      description:
-                          'Bookmark destinations you love and find them quickly in your favorites list.',
-                      tabIndex: 3,
-                    ),
                   ],
-                ),
-              ),
-
-              // --- Supporting Images (just a few, not a full gallery) ---
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
-                child: Text(
-                  l10n.homeGlimpseYaounde,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SizedBox(
-                  height: 180,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _SupportingImage(
-                        path: ImagePaths.homeHero(1),
-                        label: 'Yaoundé Cityscape',
-                      ),
-                      _SupportingImage(
-                        path: ImagePaths.homeHero(2),
-                        label: 'Local Culture',
-                      ),
-                      _SupportingImage(
-                        path: ImagePaths.homeHero(3),
-                        label: 'Nature & Wildlife',
-                      ),
-                      _SupportingImage(
-                        path: ImagePaths.homeHero(4),
-                        label: 'Historic Landmarks',
-                      ),
-                    ],
-                  ),
                 ),
               ),
 
@@ -274,11 +323,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       onPressed: () => widget.onSwitchTab?.call(2),
                       icon: const Icon(Icons.star_outline),
                       label: Text(l10n.recommendations),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () => widget.onSwitchTab?.call(3),
-                      icon: const Icon(Icons.favorite_border),
-                      label: Text(l10n.favorites),
                     ),
                     ElevatedButton.icon(
                       onPressed: () => widget.onSwitchTab?.call(4),
@@ -324,10 +368,7 @@ class _FeatureCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () {
-          // Navigate to the relevant tab
-          // We use a callback pattern via the widget tree
-        },
+        onTap: () {},
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -370,66 +411,6 @@ class _FeatureCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A small supporting image with a label overlay.
-class _SupportingImage extends StatelessWidget {
-  final String path;
-  final String label;
-
-  const _SupportingImage({required this.path, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 240,
-      margin: const EdgeInsets.only(right: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            AssetImageWidget(
-              path: path,
-              fit: BoxFit.cover,
-              fallbackIcon: Icons.landscape,
-            ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.6),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-            ),
-            Positioned(
-              left: 12,
-              bottom: 12,
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  shadows: [
-                    Shadow(
-                      offset: Offset(0, 1),
-                      blurRadius: 0.0,
-                      color: Colors.black,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

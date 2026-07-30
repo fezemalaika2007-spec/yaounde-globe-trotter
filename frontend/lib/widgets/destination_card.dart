@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'asset_image.dart';
 
 class DestinationCard extends StatefulWidget {
   final String imagePath;
@@ -14,6 +13,8 @@ class DestinationCard extends StatefulWidget {
   final VoidCallback? onTap;
   final String? city;
   final double? rating;
+  final double? averageRating;
+  final int? ratingCount;
   final String? bestTimeToVisit;
   final String? duration;
   final String? location;
@@ -36,6 +37,8 @@ class DestinationCard extends StatefulWidget {
     this.onTap,
     this.city,
     this.rating,
+    this.averageRating,
+    this.ratingCount,
     this.bestTimeToVisit,
     this.duration,
     this.location,
@@ -52,9 +55,11 @@ class DestinationCard extends StatefulWidget {
 class _DestinationCardState extends State<DestinationCard> {
   void _showDetailsSheet(BuildContext context) {
     final theme = Theme.of(context);
-    final l10nCost = widget.cost != null
-        ? '\$${widget.cost}/${widget.currency ?? 'USD'}/day'
-        : null;
+    // Format cost in XAF/FCFA
+    String? costFormatted;
+    if (widget.cost != null) {
+      costFormatted = '${widget.cost!.toStringAsFixed(0)} FCFA';
+    }
 
     showModalBottomSheet(
       context: context,
@@ -72,6 +77,7 @@ class _DestinationCardState extends State<DestinationCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Image section
               Stack(
                 children: [
                   ClipRRect(
@@ -81,14 +87,7 @@ class _DestinationCardState extends State<DestinationCard> {
                     child: SizedBox(
                       width: double.infinity,
                       height: 200,
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        child: AssetImageWidget(
-                          path: widget.imagePath,
-                          fit: BoxFit.cover,
-                          fallbackIcon: Icons.place_outlined,
-                        ),
-                      ),
+                      child: _buildImage(),
                     ),
                   ),
                   Positioned(
@@ -103,25 +102,6 @@ class _DestinationCardState extends State<DestinationCard> {
                       ),
                     ),
                   ),
-                  if (widget.onFavoriteToggle != null)
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: IconButton.filled(
-                        icon: Icon(
-                          widget.isFavorite
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                        ),
-                        onPressed: () => widget.onFavoriteToggle!(),
-                        style: IconButton.styleFrom(
-                          backgroundColor: widget.isFavorite
-                              ? Colors.red
-                              : Colors.black54,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
                 ],
               ),
               Padding(
@@ -170,7 +150,7 @@ class _DestinationCardState extends State<DestinationCard> {
                             ],
                           ),
                         ),
-                        if (l10nCost != null)
+                        if (costFormatted != null)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -181,7 +161,7 @@ class _DestinationCardState extends State<DestinationCard> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              l10nCost,
+                              costFormatted,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: theme.colorScheme.onPrimaryContainer,
                                 fontWeight: FontWeight.bold,
@@ -190,16 +170,26 @@ class _DestinationCardState extends State<DestinationCard> {
                           ),
                       ],
                     ),
-                    if (widget.rating != null) ...[
+                    // Star rating display
+                    if (widget.averageRating != null &&
+                        widget.averageRating! > 0) ...[
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 20),
-                          const SizedBox(width: 4),
+                          ...List.generate(5, (i) {
+                            final star = i + 1;
+                            final fill = star <= widget.averageRating!.round();
+                            return Icon(
+                              fill ? Icons.star : Icons.star_border,
+                              color: Colors.amber,
+                              size: 20,
+                            );
+                          }),
+                          const SizedBox(width: 8),
                           Text(
-                            widget.rating!.toStringAsFixed(1),
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
+                            '${widget.averageRating!.toStringAsFixed(1)} (${widget.ratingCount ?? 0})',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -221,54 +211,6 @@ class _DestinationCardState extends State<DestinationCard> {
                             .toList(),
                       ),
                     ],
-                    if (widget.bestTimeToVisit != null ||
-                        widget.duration != null ||
-                        widget.location != null) ...[
-                      const SizedBox(height: 20),
-                      _InfoRow(
-                        icon: Icons.calendar_today,
-                        label: 'Best time to visit',
-                        value: widget.bestTimeToVisit,
-                      ),
-                      _InfoRow(
-                        icon: Icons.schedule,
-                        label: 'Duration',
-                        value: widget.duration,
-                      ),
-                      _InfoRow(
-                        icon: Icons.place,
-                        label: 'Location',
-                        value: widget.location,
-                      ),
-                    ],
-                    if (widget.highlights != null &&
-                        widget.highlights!.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      Text(
-                        'Highlights',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: widget.highlights!
-                            .map(
-                              (h) => Chip(
-                                label: Text(h),
-                                avatar: const Icon(
-                                  Icons.check_circle,
-                                  size: 18,
-                                ),
-                                backgroundColor:
-                                    theme.colorScheme.tertiaryContainer,
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ],
                     if (widget.description != null &&
                         widget.description!.isNotEmpty) ...[
                       const SizedBox(height: 20),
@@ -285,44 +227,24 @@ class _DestinationCardState extends State<DestinationCard> {
                       ),
                     ],
                     const SizedBox(height: 28),
-                    Row(
-                      children: [
-                        if (widget.onFavoriteToggle != null)
-                          Tooltip(
-                            message: widget.isFavorite
-                                ? 'Favorited'
-                                : 'Add to favorites',
-                            child: IconButton.filledTonal(
-                              onPressed: () => widget.onFavoriteToggle!(),
-                              icon: Icon(
-                                widget.isFavorite
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Added "${widget.name}" to your trip plans!',
                               ),
+                              behavior: SnackBarBehavior.floating,
                             ),
-                          ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: FilledButton.icon(
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Added "${widget.name}" to your trip plans!',
-                                    ),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.bookmark_add),
-                              label: const Text('Add to Itinerary'),
-                            ),
-                          ),
-                        ),
-                      ],
+                          );
+                        },
+                        icon: const Icon(Icons.bookmark_add),
+                        label: const Text('Add to Itinerary'),
+                      ),
                     ),
                   ],
                 ),
@@ -334,13 +256,46 @@ class _DestinationCardState extends State<DestinationCard> {
     );
   }
 
+  Widget _buildImage() {
+    if (widget.imagePath.startsWith('http://') ||
+        widget.imagePath.startsWith('https://')) {
+      return Image.network(
+        widget.imagePath,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: 160,
+        errorBuilder: (_, __, ___) => Container(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          child: const Icon(Icons.place_outlined, size: 48),
+        ),
+      );
+    }
+    // If it's an asset path, use Image.asset
+    return Image.asset(
+      widget.imagePath,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: 160,
+      errorBuilder: (_, __, ___) => Container(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        child: const Icon(Icons.place_outlined, size: 48),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final handleTap =
         widget.onTap ??
         widget.onViewDetails ??
-        () => _showDetailsSheet(context);
+        (() => _showDetailsSheet(context));
+
+    // Format cost in XAF/FCFA for display
+    String? costFormatted;
+    if (widget.cost != null) {
+      costFormatted = '${widget.cost!.toStringAsFixed(0)} FCFA';
+    }
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -352,7 +307,6 @@ class _DestinationCardState extends State<DestinationCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Image and content in a centered fixed-width column ---
             Center(
               child: SizedBox(
                 width: 280,
@@ -367,15 +321,11 @@ class _DestinationCardState extends State<DestinationCard> {
                         child: SizedBox(
                           width: 280,
                           height: 160,
-                          child: AssetImageWidget(
-                            path: widget.imagePath,
-                            fit: BoxFit.cover,
-                            fallbackIcon: Icons.place_outlined,
-                          ),
+                          child: _buildImage(),
                         ),
                       ),
                     ),
-                    // Content below image — same width as image
+                    // Content
                     Padding(
                       padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
                       child: Column(
@@ -427,6 +377,58 @@ class _DestinationCardState extends State<DestinationCard> {
                               widget.trailing ?? const SizedBox.shrink(),
                             ],
                           ),
+                          // Star rating row
+                          if (widget.averageRating != null &&
+                              widget.averageRating! > 0) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.star,
+                                  size: 16,
+                                  color: Colors.amber,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${widget.averageRating!.toStringAsFixed(1)}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (widget.ratingCount != null &&
+                                    widget.ratingCount! > 0) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(${widget.ratingCount})',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                          // Cost in XAF
+                          if (costFormatted != null) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.attach_money,
+                                  size: 16,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  costFormatted,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           if (widget.duration != null) ...[
                             const SizedBox(height: 8),
                             Row(
@@ -508,44 +510,6 @@ class _DestinationCardState extends State<DestinationCard> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// A reusable info row for the details sheet.
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String? value;
-
-  const _InfoRow({required this.icon, required this.label, this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    if (value == null || value!.isEmpty) return const SizedBox.shrink();
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(
-            '$label: ',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value!,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

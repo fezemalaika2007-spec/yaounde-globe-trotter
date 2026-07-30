@@ -105,9 +105,9 @@ class _MainShellState extends State<MainShell> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) async {
-              if (value == 'profile')
+              if (value == 'profile') {
                 _showProfileSheet();
-              else if (value == 'logout')
+              } else if (value == 'logout')
                 _logout();
               else if (value == 'en') {
                 await AppLocalizations.persistLocale(const Locale('en'));

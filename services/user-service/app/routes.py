@@ -18,6 +18,12 @@ from app.models import get_user_by_username, create_user, get_user_by_id
 user_bp = Blueprint("user", __name__)
 
 
+@user_bp.route("/", methods=["GET"])
+def health():
+    """Health check for the user service."""
+    return jsonify({"status": "ok", "service": "user-service"}), 200
+
+
 # ---------------------------------------------------------------------------
 # JWT Helpers
 # ---------------------------------------------------------------------------

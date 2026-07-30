@@ -390,7 +390,7 @@ class _DestinationCardState extends State<DestinationCard> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '${widget.averageRating!.toStringAsFixed(1)}',
+                                  widget.averageRating!.toStringAsFixed(1),
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),

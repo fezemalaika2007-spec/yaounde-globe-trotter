@@ -19,6 +19,12 @@ from app.overpass_sync import sync_destinations as _sync_destinations
 recommendation_bp = Blueprint("recommendation", __name__)
 
 
+@recommendation_bp.route("/", methods=["GET"])
+def health():
+    """Health check for the recommendation service."""
+    return jsonify({"status": "ok", "service": "recommendation-service"}), 200
+
+
 @recommendation_bp.route("/destinations", methods=["GET"])
 def search_destinations():
     """Search destinations by name, tag, and/or max_cost.

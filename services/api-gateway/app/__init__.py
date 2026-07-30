@@ -7,6 +7,7 @@ This gateway contains NO business logic. It simply proxies requests
 to the appropriate backend service based on the request path.
 """
 import os
+
 from flask import Flask
 from flask_cors import CORS
 

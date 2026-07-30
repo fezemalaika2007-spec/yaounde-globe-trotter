@@ -6,6 +6,7 @@ Contains no business logic, only routing/forwarding.
 """
 
 import os
+
 import requests
 from flask import Blueprint, request, jsonify, Response
 

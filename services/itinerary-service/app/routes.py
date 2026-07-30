@@ -17,6 +17,12 @@ from app.models import get_itineraries_for_user, get_itineraries_by_user_id, cre
 itinerary_bp = Blueprint("itinerary", __name__)
 
 
+@itinerary_bp.route("/", methods=["GET"])
+def health():
+    """Health check for the itinerary service."""
+    return jsonify({"status": "ok", "service": "itinerary-service"}), 200
+
+
 @itinerary_bp.route("/itineraries", methods=["POST"])
 @token_required
 def create_itinerary_route():

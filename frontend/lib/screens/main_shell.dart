@@ -3,13 +3,16 @@ import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../services/theme_provider.dart';
-import '../widgets/destination_card.dart';
+import '../widgets/destination_grid.dart';
 import '../widgets/empty_state.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
 import 'recommendations_screen.dart';
 import 'itineraries_screen.dart';
 import 'favorites_screen.dart';
+
+/// Breakpoint at which the sidebar switches from drawer to permanent.
+const double _sidebarBreakpoint = 850;
 
 /// Main app shell shown after login.
 class MainShell extends StatefulWidget {
@@ -23,21 +26,21 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  late final List<Widget> _screens;
+  // Lazily-created tab screens. Screens are only built the first time the
+  // user visits them, so logging in only builds the Home tab instead of
+  // firing network requests for ALL tabs at once (which froze the app).
+  final List<Widget?> _screens = List<Widget?>.filled(5, null);
+
+  /// Non-null children for [IndexedStack]; unbuilt tabs render as an empty
+  /// box so index alignment is preserved.
+  List<Widget> get _stackChildren =>
+      _screens.map((w) => w ?? const SizedBox.shrink()).toList();
 
   @override
   void initState() {
     super.initState();
-    _screens = [
-      HomeScreen(
-        onLocaleChanged: widget.onLocaleChanged,
-        onSwitchTab: (i) => setState(() => _currentIndex = i),
-      ),
-      _DestinationsTab(onLocaleChanged: widget.onLocaleChanged),
-      RecommendationsScreen(onLocaleChanged: widget.onLocaleChanged),
-      FavoritesScreen(onLocaleChanged: widget.onLocaleChanged),
-      ItinerariesScreen(onLocaleChanged: widget.onLocaleChanged),
-    ];
+    // Pre-build only the initial (Home) tab.
+    _getScreen(0);
     AuthProvider().addListener(_onAuthChange);
   }
 
@@ -58,9 +61,140 @@ class _MainShellState extends State<MainShell> {
     await AuthProvider().logout();
   }
 
-  void _navigateTo(int index) {
-    setState(() => _currentIndex = index);
-    Navigator.of(context).pop();
+  /// Builds (once) and caches the widget for [index].
+  Widget _getScreen(int index) {
+    final cached = _screens[index];
+    if (cached != null) return cached;
+    late final Widget built;
+    switch (index) {
+      case 0:
+        built = HomeScreen(
+          onLocaleChanged: widget.onLocaleChanged,
+          onSwitchTab: _switchTo,
+        );
+      case 1:
+        built = _DestinationsTab(onLocaleChanged: widget.onLocaleChanged);
+      case 2:
+        built = RecommendationsScreen(onLocaleChanged: widget.onLocaleChanged);
+      case 3:
+        built = FavoritesScreen(onLocaleChanged: widget.onLocaleChanged);
+      case 4:
+        built = ItinerariesScreen(onLocaleChanged: widget.onLocaleChanged);
+      default:
+        built = const SizedBox.shrink();
+    }
+    _screens[index] = built;
+    return built;
+  }
+
+  /// Switches tabs and lazily builds the target screen on first visit.
+  void _switchTo(int index) {
+    if (index < 0 || index >= _screens.length) return;
+    if (index == _currentIndex) return;
+    setState(() {
+      _currentIndex = index;
+      _getScreen(index);
+    });
+  }
+
+  void _navigateTo(int index) => _switchTo(index);
+
+  void _showProfileSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.85,
+        builder: (_, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          child: ProfileScreen(onLocaleChanged: widget.onLocaleChanged),
+        ),
+      ),
+    );
+  }
+
+  /// Builds the app bar actions menu (theme, language, profile, logout).
+  List<Widget> _buildAppBarActions(AppLocalizations l10n, ThemeProvider theme) {
+    return [
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert),
+        onSelected: (value) async {
+          if (value == 'profile') {
+            _showProfileSheet();
+          } else if (value == 'logout') {
+            _logout();
+          } else if (value == 'en') {
+            await AppLocalizations.persistLocale(const Locale('en'));
+            widget.onLocaleChanged(const Locale('en'));
+          } else if (value == 'fr') {
+            await AppLocalizations.persistLocale(const Locale('fr'));
+            widget.onLocaleChanged(const Locale('fr'));
+          } else if (value == 'toggle_theme') {
+            await theme.toggleTheme();
+          }
+        },
+        itemBuilder: (_) => [
+          PopupMenuItem(
+            value: 'toggle_theme',
+            child: Row(
+              children: [
+                Icon(theme.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+                const SizedBox(width: 8),
+                Text(theme.isDarkMode ? l10n.lightMode : l10n.darkMode),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem(
+            value: 'en',
+            child: Row(
+              children: [
+                const Icon(Icons.language),
+                const SizedBox(width: 8),
+                Text(l10n.english),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'fr',
+            child: Row(
+              children: [
+                const Icon(Icons.language),
+                const SizedBox(width: 8),
+                Text(l10n.french),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem(
+            value: 'profile',
+            child: Row(
+              children: [
+                const Icon(Icons.person, size: 20),
+                const SizedBox(width: 8),
+                Text(l10n.profile),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'logout',
+            child: Row(
+              children: [
+                const Icon(Icons.logout, size: 20),
+                const SizedBox(width: 8),
+                Text(l10n.logout),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ];
   }
 
   @override
@@ -98,200 +232,283 @@ class _MainShellState extends State<MainShell> {
 
     final titles = navItems.map((n) => n.label).toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Yaounde.Trip · ${titles[_currentIndex]}'),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) async {
-              if (value == 'profile') {
-                _showProfileSheet();
-              } else if (value == 'logout')
-                _logout();
-              else if (value == 'en') {
-                await AppLocalizations.persistLocale(const Locale('en'));
-                widget.onLocaleChanged(const Locale('en'));
-              } else if (value == 'fr') {
-                await AppLocalizations.persistLocale(const Locale('fr'));
-                widget.onLocaleChanged(const Locale('fr'));
-              } else if (value == 'toggle_theme')
-                await theme.toggleTheme();
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'toggle_theme',
-                child: Row(
-                  children: [
-                    Icon(theme.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-                    const SizedBox(width: 8),
-                    Text(theme.isDarkMode ? l10n.lightMode : l10n.darkMode),
-                  ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= _sidebarBreakpoint;
+
+        if (isWide) {
+          // --- Wide layout: permanent sidebar + content side by side ---
+          return Scaffold(
+            appBar: AppBar(
+              title: Text('Yaounde.Trip · ${titles[_currentIndex]}'),
+              actions: _buildAppBarActions(l10n, theme),
+            ),
+            body: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Permanent sidebar
+                _SidebarPanel(
+                  navItems: navItems,
+                  currentIndex: _currentIndex,
+                  l10n: l10n,
+                  onNavigate: _navigateTo,
+                  onProfile: _showProfileSheet,
+                  onLogout: _logout,
                 ),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'en',
-                child: Row(
-                  children: [
-                    const Icon(Icons.language),
-                    const SizedBox(width: 8),
-                    Text(l10n.english),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'fr',
-                child: Row(
-                  children: [
-                    const Icon(Icons.language),
-                    const SizedBox(width: 8),
-                    Text(l10n.french),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'profile',
-                child: Row(
-                  children: [
-                    const Icon(Icons.person, size: 20),
-                    const SizedBox(width: 8),
-                    Text(l10n.profile),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    const Icon(Icons.logout, size: 20),
-                    const SizedBox(width: 8),
-                    Text(l10n.logout),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(context).colorScheme.primary,
-                    Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.8),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Icon(
-                    Icons.travel_explore,
-                    size: 40,
-                    color: Theme.of(context).colorScheme.onPrimary,
+                // Vertical divider
+                const VerticalDivider(width: 1, thickness: 1),
+                // Main content area
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentIndex,
+                    children: _stackChildren,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Yaounde.Trip',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.exploreSubtitle,
-                    style: TextStyle(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onPrimary.withValues(alpha: 0.9),
-                      fontSize: 12,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          // --- Narrow layout: drawer-based navigation (unchanged) ---
+          return Scaffold(
+            appBar: AppBar(
+              title: Text('Yaounde.Trip · ${titles[_currentIndex]}'),
+              actions: _buildAppBarActions(l10n, theme),
+            ),
+            drawer: _buildDrawer(l10n, navItems),
+            body: IndexedStack(index: _currentIndex, children: _stackChildren),
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildDrawer(AppLocalizations l10n, List<_NavItem> navItems) {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Theme.of(context).colorScheme.primary,
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
-            ...List.generate(navItems.length, (i) {
-              final item = navItems[i];
-              return ListTile(
-                leading: Icon(
-                  _currentIndex == i ? item.selectedIcon : item.icon,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Icon(
+                  Icons.travel_explore,
+                  size: 40,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Yaounde.Trip',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.exploreSubtitle,
+                  style: TextStyle(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onPrimary.withValues(alpha: 0.9),
+                    fontSize: 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          ...List.generate(navItems.length, (i) {
+            final item = navItems[i];
+            return ListTile(
+              leading: Icon(
+                _currentIndex == i ? item.selectedIcon : item.icon,
+                color: _currentIndex == i
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+              ),
+              title: Text(
+                item.label,
+                style: TextStyle(
+                  fontWeight: _currentIndex == i
+                      ? FontWeight.bold
+                      : FontWeight.normal,
                   color: _currentIndex == i
                       ? Theme.of(context).colorScheme.primary
                       : null,
                 ),
-                title: Text(
-                  item.label,
-                  style: TextStyle(
-                    fontWeight: _currentIndex == i
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    color: _currentIndex == i
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
-                ),
-                selected: _currentIndex == i,
-                onTap: () => _navigateTo(i),
-              );
-            }),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: Text(l10n.profile),
-              onTap: () {
-                Navigator.of(context).pop();
-                _showProfileSheet();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: Text(
-                l10n.logout,
-                style: const TextStyle(color: Colors.red),
               ),
+              selected: _currentIndex == i,
               onTap: () {
+                setState(() => _currentIndex = i);
                 Navigator.of(context).pop();
-                _logout();
               },
-            ),
-          ],
-        ),
+            );
+          }),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: Text(l10n.profile),
+            onTap: () {
+              Navigator.of(context).pop();
+              _showProfileSheet();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
+            onTap: () {
+              Navigator.of(context).pop();
+              _logout();
+            },
+          ),
+        ],
       ),
-      body: IndexedStack(index: _currentIndex, children: _screens),
     );
   }
+}
 
-  void _showProfileSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.85,
-        builder: (_, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          child: ProfileScreen(onLocaleChanged: widget.onLocaleChanged),
+/// Reusable sidebar panel for the wide (permanent) layout.
+class _SidebarPanel extends StatelessWidget {
+  final List<_NavItem> navItems;
+  final int currentIndex;
+  final AppLocalizations l10n;
+  final void Function(int) onNavigate;
+  final VoidCallback onProfile;
+  final VoidCallback onLogout;
+
+  const _SidebarPanel({
+    required this.navItems,
+    required this.currentIndex,
+    required this.l10n,
+    required this.onNavigate,
+    required this.onProfile,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: 260,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border(
+          right: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
         ),
+      ),
+      child: Column(
+        children: [
+          // Header — same gradient style as the drawer header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.primary.withValues(alpha: 0.8),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.travel_explore,
+                  size: 36,
+                  color: theme.colorScheme.onPrimary,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Yaounde.Trip',
+                  style: TextStyle(
+                    color: theme.colorScheme.onPrimary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.exploreSubtitle,
+                  style: TextStyle(
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
+                    fontSize: 11,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          // Navigation items
+          ...List.generate(navItems.length, (i) {
+            final item = navItems[i];
+            final isSelected = currentIndex == i;
+            return ListTile(
+              leading: Icon(
+                isSelected ? item.selectedIcon : item.icon,
+                color: isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+              title: Text(
+                item.label,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              selected: isSelected,
+              selectedTileColor: theme.colorScheme.primaryContainer.withValues(
+                alpha: 0.3,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              onTap: () => onNavigate(i),
+            );
+          }),
+          const Spacer(),
+          const Divider(),
+          ListTile(
+            leading: Icon(
+              Icons.person_outline,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            title: Text(
+              l10n.profile,
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            onTap: onProfile,
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('Logout', style: TextStyle(color: Colors.red)),
+            onTap: onLogout,
+          ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -474,26 +691,11 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                   onAction: _fetch,
                   actionLabel: l10n.refresh,
                 )
-              : ListView.builder(
-                  itemCount: _filteredDestinations.length,
-                  padding: const EdgeInsets.only(top: 4, bottom: 16),
-                  itemBuilder: (_, i) {
-                    final d = _filteredDestinations[i];
-                    final name = d['name'] ?? '';
-                    final imageUrl = d['image'] ?? '';
-                    final cost = d['cost'];
-                    final avgRating = (d['average_rating'] ?? 0).toDouble();
-                    return DestinationCard(
-                      imagePath: imageUrl,
-                      name: name,
-                      country: d['area'] ?? 'Yaoundé',
-                      city: null,
-                      cost: cost,
-                      tags: d['tags'] ?? [],
-                      description: d['description'],
-                      rating: avgRating,
-                    );
-                  },
+              : SingleChildScrollView(
+                  child: DestinationGrid(
+                    destinations: _filteredDestinations
+                        .cast<Map<String, dynamic>>(),
+                  ),
                 ),
         ),
       ],

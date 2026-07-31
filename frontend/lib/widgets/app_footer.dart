@@ -1,157 +1,250 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 
-/// A comprehensive footer for the home screen.
+/// A scroll-reveal animated footer for the home screen.
 ///
-/// Includes app branding, quick navigation links, contact info,
-/// social media icons, and copyright notice.
-class AppFooter extends StatelessWidget {
+/// Features:
+/// - Hidden until scrolled into view, then fades in + slides up (once per visit)
+/// - Clean modern layout with app branding, quick links, and copyright
+/// - Hover/tap scale animation on interactive elements
+class AppFooter extends StatefulWidget {
   final void Function(int)? onNavigate;
-  final VoidCallback? onLogout;
 
-  const AppFooter({super.key, this.onNavigate, this.onLogout});
+  const AppFooter({super.key, this.onNavigate});
+
+  @override
+  State<AppFooter> createState() => _AppFooterState();
+}
+
+class _AppFooterState extends State<AppFooter>
+    with SingleTickerProviderStateMixin {
+  final GlobalKey _footerKey = GlobalKey();
+  late final AnimationController _entranceController;
+  late final Animation<double> _entranceFade;
+  late final Animation<Offset> _entranceSlide;
+  bool _hasAnimated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
+    _entranceFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _entranceController, curve: Curves.easeOut),
+    );
+    _entranceSlide =
+        Tween<Offset>(begin: const Offset(0.0, 0.04), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _entranceController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Listen to the enclosing Scrollable's position so we react
+    // when the user scrolls the footer into view.
+    final scrollable = Scrollable.maybeOf(context);
+    final pos = scrollable?.position;
+    if (pos != null && !_hasAnimated) {
+      pos.addListener(_onScroll);
+    }
+    _checkVisibility();
+  }
+
+  @override
+  void dispose() {
+    // Safely remove the listener
+    try {
+      final pos = Scrollable.maybeOf(context)?.position;
+      if (pos != null) pos.removeListener(_onScroll);
+    } catch (_) {}
+    _entranceController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_hasAnimated) _checkVisibility();
+  }
+
+  void _checkVisibility() {
+    if (_hasAnimated) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_hasAnimated || !mounted) return;
+      final renderBox =
+          _footerKey.currentContext?.findRenderObject() as RenderBox?;
+      if (renderBox == null || !renderBox.hasSize) return;
+
+      final position = renderBox.localToGlobal(Offset.zero);
+      final viewportHeight = MediaQuery.of(context).size.height;
+
+      // Trigger when the top of the footer enters the viewport
+      if (position.dy < viewportHeight) {
+        _hasAnimated = true;
+        // Remove the scroll listener — fire once per page visit
+        try {
+          final pos = Scrollable.maybeOf(context)?.position;
+          if (pos != null) pos.removeListener(_onScroll);
+        } catch (_) {}
+        _entranceController.forward();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
+    return AnimatedBuilder(
+      animation: _entranceController,
+      builder: (context, child) {
+        return FadeTransition(
+          opacity: _entranceFade,
+          child: SlideTransition(position: _entranceSlide, child: child),
+        );
+      },
+      child: _buildFooterContent(context, theme, l10n),
+    );
+  }
+
+  Widget _buildFooterContent(
+    BuildContext context,
+    ThemeData theme,
+    AppLocalizations l10n,
+  ) {
     return Container(
+      key: _footerKey,
       width: double.infinity,
-      color: theme.colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.surfaceContainerHighest,
+            theme.colorScheme.surface,
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 960),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Top section: Brand + Links columns ---
+            // --- Brand row: app name + tagline + quick links ---
             Wrap(
               spacing: 48,
-              runSpacing: 32,
+              runSpacing: 28,
+              alignment: WrapAlignment.start,
+              crossAxisAlignment: WrapCrossAlignment.start,
               children: [
-                // Brand column
-                _FooterColumn(
-                  title: 'Yaounde.Trip',
-                  children: [
-                    Text(
-                      l10n.footerTagline,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _SocialIcon(
-                          icon: Icons.facebook,
-                          url: 'https://facebook.com',
-                          color: const Color(0xFF1877F2),
-                        ),
-                        const SizedBox(width: 12),
-                        _SocialIcon(
-                          icon: Icons.camera_alt,
-                          url: 'https://instagram.com',
-                          color: const Color(0xFFE4405F),
-                        ),
-                        const SizedBox(width: 12),
-                        _SocialIcon(
-                          icon: Icons.email,
-                          url: 'mailto:contact@yaounde.trip',
+                // App name / tagline column
+                SizedBox(
+                  width: 260,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Yaounde.Trip',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
                           color: theme.colorScheme.primary,
+                          letterSpacing: 0.3,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                // Quick links column
-                _FooterColumn(
-                  title: l10n.footerQuickLinks,
-                  children: [
-                    _FooterLink(
-                      icon: Icons.home_outlined,
-                      label: l10n.home,
-                      onTap: () => onNavigate?.call(0),
-                    ),
-                    _FooterLink(
-                      icon: Icons.explore_outlined,
-                      label: l10n.destinations,
-                      onTap: () => onNavigate?.call(1),
-                    ),
-                    _FooterLink(
-                      icon: Icons.star_outline,
-                      label: l10n.recommendations,
-                      onTap: () => onNavigate?.call(2),
-                    ),
-                    _FooterLink(
-                      icon: Icons.favorite_border,
-                      label: l10n.favorites,
-                      onTap: () => onNavigate?.call(3),
-                    ),
-                    _FooterLink(
-                      icon: Icons.map_outlined,
-                      label: l10n.itineraries,
-                      onTap: () => onNavigate?.call(4),
-                    ),
-                  ],
-                ),
-
-                // Contact column
-                _FooterColumn(
-                  title: l10n.footerContact,
-                  children: [
-                    _FooterInfo(
-                      icon: Icons.location_on_outlined,
-                      text: l10n.footerAddress,
-                    ),
-                    const SizedBox(height: 8),
-                    _FooterInfo(
-                      icon: Icons.phone_outlined,
-                      text: '+237 6XX XXX XXX',
-                    ),
-                    const SizedBox(height: 8),
-                    _FooterInfo(
-                      icon: Icons.email_outlined,
-                      text: 'contact@yaounde.trip',
-                    ),
-                    const SizedBox(height: 8),
-                    _FooterInfo(icon: Icons.language, text: 'www.yaounde.trip'),
-                  ],
-                ),
-
-                // About column
-                _FooterColumn(
-                  title: l10n.footerAbout,
-                  children: [
-                    Text(
-                      l10n.footerAboutText,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.5,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.footerTagline,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Quick links column
+                SizedBox(
+                  width: 200,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.footerQuickLinks,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _FooterLinkItem(
+                        label: l10n.destinations,
+                        onTap: () => widget.onNavigate?.call(1),
+                      ),
+                      const SizedBox(height: 6),
+                      _FooterLinkItem(
+                        label: l10n.recommendations,
+                        onTap: () => widget.onNavigate?.call(2),
+                      ),
+                      const SizedBox(height: 6),
+                      _FooterLinkItem(
+                        label: l10n.itineraries,
+                        onTap: () => widget.onNavigate?.call(4),
+                      ),
+                    ],
+                  ),
+                ),
+                // Contact column
+                SizedBox(
+                  width: 200,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.footerContact,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _FooterContactLine(
+                        icon: Icons.email_outlined,
+                        text: 'contact@yaounde.trip',
+                      ),
+                      const SizedBox(height: 6),
+                      _FooterContactLine(
+                        icon: Icons.language,
+                        text: 'www.yaounde.trip',
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-
-            const SizedBox(height: 32),
-
-            // --- Divider ---
+            const SizedBox(height: 28),
             Divider(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
               height: 1,
             ),
-
-            const SizedBox(height: 24),
-
-            // --- Bottom section: Copyright + Legal links ---
+            const SizedBox(height: 20),
+            // --- Bottom row: copyright + "made with love" ---
             Wrap(
               alignment: WrapAlignment.spaceBetween,
               spacing: 16,
-              runSpacing: 8,
+              runSpacing: 10,
               children: [
                 Text(
                   l10n.footerCopyright,
@@ -162,40 +255,24 @@ class AppFooter extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _LegalLink(label: l10n.footerPrivacy, onTap: () {}),
-                    const SizedBox(width: 16),
-                    _LegalLink(label: l10n.footerTerms, onTap: () {}),
-                    const SizedBox(width: 16),
-                    _LegalLink(label: l10n.footerCookies, onTap: () {}),
+                    Text(
+                      l10n.footerMadeWith,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    _PulsingHeart(),
+                    const SizedBox(width: 4),
+                    Text(
+                      l10n.footerInCameroon,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // --- Made with love ---
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    l10n.footerMadeWith,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.favorite, size: 14, color: Colors.red.shade400),
-                  const SizedBox(width: 4),
-                  Text(
-                    l10n.footerInCameroon,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -204,68 +281,58 @@ class AppFooter extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Helper widgets
-// ---------------------------------------------------------------------------
-
-class _FooterColumn extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-
-  const _FooterColumn({required this.title, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SizedBox(
-      width: 220,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
-
-class _FooterLink extends StatelessWidget {
-  final IconData icon;
+/// A single footer quick-link item with hover/tap scale animation.
+class _FooterLinkItem extends StatefulWidget {
   final String label;
   final VoidCallback? onTap;
 
-  const _FooterLink({required this.icon, required this.label, this.onTap});
+  const _FooterLinkItem({required this.label, this.onTap});
+
+  @override
+  State<_FooterLinkItem> createState() => _FooterLinkItemState();
+}
+
+class _FooterLinkItemState extends State<_FooterLinkItem> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+    final color = _hovered
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onTapDown: (_) => setState(() => _hovered = true),
+        onTapUp: (_) => setState(() => _hovered = false),
+        onTapCancel: () => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: _hovered
+                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.35)
+                : Colors.transparent,
+          ),
+          transform: Matrix4.diagonal3Values(
+            _hovered ? 1.04 : 1.0,
+            _hovered ? 1.04 : 1.0,
+            1.0,
+          ),
+          transformAlignment: Alignment.centerLeft,
+          child: Text(
+            widget.label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: _hovered ? FontWeight.w600 : FontWeight.normal,
+            ),
           ),
         ),
       ),
@@ -273,27 +340,28 @@ class _FooterLink extends StatelessWidget {
   }
 }
 
-class _FooterInfo extends StatelessWidget {
+/// A contact info line with an icon.
+class _FooterContactLine extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _FooterInfo({required this.icon, required this.text});
+  const _FooterContactLine({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Expanded(
+        Icon(icon, size: 14, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Flexible(
           child: Text(
             text,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              height: 1.4,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -301,64 +369,43 @@ class _FooterInfo extends StatelessWidget {
   }
 }
 
-class _SocialIcon extends StatelessWidget {
-  final IconData icon;
-  final String url;
-  final Color color;
-
-  const _SocialIcon({
-    required this.icon,
-    required this.url,
-    required this.color,
-  });
-
+/// A subtle pulsing heart icon for the "Made with love" section.
+class _PulsingHeart extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        // In a real app, use url_launcher to open the URL
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Opening: $url'),
-            duration: const Duration(seconds: 1),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color.withValues(alpha: 0.15),
-        ),
-        child: Icon(icon, size: 20, color: color),
-      ),
-    );
-  }
+  State<_PulsingHeart> createState() => _PulsingHeartState();
 }
 
-class _LegalLink extends StatelessWidget {
-  final String label;
-  final VoidCallback? onTap;
+class _PulsingHeartState extends State<_PulsingHeart>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnim;
 
-  const _LegalLink({required this.label, this.onTap});
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.25).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-        child: Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            decoration: TextDecoration.underline,
-          ),
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: _pulseAnim,
+      builder: (context, child) {
+        return Transform.scale(scale: _pulseAnim.value, child: child);
+      },
+      child: Icon(Icons.favorite, size: 14, color: Colors.red.shade400),
     );
   }
 }

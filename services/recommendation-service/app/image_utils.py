@@ -23,7 +23,7 @@ COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 
 
 def fetch_wikimedia_image(wikidata_id="", wikipedia_title="", place_name=""):
-    """Try to fetch a representative image for a place from Wikidata/Wikimedia.
+    """Try to fetch representative images for a place from Wikidata/Wikimedia.
 
     Args:
         wikidata_id: OSM wikidata tag (e.g. "Q12345")
@@ -31,9 +31,9 @@ def fetch_wikimedia_image(wikidata_id="", wikipedia_title="", place_name=""):
         place_name: The place name from OSM, used for verification
 
     Returns:
-        Tuple of (image_url_or_empty_string, verified_bool)
+        Tuple of (list_of_image_urls, verified_bool)
     """
-    image_url = ""
+    image_urls = []
     entity_id = wikidata_id
 
     # If no wikidata ID but we have a Wikipedia title, try to extract it
@@ -66,7 +66,7 @@ def fetch_wikimedia_image(wikidata_id="", wikipedia_title="", place_name=""):
             logger.warning(f"Wikipedia API request failed: {e}")
 
     if not entity_id:
-        return ("", False)
+        return ([], False)
 
     # Fetch Wikidata entity data to get the image (P18 property)
     try:
@@ -79,7 +79,7 @@ def fetch_wikimedia_image(wikidata_id="", wikipedia_title="", place_name=""):
         wd_data = wd_resp.json()
     except requests.exceptions.RequestException as e:
         logger.warning(f"Wikidata API request failed: {e}")
-        return ("", False)
+        return ([], False)
 
     entity = wd_data.get("entities", {}).get(entity_id, {})
 
@@ -103,31 +103,34 @@ def fetch_wikimedia_image(wikidata_id="", wikipedia_title="", place_name=""):
 
     if not name_matches:
         logger.info(f"Entity name '{entity_name}' doesn't match place '{place_name}'. Skipping image.")
-        return ("", False)
+        return ([], False)
 
     # Get the image filename from P18 property
     claims = entity.get("claims", {})
     p18 = claims.get("P18", [])
-    if p18:
-        image_filename = p18[0].get("mainsnak", {}).get("datavalue", {}).get("value", "")
+    for claim in p18:
+        image_filename = claim.get("mainsnak", {}).get("datavalue", {}).get("value", "")
         if image_filename:
             # Build Commons image URL
             image_url = _build_commons_url(image_filename)
-            if image_url:
-                logger.info(f"Found Wikimedia image for '{place_name}': {image_url}")
-                return (image_url, True)
+            if image_url and image_url not in image_urls:
+                image_urls.append(image_url)
 
     # Also try P373 (Commons category) for images
     p373 = claims.get("P373", [])
-    if not image_url and p373:
+    if p373:
         commons_category = p373[0].get("mainsnak", {}).get("datavalue", {}).get("value", "")
         if commons_category:
-            image_url = _fetch_commons_category_image(commons_category)
-            if image_url:
-                logger.info(f"Found Commons category image for '{place_name}': {image_url}")
-                return (image_url, True)
+            cat_urls = _fetch_commons_category_images(commons_category)
+            for url in cat_urls:
+                if url not in image_urls:
+                    image_urls.append(url)
 
-    return ("", False)
+    if image_urls:
+        logger.info(f"Found {len(image_urls)} Wikimedia images for '{place_name}'")
+        return (image_urls, True)
+
+    return ([], False)
 
 
 def _build_commons_url(filename):
@@ -147,8 +150,9 @@ def _build_commons_url(filename):
     return f"{base_url}"
 
 
-def _fetch_commons_category_image(category_name):
-    """Fetch a representative image from a Wikimedia Commons category."""
+def _fetch_commons_category_images(category_name):
+    """Fetch a list of representative images from a Wikimedia Commons category."""
+    urls = []
     try:
         resp = requests.get(
             COMMONS_API,
@@ -157,7 +161,7 @@ def _fetch_commons_category_image(category_name):
                 "list": "categorymembers",
                 "cmtitle": f"Category:{category_name}",
                 "cmtype": "file",
-                "cmlimit": 5,
+                "cmlimit": 8,
                 "format": "json",
             },
             timeout=10,
@@ -171,13 +175,15 @@ def _fetch_commons_category_image(category_name):
             if title and ("jpg" in title.lower() or "jpeg" in title.lower() or "png" in title.lower()):
                 # Extract filename from title (remove "File:" prefix)
                 filename = title.replace("File:", "", 1)
-                return _build_commons_url(filename)
+                url = _build_commons_url(filename)
+                if url and url not in urls:
+                    urls.append(url)
     except requests.exceptions.RequestException as e:
         logger.warning(f"Commons API request failed for category '{category_name}': {e}")
-    return ""
+    return urls
 
 
-def get_placeholder_image(category):
+def get_placeholder_image(category, name=""):
     """Return a category-based placeholder image URL.
 
     Uses REAL Wikimedia Commons images of Yaoundé, Cameroon, sourced
@@ -233,6 +239,7 @@ def get_placeholder_image(category):
     # Default to "attraction" if category unknown
     images = yaounde_images.get(category, yaounde_images["attraction"])
 
-    # Use a deterministic index based on hash of category string for consistency
-    index = abs(hash(category)) % len(images)
+    # Use a deterministic index based on hash of name or category for consistency
+    seed = name if name else category
+    index = abs(hash(seed)) % len(images)
     return images[index]

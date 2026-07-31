@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../screens/destination_details_screen.dart';
 
 class DestinationCard extends StatefulWidget {
   final String imagePath;
@@ -23,6 +24,24 @@ class DestinationCard extends StatefulWidget {
   final bool isFavorite;
   final VoidCallback? onFavoriteToggle;
 
+  // New fields
+  final String? id;
+  final String? osmId;
+  final double? latitude;
+  final double? longitude;
+  final String? address;
+  final String? category;
+  final List<dynamic>? activities;
+  final String? openingHours;
+  final String? phone;
+  final String? website;
+  final String? email;
+  final int? priceLevel;
+  final List<dynamic>? facilities;
+  final String? cuisine;
+  final double? starRating;
+  final List<dynamic>? images;
+
   const DestinationCard({
     super.key,
     required this.imagePath,
@@ -46,6 +65,23 @@ class DestinationCard extends StatefulWidget {
     this.currency,
     this.isFavorite = false,
     this.onFavoriteToggle,
+    // New fields
+    this.id,
+    this.osmId,
+    this.latitude,
+    this.longitude,
+    this.address,
+    this.category,
+    this.activities,
+    this.openingHours,
+    this.phone,
+    this.website,
+    this.email,
+    this.priceLevel,
+    this.facilities,
+    this.cuisine,
+    this.starRating,
+    this.images,
   });
 
   @override
@@ -53,209 +89,6 @@ class DestinationCard extends StatefulWidget {
 }
 
 class _DestinationCardState extends State<DestinationCard> {
-  void _showDetailsSheet(BuildContext context) {
-    final theme = Theme.of(context);
-    // Format cost in XAF/FCFA
-    String? costFormatted;
-    if (widget.cost != null) {
-      costFormatted = '${widget.cost!.toStringAsFixed(0)} FCFA';
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.75,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        builder: (_, scrollCtrl) => SingleChildScrollView(
-          controller: scrollCtrl,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Image section
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 200,
-                      child: _buildImage(),
-                    ),
-                  ),
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: IconButton.filled(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.black54,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.name,
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    size: 18,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      widget.city != null
-                                          ? '${widget.city}, ${widget.country}'
-                                          : widget.country,
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
-                                            color: theme
-                                                .colorScheme
-                                                .onSurfaceVariant,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (costFormatted != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              costFormatted,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    // Star rating display
-                    if (widget.averageRating != null &&
-                        widget.averageRating! > 0) ...[
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          ...List.generate(5, (i) {
-                            final star = i + 1;
-                            final fill = star <= widget.averageRating!.round();
-                            return Icon(
-                              fill ? Icons.star : Icons.star_border,
-                              color: Colors.amber,
-                              size: 20,
-                            );
-                          }),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${widget.averageRating!.toStringAsFixed(1)} (${widget.ratingCount ?? 0})',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (widget.tags.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: widget.tags
-                            .map(
-                              (t) => Chip(
-                                label: Text('#$t'),
-                                backgroundColor:
-                                    theme.colorScheme.surfaceContainerHighest,
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ],
-                    if (widget.description != null &&
-                        widget.description!.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      Text(
-                        'About',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.description!,
-                        style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Added "${widget.name}" to your trip plans!',
-                              ),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.bookmark_add),
-                        label: const Text('Add to Itinerary'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildImage() {
     if (widget.imagePath.startsWith('http://') ||
         widget.imagePath.startsWith('https://')) {
@@ -264,7 +97,7 @@ class _DestinationCardState extends State<DestinationCard> {
         fit: BoxFit.cover,
         width: double.infinity,
         height: 160,
-        errorBuilder: (_, __, ___) => Container(
+        errorBuilder: (_, _, _) => Container(
           color: Theme.of(context).colorScheme.primaryContainer,
           child: const Icon(Icons.place_outlined, size: 48),
         ),
@@ -276,7 +109,7 @@ class _DestinationCardState extends State<DestinationCard> {
       fit: BoxFit.cover,
       width: double.infinity,
       height: 160,
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (_, _, _) => Container(
         color: Theme.of(context).colorScheme.primaryContainer,
         child: const Icon(Icons.place_outlined, size: 48),
       ),
@@ -288,8 +121,42 @@ class _DestinationCardState extends State<DestinationCard> {
     final theme = Theme.of(context);
     final handleTap =
         widget.onTap ??
-        widget.onViewDetails ??
-        (() => _showDetailsSheet(context));
+        () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DestinationDetailScreen(
+                destination: {
+                  'id': widget.id,
+                  'osm_id': widget.osmId,
+                  'name': widget.name,
+                  'image': widget.imagePath,
+                  'area': widget.country,
+                  'cost': widget.cost,
+                  'tags': widget.tags,
+                  'description': widget.description,
+                  'average_rating':
+                      widget.averageRating ?? widget.rating ?? 0.0,
+                  'rating_count': widget.ratingCount ?? 0,
+                  'latitude': widget.latitude,
+                  'longitude': widget.longitude,
+                  'address': widget.address,
+                  'category': widget.category ?? '',
+                  'activities': widget.activities ?? [],
+                  'opening_hours': widget.openingHours ?? '',
+                  'phone': widget.phone ?? '',
+                  'website': widget.website ?? '',
+                  'email': widget.email ?? '',
+                  'price_level': widget.priceLevel,
+                  'facilities': widget.facilities ?? [],
+                  'cuisine': widget.cuisine ?? '',
+                  'star_rating': widget.starRating,
+                  'images': widget.images ?? [],
+                },
+              ),
+            ),
+          );
+        };
 
     // Format cost in XAF/FCFA for display
     String? costFormatted;

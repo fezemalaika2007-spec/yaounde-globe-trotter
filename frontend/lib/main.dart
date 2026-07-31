@@ -24,12 +24,14 @@ class YaoundeTripApp extends StatefulWidget {
 
 class _YaoundeTripAppState extends State<YaoundeTripApp> {
   Locale _locale = const Locale('en');
-  bool _ready = false;
 
   @override
   void initState() {
     super.initState();
-    _init();
+    // Fire-and-forget: load the persisted locale/theme in the background.
+    // The app renders immediately with defaults; when storage responds the
+    // values are applied via setState without ever blocking the first frame.
+    _loadPersistedSettings();
     ThemeProvider().addListener(_onThemeChange);
   }
 
@@ -43,23 +45,20 @@ class _YaoundeTripAppState extends State<YaoundeTripApp> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _init() async {
+  Future<void> _loadPersistedSettings() async {
     try {
-      final locale = await AppLocalizations.getPersistedLocale();
-      await ThemeProvider().loadTheme();
-      if (mounted) {
-        setState(() {
-          _locale = locale;
-        });
+      final prefs = await AppLocalizations.getPersistedLocale().timeout(
+        const Duration(milliseconds: 1500),
+        onTimeout: () => const Locale('en'),
+      );
+      if (mounted && _locale != prefs) {
+        setState(() => _locale = prefs);
       }
+      await ThemeProvider().loadTheme().timeout(
+        const Duration(milliseconds: 1500),
+      );
     } catch (e) {
-      debugPrint('Error during init: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _ready = true;
-        });
-      }
+      debugPrint('Error loading persisted settings: $e');
     }
   }
 
@@ -69,12 +68,6 @@ class _YaoundeTripAppState extends State<YaoundeTripApp> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_ready) {
-      return const MaterialApp(
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
-      );
-    }
-
     return MaterialApp(
       title: 'Yaounde.Trip',
       debugShowCheckedModeBanner: false,
@@ -154,12 +147,16 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  bool _checking = true;
-
   @override
   void initState() {
     super.initState();
-    _check();
+    // Kick off the auth-status check in the background — never block the
+    // first frame. The login screen renders immediately; if a stored token
+    // is found, AuthProvider notifies listeners and this widget swaps to
+    // MainShell automatically.
+    AuthProvider().checkAuthStatus().catchError((e) {
+      debugPrint('Error during auth check: $e');
+    });
     AuthProvider().addListener(_onAuthChange);
   }
 
@@ -174,22 +171,8 @@ class _AuthGateState extends State<AuthGate> {
     setState(() {});
   }
 
-  Future<void> _check() async {
-    try {
-      await AuthProvider().checkAuthStatus();
-    } catch (e) {
-      debugPrint('Error during auth check: $e');
-    } finally {
-      if (mounted) setState(() => _checking = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_checking) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     final auth = AuthProvider();
     if (auth.isLoggedIn) {
       return MainShell(onLocaleChanged: widget.onLocaleChanged);

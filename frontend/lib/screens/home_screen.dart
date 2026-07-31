@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
-import '../services/auth_provider.dart';
+
 import '../widgets/app_footer.dart';
 
 /// Callback type for requesting a tab switch from within a child widget.
@@ -32,8 +32,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadFeatured() async {
     try {
-      // Pull a few real destinations from the API for the home screen
-      final destinations = await _api.getDestinations();
+      // Pull a few real destinations from the API for the home screen.
+      // Bounded with a timeout so a slow/unreachable backend never leaves
+      // the home page janky — the rest of the page renders regardless.
+      final destinations = await _api.getDestinations().timeout(
+        const Duration(seconds: 4),
+      );
       if (mounted) {
         setState(() {
           // Take first 3-4 destinations to feature on home
@@ -70,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Image.asset(
                       'assets/images/home/hero_1.jpg',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
                     // Gradient overlay for readability
                     Container(
@@ -204,16 +208,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ? Image.network(
                                           d['image'],
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              Container(
-                                                color: theme
-                                                    .colorScheme
-                                                    .primaryContainer,
-                                                child: const Icon(
-                                                  Icons.place,
-                                                  size: 48,
-                                                ),
-                                              ),
+                                          errorBuilder: (_, _, _) => Container(
+                                            color: theme
+                                                .colorScheme
+                                                .primaryContainer,
+                                            child: const Icon(
+                                              Icons.place,
+                                              size: 48,
+                                            ),
+                                          ),
                                         )
                                       : Container(
                                           color: theme
@@ -336,10 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 32),
 
               // --- Footer ---
-              AppFooter(
-                onNavigate: widget.onSwitchTab,
-                onLogout: () => AuthProvider().logout(),
-              ),
+              AppFooter(onNavigate: widget.onSwitchTab),
             ],
           ),
         ),

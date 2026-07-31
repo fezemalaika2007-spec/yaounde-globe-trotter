@@ -66,6 +66,32 @@ def init_db(app=None):
             UNIQUE(destination_id, user_id)
         )
     """)
+    
+    # Migrations to add new columns to destinations table if they don't exist
+    new_columns = [
+        ("latitude", "REAL"),
+        ("longitude", "REAL"),
+        ("address", "TEXT DEFAULT ''"),
+        ("category", "TEXT DEFAULT ''"),
+        ("activities", "TEXT DEFAULT '[]'"),
+        ("opening_hours", "TEXT DEFAULT ''"),
+        ("phone", "TEXT DEFAULT ''"),
+        ("website", "TEXT DEFAULT ''"),
+        ("email", "TEXT DEFAULT ''"),
+        ("price_level", "INTEGER"),
+        ("facilities", "TEXT DEFAULT '[]'"),
+        ("cuisine", "TEXT DEFAULT ''"),
+        ("star_rating", "REAL"),
+        ("images", "TEXT DEFAULT '[]'")
+    ]
+    
+    for col_name, col_type in new_columns:
+        try:
+            conn.execute(f"ALTER TABLE destinations ADD COLUMN {col_name} {col_type}")
+        except sqlite3.OperationalError:
+            # Column already exists
+            pass
+            
     conn.commit()
     conn.close()
 
@@ -83,12 +109,12 @@ def get_all_destinations(app=None):
     results = []
     for r in rows:
         d = dict(r)
-        # Parse tags JSON string back to list
-        if isinstance(d.get("tags"), str):
-            try:
-                d["tags"] = json.loads(d["tags"])
-            except (json.JSONDecodeError, TypeError):
-                d["tags"] = []
+        for key in ["tags", "activities", "facilities", "images"]:
+            if key in d and isinstance(d[key], str):
+                try:
+                    d[key] = json.loads(d[key])
+                except (json.JSONDecodeError, TypeError):
+                    d[key] = []
         results.append(d)
     return results
 
@@ -101,11 +127,12 @@ def get_destination_by_id(dest_id, app=None):
     conn.close()
     if row:
         d = dict(row)
-        if isinstance(d.get("tags"), str):
-            try:
-                d["tags"] = json.loads(d["tags"])
-            except (json.JSONDecodeError, TypeError):
-                d["tags"] = []
+        for key in ["tags", "activities", "facilities", "images"]:
+            if key in d and isinstance(d[key], str):
+                try:
+                    d[key] = json.loads(d[key])
+                except (json.JSONDecodeError, TypeError):
+                    d[key] = []
         return d
     return None
 
@@ -118,20 +145,31 @@ def get_destination_by_osm_id(osm_id, app=None):
     conn.close()
     if row:
         d = dict(row)
-        if isinstance(d.get("tags"), str):
-            try:
-                d["tags"] = json.loads(d["tags"])
-            except (json.JSONDecodeError, TypeError):
-                d["tags"] = []
+        for key in ["tags", "activities", "facilities", "images"]:
+            if key in d and isinstance(d[key], str):
+                try:
+                    d[key] = json.loads(d[key])
+                except (json.JSONDecodeError, TypeError):
+                    d[key] = []
         return d
     return None
 
 
-def upsert_destination(osm_id, name, area, tags, description, cost, image, image_source, app=None):
+def upsert_destination(
+    osm_id, name, area, tags, description, cost, image, image_source,
+    latitude=None, longitude=None, address='', category='', activities=None,
+    opening_hours='', phone='', website='', email='', price_level=None,
+    facilities=None, cuisine='', star_rating=None, images=None, app=None
+):
     """Insert or update a destination by osm_id (stable OSM identifier)."""
     import json
     conn = get_connection(app)
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    # Defaults for list parameters
+    activities_val = activities if activities is not None else []
+    facilities_val = facilities if facilities is not None else []
+    images_val = images if images is not None else []
 
     # Check if destination already exists
     existing = conn.execute("SELECT * FROM destinations WHERE osm_id = ?", (osm_id,)).fetchone()
@@ -142,17 +180,37 @@ def upsert_destination(osm_id, name, area, tags, description, cost, image, image
         conn.execute("""
             UPDATE destinations SET
                 name = ?, area = ?, tags = ?, description = ?,
-                cost = ?, image = ?, image_source = ?, last_synced_at = ?
+                cost = ?, image = ?, image_source = ?, last_synced_at = ?,
+                latitude = ?, longitude = ?, address = ?, category = ?,
+                activities = ?, opening_hours = ?, phone = ?, website = ?,
+                email = ?, price_level = ?, facilities = ?, cuisine = ?,
+                star_rating = ?, images = ?
             WHERE osm_id = ?
-        """, (name, area, json.dumps(tags), description, cost, image, image_source, now, osm_id))
+        """, (
+            name, area, json.dumps(tags), description, cost, image, image_source, now,
+            latitude, longitude, address, category,
+            json.dumps(activities_val), opening_hours, phone, website,
+            email, price_level, json.dumps(facilities_val), cuisine,
+            star_rating, json.dumps(images_val), osm_id
+        ))
         result_id = existing_dict["id"]
     else:
         # Insert new destination
         dest_id = str(uuid.uuid4())
         conn.execute("""
-            INSERT INTO destinations (id, osm_id, name, area, tags, description, cost, image, image_source, average_rating, rating_count, last_synced_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0, ?)
-        """, (dest_id, osm_id, name, area, json.dumps(tags), description, cost, image, image_source, now))
+            INSERT INTO destinations (
+                id, osm_id, name, area, tags, description, cost, image, image_source,
+                latitude, longitude, address, category, activities, opening_hours,
+                phone, website, email, price_level, facilities, cuisine, star_rating,
+                images, average_rating, rating_count, last_synced_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0, ?)
+        """, (
+            dest_id, osm_id, name, area, json.dumps(tags), description, cost, image, image_source,
+            latitude, longitude, address, category, json.dumps(activities_val), opening_hours,
+            phone, website, email, price_level, json.dumps(facilities_val), cuisine, star_rating,
+            json.dumps(images_val), now
+        ))
         result_id = dest_id
 
     conn.commit()

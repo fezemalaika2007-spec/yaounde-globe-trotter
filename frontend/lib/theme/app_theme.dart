@@ -22,6 +22,7 @@ class AppTheme {
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
+      fontFamily: 'Roboto',
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,

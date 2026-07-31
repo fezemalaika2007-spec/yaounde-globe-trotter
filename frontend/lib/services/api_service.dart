@@ -15,10 +15,52 @@ class ApiService {
   static const String _tokenKey = 'jwt_token';
   static const String _prefsTokenKey = 'jwt_token_prefs';
 
+  /// Hard upper bound for any single HTTP request. Prevents the UI from
+  /// hanging forever on a slow/unreachable backend — the user gets a clear
+  /// timeout error instead of an infinite spinner.
+  static const Duration _requestTimeout = Duration(seconds: 6);
+
+  Future<http.Response> _get(Uri uri, {Map<String, String>? headers}) {
+    return http
+        .get(uri, headers: headers)
+        .timeout(
+          _requestTimeout,
+          onTimeout: () => throw ApiException(
+            408,
+            'Request timed out. Is the server running?',
+          ),
+        );
+  }
+
+  Future<http.Response> _post(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    return http
+        .post(uri, headers: headers, body: body)
+        .timeout(
+          _requestTimeout,
+          onTimeout: () => throw ApiException(
+            408,
+            'Request timed out. Is the server running?',
+          ),
+        );
+  }
+
   // Token management
+  //
+  // NOTE: FlutterSecureStorage on web can hang during WebCrypto / IndexedDB
+  // plugin initialization. Every secure-storage call is therefore bounded
+  // with a short timeout so a frozen storage backend can never block the
+  // UI (startup auth check, login, logout, etc.). On timeout we fall back
+  // to the SharedPreferences copy (kept in sync on web) or null, so the
+  // app always stays responsive.
   Future<void> saveToken(String token) async {
     try {
-      await _secureStorage.write(key: _tokenKey, value: token);
+      await _secureStorage
+          .write(key: _tokenKey, value: token)
+          .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
     } catch (_) {}
     if (kIsWeb) {
       try {
@@ -30,7 +72,9 @@ class ApiService {
 
   Future<String?> getToken() async {
     try {
-      final token = await _secureStorage.read(key: _tokenKey);
+      final token = await _secureStorage
+          .read(key: _tokenKey)
+          .timeout(const Duration(milliseconds: 1500), onTimeout: () => null);
       if (token != null) return token;
     } catch (_) {}
     if (kIsWeb) {
@@ -44,7 +88,9 @@ class ApiService {
 
   Future<void> deleteToken() async {
     try {
-      await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage
+          .delete(key: _tokenKey)
+          .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
     } catch (_) {}
     if (kIsWeb) {
       try {
@@ -61,7 +107,7 @@ class ApiService {
     required List<String> preferences,
   }) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.register}');
-    final response = await http.post(
+    final response = await _post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -80,7 +126,7 @@ class ApiService {
     required String password,
   }) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.login}');
-    final response = await http.post(
+    final response = await _post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
@@ -102,7 +148,7 @@ class ApiService {
     final uri = Uri.parse(
       '${ApiConfig.baseUrl}${ApiConfig.destinations}',
     ).replace(queryParameters: params.isNotEmpty ? params : null);
-    final response = await http.get(uri);
+    final response = await _get(uri);
     final body = _decode(response);
     if (response.statusCode == 200) return body as List<dynamic>;
     throw ApiException(response.statusCode, _errorMessage(body));
@@ -115,7 +161,7 @@ class ApiService {
     final uri = Uri.parse(
       '${ApiConfig.baseUrl}${ApiConfig.recommendations}',
     ).replace(queryParameters: {'limit': limit.toString()});
-    final response = await http.get(uri, headers: _authHeaders(token));
+    final response = await _get(uri, headers: _authHeaders(token));
     final body = _decode(response);
     if (response.statusCode == 200) return body as List<dynamic>;
     throw ApiException(response.statusCode, _errorMessage(body));
@@ -126,7 +172,7 @@ class ApiService {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
     final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.itineraries}');
-    final response = await http.get(uri, headers: _authHeaders(token));
+    final response = await _get(uri, headers: _authHeaders(token));
     final body = _decode(response);
     if (response.statusCode == 200) return body as List<dynamic>;
     throw ApiException(response.statusCode, _errorMessage(body));
@@ -142,7 +188,7 @@ class ApiService {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
     final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.itineraries}');
-    final response = await http.post(
+    final response = await _post(
       uri,
       headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -159,7 +205,7 @@ class ApiService {
   }
 
   // Ratings
-  /// POST /destinations/<id>/rating – submit or update a rating.
+  /// POST /destinations/[id]/rating – submit or update a rating.
   /// [rating] must be 1-5.
   Future<Map<String, dynamic>> submitRating({
     required String destinationId,
@@ -170,7 +216,7 @@ class ApiService {
     final uri = Uri.parse(
       '${ApiConfig.baseUrl}/destinations/$destinationId/rating',
     );
-    final response = await http.post(
+    final response = await _post(
       uri,
       headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
       body: jsonEncode({'rating': rating}),
@@ -185,7 +231,7 @@ class ApiService {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
     final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.favorites}');
-    final response = await http.get(uri, headers: _authHeaders(token));
+    final response = await _get(uri, headers: _authHeaders(token));
     final body = _decode(response);
     if (response.statusCode == 200) {
       return (body as List<dynamic>).cast<String>();
@@ -197,7 +243,7 @@ class ApiService {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
     final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.favorites}');
-    final response = await http.post(
+    final response = await _post(
       uri,
       headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
       body: jsonEncode({'destination': destinationName}),

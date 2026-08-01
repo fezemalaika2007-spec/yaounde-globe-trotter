@@ -152,7 +152,7 @@ class _AppFooterState extends State<AppFooter>
               children: [
                 // App name / tagline column
                 SizedBox(
-                  width: 260,
+                  width: 280,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -164,12 +164,20 @@ class _AppFooterState extends State<AppFooter>
                           letterSpacing: 0.3,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 10),
                       Text(
                         l10n.footerTagline,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
-                          height: 1.5,
+                          height: 1.6,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        l10n.footerAboutText,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.6,
                         ),
                       ),
                     ],
@@ -188,17 +196,17 @@ class _AppFooterState extends State<AppFooter>
                           color: theme.colorScheme.onSurface,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       _FooterLinkItem(
                         label: l10n.destinations,
                         onTap: () => widget.onNavigate?.call(1),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       _FooterLinkItem(
                         label: l10n.recommendations,
                         onTap: () => widget.onNavigate?.call(2),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       _FooterLinkItem(
                         label: l10n.itineraries,
                         onTap: () => widget.onNavigate?.call(4),
@@ -208,7 +216,7 @@ class _AppFooterState extends State<AppFooter>
                 ),
                 // Contact column
                 SizedBox(
-                  width: 200,
+                  width: 220,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -219,15 +227,20 @@ class _AppFooterState extends State<AppFooter>
                           color: theme.colorScheme.onSurface,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       _FooterContactLine(
                         icon: Icons.email_outlined,
                         text: 'contact@yaounde.trip',
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       _FooterContactLine(
                         icon: Icons.language,
                         text: 'www.yaounde.trip',
+                      ),
+                      const SizedBox(height: 8),
+                      _FooterContactLine(
+                        icon: Icons.location_on_outlined,
+                        text: l10n.footerAddress,
                       ),
                     ],
                   ),
@@ -235,11 +248,6 @@ class _AppFooterState extends State<AppFooter>
               ],
             ),
             const SizedBox(height: 28),
-            Divider(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-              height: 1,
-            ),
-            const SizedBox(height: 20),
             // --- Bottom row: copyright + "made with love" ---
             Wrap(
               alignment: WrapAlignment.spaceBetween,

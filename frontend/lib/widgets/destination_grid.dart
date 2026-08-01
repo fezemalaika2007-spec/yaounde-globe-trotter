@@ -38,8 +38,6 @@ class DestinationGrid extends StatelessWidget {
         final mainAxisSpacing = 12.0;
 
         return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,

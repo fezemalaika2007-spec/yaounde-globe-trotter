@@ -81,13 +81,36 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
                               ? Image.network(
                                   imageUrl,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Container(
-                                    color: theme.colorScheme.primaryContainer,
-                                    child: const Icon(
-                                      Icons.place_outlined,
-                                      size: 32,
-                                    ),
-                                  ),
+                                  gaplessPlayback: true,
+                                  loadingBuilder:
+                                      (context, child, loadingProgress) {
+                                        if (loadingProgress == null) {
+                                          return child;
+                                        }
+                                        return Container(
+                                          color: theme
+                                              .colorScheme
+                                              .primaryContainer,
+                                          child: const Center(
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: theme.colorScheme.primaryContainer,
+                                      child: const Icon(
+                                        Icons.place_outlined,
+                                        size: 32,
+                                      ),
+                                    );
+                                  },
                                 )
                               : Container(
                                   color: theme.colorScheme.primaryContainer,

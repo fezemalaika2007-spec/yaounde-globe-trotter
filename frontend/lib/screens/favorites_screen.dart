@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../services/favorites_provider.dart';
 import '../widgets/destination_card.dart';
 import '../widgets/empty_state.dart';
 
@@ -14,6 +15,7 @@ class FavoritesScreen extends StatefulWidget {
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
   final _api = ApiService();
+  final _favProvider = FavoritesProvider();
   List<String> _favoriteNames = [];
   List<dynamic> _allDestinations = [];
   bool _loading = true;
@@ -22,7 +24,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   void initState() {
     super.initState();
+    _favProvider.addListener(_onFavChange);
     _fetch();
+    // kick off loading favorites in background; provider will update listeners
+    _favProvider.loadFavorites();
+  }
+
+  void _onFavChange() {
+    if (!mounted) return;
+    setState(() => _favoriteNames = _favProvider.favorites);
   }
 
   Future<void> _fetch() async {
@@ -49,7 +59,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Future<void> _toggleFavorite(String destinationName) async {
     try {
-      final updated = await _api.toggleFavorite(destinationName);
+      final updated = await _favProvider.toggleFavorite(destinationName);
       setState(() => _favoriteNames = updated);
     } on ApiException catch (e) {
       if (mounted) {
@@ -75,6 +85,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         .where((d) => _favoriteNames.contains(d['name']))
         .toList();
 
+    final hasError = _error != null;
+    final favoriteMessage = _error ?? l10n.failedToLoad;
+
     return Column(
       children: [
         Padding(
@@ -99,21 +112,27 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
-              : _error != null
+              : hasError
               ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.cloud_off,
-                        size: 48,
-                        color: theme.colorScheme.error,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 8),
-                      TextButton(onPressed: _fetch, child: Text(l10n.tryAgain)),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          favoriteMessage,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        FilledButton.tonal(
+                          onPressed: _fetch,
+                          child: Text(l10n.refresh),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : favoriteDestinations.isEmpty
@@ -147,8 +166,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       onFavoriteToggle: () => _toggleFavorite(name),
                       id: d['id'] ?? '',
                       osmId: d['osm_id'] ?? '',
-                      latitude: d['latitude'] != null ? (d['latitude'] as num).toDouble() : null,
-                      longitude: d['longitude'] != null ? (d['longitude'] as num).toDouble() : null,
+                      latitude: d['latitude'] != null
+                          ? (d['latitude'] as num).toDouble()
+                          : null,
+                      longitude: d['longitude'] != null
+                          ? (d['longitude'] as num).toDouble()
+                          : null,
                       address: d['address'] ?? '',
                       category: d['category'] ?? '',
                       activities: d['activities'] ?? [],
@@ -156,10 +179,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       phone: d['phone'] ?? '',
                       website: d['website'] ?? '',
                       email: d['email'] ?? '',
-                      priceLevel: d['price_level'] != null ? d['price_level'] as int : null,
+                      priceLevel: d['price_level'] != null
+                          ? d['price_level'] as int
+                          : null,
                       facilities: d['facilities'] ?? [],
                       cuisine: d['cuisine'] ?? '',
-                      starRating: d['star_rating'] != null ? (d['star_rating'] as num).toDouble() : null,
+                      starRating: d['star_rating'] != null
+                          ? (d['star_rating'] as num).toDouble()
+                          : null,
                       images: d['images'] ?? [],
                     );
                   },
@@ -167,5 +194,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         ),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _favProvider.removeListener(_onFavChange);
+    super.dispose();
   }
 }

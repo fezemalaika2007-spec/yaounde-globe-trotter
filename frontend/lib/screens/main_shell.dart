@@ -72,14 +72,19 @@ class _MainShellState extends State<MainShell> {
           onLocaleChanged: widget.onLocaleChanged,
           onSwitchTab: _switchTo,
         );
+        break;
       case 1:
         built = _DestinationsTab(onLocaleChanged: widget.onLocaleChanged);
+        break;
       case 2:
         built = RecommendationsScreen(onLocaleChanged: widget.onLocaleChanged);
+        break;
       case 3:
         built = FavoritesScreen(onLocaleChanged: widget.onLocaleChanged);
+        break;
       case 4:
         built = ItinerariesScreen(onLocaleChanged: widget.onLocaleChanged);
+        break;
       default:
         built = const SizedBox.shrink();
     }
@@ -691,11 +696,9 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                   onAction: _fetch,
                   actionLabel: l10n.refresh,
                 )
-              : SingleChildScrollView(
-                  child: DestinationGrid(
-                    destinations: _filteredDestinations
-                        .cast<Map<String, dynamic>>(),
-                  ),
+              : DestinationGrid(
+                  destinations: _filteredDestinations
+                      .cast<Map<String, dynamic>>(),
                 ),
         ),
       ],

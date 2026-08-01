@@ -23,6 +23,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _api = ApiService();
   List<dynamic> _featuredDestinations = [];
+  bool _featuredLoading = true;
 
   @override
   void initState() {
@@ -46,6 +47,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (_) {
       // Silently handle — home will just show no featured destinations
+    } finally {
+      if (mounted) {
+        setState(() {
+          _featuredLoading = false;
+        });
+      }
     }
   }
 
@@ -172,23 +179,77 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
               // --- Featured Destinations (from API) ---
-              if (_featuredDestinations.isNotEmpty) ...[
+              if (_featuredLoading || _featuredDestinations.isNotEmpty) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
                   child: Text(
-                    'Featured Destinations',
+                    l10n.featuredDestinations,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 SizedBox(
-                  height: 240,
+                  height: 260,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: _featuredDestinations.length,
+                    itemCount: _featuredLoading
+                        ? 4
+                        : _featuredDestinations.length,
                     itemBuilder: (_, i) {
+                      if (_featuredLoading) {
+                        return SizedBox(
+                          width: 280,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Card(
+                              clipBehavior: Clip.antiAlias,
+                              elevation: 1,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      height: 140,
+                                      decoration: BoxDecoration(
+                                        color: theme
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Container(
+                                      height: 18,
+                                      width: 140,
+                                      decoration: BoxDecoration(
+                                        color: theme
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      height: 14,
+                                      width: 90,
+                                      decoration: BoxDecoration(
+                                        color: theme
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
                       final d = _featuredDestinations[i];
                       return SizedBox(
                         width: 280,
@@ -196,11 +257,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.only(right: 8),
                           child: Card(
                             clipBehavior: Clip.antiAlias,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 SizedBox(
-                                  height: 140,
+                                  height: 150,
                                   width: double.infinity,
                                   child:
                                       d['image'] != null &&
@@ -208,20 +273,25 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ? Image.network(
                                           d['image'],
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, _, _) => Container(
-                                            color: theme
-                                                .colorScheme
-                                                .primaryContainer,
-                                            child: const Icon(
-                                              Icons.place,
-                                              size: 48,
-                                            ),
-                                          ),
+                                          errorBuilder:
+                                              (
+                                                context,
+                                                error,
+                                                stackTrace,
+                                              ) => Container(
+                                                color: theme
+                                                    .colorScheme
+                                                    .surfaceContainerHighest,
+                                                child: const Icon(
+                                                  Icons.place,
+                                                  size: 48,
+                                                ),
+                                              ),
                                         )
                                       : Container(
                                           color: theme
                                               .colorScheme
-                                              .primaryContainer,
+                                              .surfaceContainerHighest,
                                           child: const Icon(
                                             Icons.place,
                                             size: 48,
@@ -229,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.all(12),
+                                  padding: const EdgeInsets.all(14),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -243,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 8),
                                       Row(
                                         children: [
                                           const Icon(
@@ -251,7 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             size: 16,
                                             color: Colors.amber,
                                           ),
-                                          const SizedBox(width: 4),
+                                          const SizedBox(width: 6),
                                           Text(
                                             '${(d['average_rating'] ?? 0).toStringAsFixed(1)}',
                                             style: theme.textTheme.bodySmall,
@@ -305,6 +375,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       description:
                           'Create custom trip itineraries, add destinations, set dates, and keep all your travel plans in one place.',
                       onTap: () => widget.onSwitchTab?.call(4),
+                    ),
+                    _FeatureCard(
+                      icon: Icons.favorite,
+                      title: 'Save Favorite Locations',
+                      description:
+                          'Tap the heart icon on any destination to bookmark it and build your personal travel list for easy access later.',
+                      onTap: () => widget.onSwitchTab?.call(2),
                     ),
                   ],
                 ),

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
-
 import '../widgets/app_footer.dart';
+import '../widgets/destination_grid.dart';
 
 /// Callback type for requesting a tab switch from within a child widget.
 typedef OnSwitchTab = void Function(int index);
@@ -266,169 +266,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // --- Featured Destinations (from API) ---
-              if (_featuredLoading || _featuredDestinations.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                  child: Text(
-                    l10n.featuredDestinations,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 260,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: _featuredLoading
-                        ? 4
-                        : _featuredDestinations.length,
-                    itemBuilder: (_, i) {
-                      if (_featuredLoading) {
-                        return SizedBox(
-                          width: 280,
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Card(
-                              clipBehavior: Clip.antiAlias,
-                              elevation: 1,
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      height: 140,
-                                      decoration: BoxDecoration(
-                                        color: theme
-                                            .colorScheme
-                                            .surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Container(
-                                      height: 18,
-                                      width: 140,
-                                      decoration: BoxDecoration(
-                                        color: theme
-                                            .colorScheme
-                                            .surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Container(
-                                      height: 14,
-                                      width: 90,
-                                      decoration: BoxDecoration(
-                                        color: theme
-                                            .colorScheme
-                                            .surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      final d = _featuredDestinations[i];
-                      return SizedBox(
-                        width: 280,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: Card(
-                            clipBehavior: Clip.antiAlias,
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  height: 150,
-                                  width: double.infinity,
-                                  child:
-                                      d['image'] != null &&
-                                          d['image'].toString().isNotEmpty
-                                      ? Image.network(
-                                          d['image'],
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (
-                                                context,
-                                                error,
-                                                stackTrace,
-                                              ) => Container(
-                                                color: theme
-                                                    .colorScheme
-                                                    .surfaceContainerHighest,
-                                                child: const Icon(
-                                                  Icons.place,
-                                                  size: 48,
-                                                ),
-                                              ),
-                                        )
-                                      : Container(
-                                          color: theme
-                                              .colorScheme
-                                              .surfaceContainerHighest,
-                                          child: const Icon(
-                                            Icons.place,
-                                            size: 48,
-                                          ),
-                                        ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        d['name'] ?? '',
-                                        style: theme.textTheme.titleSmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.star,
-                                            size: 16,
-                                            color: Colors.amber,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            '${(d['average_rating'] ?? 0).toStringAsFixed(1)}',
-                                            style: theme.textTheme.bodySmall,
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-
               // --- Feature Cards (What you can do) ---
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
@@ -500,6 +337,30 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+
+              // --- Featured Destinations ---
+              if (_featuredLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_featuredDestinations.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
+                  child: Text(
+                    'Featured Destinations',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                DestinationGrid(
+                  destinations: _featuredDestinations
+                      .cast<Map<String, dynamic>>(),
+                  shrinkWrap: true,
+                  scrollable: false,
+                ),
+              ],
 
               const SizedBox(height: 32),
 

@@ -1,9 +1,9 @@
-/// Shared, pure helper functions for validating, deduplicating and
-/// normalizing destinations across the app (Destinations tab, Home
-/// featured list, Recommendations, Favorites).
-///
-/// Extracted into an importable library so the same rules are used
-/// everywhere and can be unit-tested without a widget tree.
+// Shared, pure helper functions for validating, deduplicating and
+// normalizing destinations across the app (Destinations tab, Home
+// featured list, Recommendations, Favorites).
+//
+// Extracted into an importable library so the same rules are used
+// everywhere and can be unit-tested without a widget tree.
 
 const List<String> kBadNamePatterns = [
   'unnamed',

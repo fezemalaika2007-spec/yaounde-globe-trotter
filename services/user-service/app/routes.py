@@ -20,7 +20,6 @@ from app.models import (
     get_user_by_id,
     get_favorites_for_user,
     toggle_favorite_for_user,
-    get_preferences_for_user,
 )
 
 user_bp = Blueprint("user", __name__)
@@ -132,6 +131,31 @@ def toggle_favorite():
 # Internal routes (for use by other services ONLY, not exposed through gateway)
 # ---------------------------------------------------------------------------
 
+@user_bp.route("/internal/users/preferences", methods=["GET"])
+@token_required
+def internal_get_preferences_and_favorites():
+    """Return the authenticated user's preferences + favorites. Internal use only.
+
+    The Recommendation Service calls this endpoint (with the user's JWT) to
+    personalise destination suggestions. This static path takes priority over
+    the dynamic ``/internal/users/<user_id>/preferences`` route.
+    """
+    username = g.current_user
+    user = get_user_by_username(username)
+    if not user:
+        return jsonify({"error": "user not found"}), 404
+    try:
+        prefs = json.loads(user["preferences"]) if isinstance(user["preferences"], str) else user["preferences"]
+    except (json.JSONDecodeError, TypeError):
+        prefs = []
+    favorites = get_favorites_for_user(username)
+    return jsonify({
+        "username": username,
+        "preferences": prefs,
+        "favorites": favorites,
+    }), 200
+
+
 @user_bp.route("/internal/users/<user_id>/preferences", methods=["GET"])
 def internal_get_user_preferences(user_id):
     """Return a user's preferences by their UUID. Internal use only."""
@@ -145,23 +169,6 @@ def internal_get_user_preferences(user_id):
     return jsonify({"user_id": user_id, "username": user["username"], "preferences": prefs}), 200
 
 
-@user_bp.route("/internal/users/preferences", methods=["GET"])
-@token_required
-def internal_get_current_user_preferences():
-    """Return the authenticated user's preferences + favorites.
 
-    JWT-protected internal endpoint consumed by the Recommendation
-    Service's scoring engine. The username is taken from the token's
-    subject claim, so no user_id needs to be passed.
 
-    Returns:
-        { "username": ..., "preferences": [...], "favorites": [...] }
-    """
-    username = g.current_user
-    preferences, favorites = get_preferences_for_user(username)
-    return jsonify({
-        "username": username,
-        "preferences": preferences,
-        "favorites": favorites,
-    }), 200
 

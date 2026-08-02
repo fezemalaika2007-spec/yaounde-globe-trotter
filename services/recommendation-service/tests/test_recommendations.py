@@ -1,4 +1,12 @@
 """tests/test_recommendations.py — pytest suite for the recommendation engine."""
+import sys
+from pathlib import Path
+
+# Ensure the service directory is on sys.path so "app" is importable.
+_service_dir = str(Path(__file__).resolve().parents[1])
+if _service_dir not in sys.path:
+    sys.path.insert(0, _service_dir)
+
 import pytest
 
 # Import the recommendation engine

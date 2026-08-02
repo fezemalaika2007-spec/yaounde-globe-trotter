@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../services/theme_provider.dart';
+import '../utils/destination_filters.dart';
 import '../widgets/destination_grid.dart';
 import '../widgets/empty_state.dart';
 import 'home_screen.dart';
@@ -643,130 +644,60 @@ class _DestinationsTabState extends State<_DestinationsTab> {
   }
 
   List<dynamic> _deduplicateDestinations(List<dynamic> destinations) {
-    final seenKeys = <String>{};
-    final unique = <dynamic>[];
-    for (final destination in destinations) {
-      if (destination is! Map<String, dynamic>) continue;
-      if (!_isDestinationValid(destination)) continue;
-      final key = _normalizeDestinationKey(destination);
-      if (key.isEmpty || seenKeys.contains(key)) continue;
-      seenKeys.add(key);
-      unique.add(destination);
-    }
-    return unique;
-  }
-
-  bool _isDestinationValid(Map<String, dynamic> destination) {
-    final name = (destination['name'] ?? '').toString().trim();
-    if (name.isEmpty || !_hasGoodName(name)) return false;
-    if (!_hasValidImage(destination)) return false;
-    if (!_hasGoodLocation(destination)) return false;
-    if (!_hasGoodDescription(destination)) return false;
-    return true;
-  }
-
-  bool _hasGoodName(String name) {
-    final normalized = name.toLowerCase();
-    if (normalized.length < 4) return false;
-    final badPatterns = [
-      'unnamed',
-      'no name',
-      'road',
-      'street',
-      'path',
-      'route',
-      'way',
-      'voie',
-      'chemin',
-      'ligne',
-      'line',
-      'unknown',
-      'null',
-      'drainage',
-      'track',
-      'roundabout',
-      'bridge',
-      'interchange',
-      'poi',
-      'point of interest',
-    ];
-    return !badPatterns.any(normalized.contains);
-  }
-
-  bool _hasValidImage(Map<String, dynamic> destination) {
-    final image = (destination['image'] ?? '').toString().trim();
-    if (image.isEmpty) return false;
-    if (image.startsWith('http://') || image.startsWith('https://')) {
-      return true;
-    }
-    return false;
-  }
-
-  bool _hasGoodLocation(Map<String, dynamic> destination) {
-    final area = (destination['area'] ?? '').toString().toLowerCase();
-    final city = (destination['city'] ?? '').toString().toLowerCase();
-    final tags = ((destination['tags'] as List<dynamic>?) ?? [])
-        .map((tag) => tag.toString().toLowerCase())
-        .toList();
-    final name = (destination['name'] ?? '').toString().toLowerCase();
-
-    if (area.contains('yaound') || city.contains('yaound')) return true;
-    if (name.contains('yaound')) return true;
-    if (tags.any((tag) => tag.contains('yaound') || tag.contains('cameroon'))) {
-      return true;
-    }
-    return false;
-  }
-
-  bool _hasGoodDescription(Map<String, dynamic> destination) {
-    final desc = (destination['description'] ?? '').toString().trim();
-    if (desc.isEmpty) {
-      final tags = (destination['tags'] as List<dynamic>?) ?? [];
-      final category = (destination['category'] ?? '').toString().trim();
-      return tags.length >= 2 || category.isNotEmpty;
-    }
-    if (desc.length < 30) return false;
-    final badDescPatterns = [
-      'no description',
-      'n/a',
-      'none',
-      'unknown',
-      'no details',
-      'no info',
-    ];
-    return !badDescPatterns.any(desc.toLowerCase().contains);
-  }
-
-  String _normalizeDestinationKey(Map<String, dynamic> destination) {
-    final id = destination['id']?.toString().trim();
-    if (id?.isNotEmpty == true) return id!;
-    final name = (destination['name'] ?? '').toString().trim();
-    final image = (destination['image'] ?? '').toString().trim();
-    if (name.isNotEmpty && image.isNotEmpty) {
-      return '${_normalizeString(name)}|${image.toLowerCase()}';
-    }
-    if (name.isNotEmpty) {
-      return _normalizeString(name);
-    }
-    return image;
-  }
-
-  String _normalizeString(String value) {
-    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+    return deduplicateDestinations(destinations);
   }
 
   void _applyLocalFilters() {
     final query = _searchCtrl.text.trim().toLowerCase();
     if (query.isEmpty) {
       _filteredDestinations = List.from(_allDestinations);
-    } else {
+      setState(() {});
+      return;
+    }
+    // When a search query is typed, also perform a live internet search on
+    // the backend. Merge local results with live Overpass results.
+    _searchLive(query);
+  }
+
+  Future<void> _searchLive(String query) async {
+    try {
+      final liveResults = await _api.searchDestinations(query, limit: 12);
+      // Merge local + live results, deduplicate by normalized key from
+      // the shared destination_filters helpers.
+      final merged = List<Map<String, dynamic>>.from(
+        _allDestinations.cast<Map<String, dynamic>>(),
+      );
+      for (final live in liveResults) {
+        if (live is! Map<String, dynamic>) continue;
+        if (!isDestinationValid(live)) continue;
+        final key = normalizeDestinationKey(live);
+        if (key.isEmpty) continue;
+        final alreadyExists = merged.any(
+          (m) => normalizeDestinationKey(m) == key,
+        );
+        if (!alreadyExists) {
+          merged.add(live);
+        }
+      }
+      // Filter merged list by search query.
+      _filteredDestinations = merged.where((d) {
+        final name = (d['name'] ?? '').toString().toLowerCase();
+        final desc = (d['description'] ?? '').toString().toLowerCase();
+        final area = (d['area'] ?? '').toString().toLowerCase();
+        final tags = (d['tags'] ?? []).join(' ').toLowerCase();
+        final searchable = '$name $desc $area $tags';
+        return searchable.contains(query);
+      }).toList();
+      setState(() {});
+    } catch (_) {
+      // Fallback to local-only filtering if live search fails.
       _filteredDestinations = _allDestinations.where((d) {
         final name = (d['name'] ?? '').toString().toLowerCase();
         final desc = (d['description'] ?? '').toString().toLowerCase();
         return name.contains(query) || desc.contains(query);
       }).toList();
+      setState(() {});
     }
-    setState(() {});
   }
 
   /// Merged view: local filtered destinations first, then unique live
@@ -778,13 +709,13 @@ class _DestinationsTabState extends State<_DestinationsTab> {
     final merged = <dynamic>[];
     for (final d in _filteredDestinations) {
       if (d is! Map<String, dynamic>) continue;
-      final key = _normalizeDestinationKey(d);
+      final key = normalizeDestinationKey(d);
       if (key.isNotEmpty) seenKeys.add(key);
       merged.add(d);
     }
     for (final d in _liveResults) {
       if (d is! Map<String, dynamic>) continue;
-      final key = _normalizeDestinationKey(d);
+      final key = normalizeDestinationKey(d);
       if (key.isNotEmpty && seenKeys.contains(key)) continue;
       if (key.isNotEmpty) seenKeys.add(key);
       merged.add(d);

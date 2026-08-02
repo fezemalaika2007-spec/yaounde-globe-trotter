@@ -122,7 +122,9 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
               decoration: BoxDecoration(
                 color: _currentImageIndex == i
                     ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
             );

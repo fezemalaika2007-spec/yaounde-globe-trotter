@@ -17,7 +17,20 @@ import 'destination_grid_card.dart';
 class DestinationGrid extends StatelessWidget {
   final List<Map<String, dynamic>> destinations;
 
-  const DestinationGrid({super.key, required this.destinations});
+  /// When true, the grid sizes itself to its content so it can be placed
+  /// inside a scrollable parent (e.g. the Home screen's featured section).
+  final bool shrinkWrap;
+
+  /// When [shrinkWrap] is true and [scrollable] is false, the grid does not
+  /// scroll independently so the parent scroll view owns the scroll gesture.
+  final bool scrollable;
+
+  const DestinationGrid({
+    super.key,
+    required this.destinations,
+    this.shrinkWrap = false,
+    this.scrollable = false,
+  });
 
   int _columnCount(double width) {
     if (width <= 600) return 2;
@@ -45,6 +58,10 @@ class DestinationGrid extends StatelessWidget {
             mainAxisSpacing: mainAxisSpacing,
             childAspectRatio: 0.72,
           ),
+          shrinkWrap: shrinkWrap,
+          physics: shrinkWrap && !scrollable
+              ? const NeverScrollableScrollPhysics()
+              : null,
           itemCount: destinations.length,
           itemBuilder: (context, index) {
             return DestinationGridCard(destination: destinations[index]);

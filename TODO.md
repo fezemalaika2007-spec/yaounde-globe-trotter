@@ -1,31 +1,23 @@
-# Task Implementation Checklist
+# Yaounde.Trip - Fix Plan
 
-## Backend — Recommendation Service
-- [x] 1. Make placeholder image selection deterministic (MD5) + pool helper in `image_utils.py`
-- [x] 2. Add `search_overpass()` live internet search + stricter image dedup in `overpass_sync.py`
-- [x] 3. Add `GET /search` endpoint + wire real `/recommendations` in `routes.py`
-- [x] 4. Fix `_fetch_user_preferences` in `recommendations.py` to call new internal endpoint
+## Information Gathered
+- **Backend**: 4 Flask microservices (api-gateway, user-service, itinerary-service, recommendation-service) with SQLite databases  
+  - Backend already has: recommendations engine, live search (`/search`), internal preferences endpoint, favorites endpoints
+- **Frontend**: Flutter app with lazy tab loading, destination grid, favorites, recommendations  
+  - Frontend already has: `searchDestinations()` in ApiService, `ApiConfig.search` endpoint
 
-## Backend — User Service + Gateway
-- [x] 5. Add JWT-protected `GET /internal/users/preferences` (preferences + favorites) in `user-service/routes.py`
-- [x] 6. Add `/search` proxy route in `api-gateway/routes.py`
+## Remaining Issues to Fix
 
-## Frontend — Live Search + Image Dedup + Performance
-- [x] 7. Add `/search` to `api_config.dart`; add `searchDestinations()` + injectable http.Client in `api_service.dart`
-- [x] 8. Create `lib/utils/destination_filters.dart` (shared pure validity/dedup helpers)
-- [x] 9. Destinations tab: local-first search + "Search online…" live Overpass action in `main_shell.dart`
-- [x] 10. Unique-gallery helper + cacheWidth + prefer long_description in `destination_details_screen.dart`
-- [x] 11. cacheWidth/gaplessPlayback in `destination_grid_card.dart` and `destination_card.dart`
-- [x] 12. Recommendations screen: personalized picks + Trending/Top-rated + rich empty state
+### Phase 1: Frontend Search Bar - Live Internet Search
+- [ ] Update `_DestinationsTab` in `main_shell.dart` to call live search API when local results are insufficient
+- [ ] Show "Searching the web..." indicator during live search
 
-## Tests
-- [x] 13. Add `frontend/test/destination_filters_test.dart` (pure function unit tests)
-- [x] 14. Extend `frontend/test/destination_details_screen_test.dart` (unique gallery + long_description precedence)
-- [x] 15. Extend `test_normalization.py` (image URL dedup/description quality)
-- [x] 16. Add `test_recommendations.py` (scoring + diversity)
-- [x] 17. Extend `test_user_service.py` (preferences endpoint)
+### Phase 2: Fix Favorites Screen Error Handling
+- [ ] Ensure `FavoritesScreen` properly handles errors and shows retry button
+- [ ] Ensure `FavoritesProvider` load errors are propagated correctly
 
-## Verification
-- [x] 18. Run `flutter analyze` and `flutter test`
-- [x] 19. Run `pytest` for recommendation & user services
-- [x] 20. All tests pass — task complete!
+### Phase 3: Fix Destination Details Image Deduplication
+- [ ] Ensure `DestinationDetailScreen` gallery deduplicates images properly
+
+### Phase 4: Testing
+- [ ] Generate unit tests for backend normalization and frontend widgets

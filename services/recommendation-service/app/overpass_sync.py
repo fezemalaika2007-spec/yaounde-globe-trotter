@@ -422,69 +422,6 @@ def _normalize_image_url(url: str) -> str:
     except Exception:
         return url.rstrip('/')
 
-def search_overpass(query, bbox=YAOUNDE_BBOX, limit=20, app=None):
-    """Perform a LIVE internet search against the OpenStreetMap Overpass API.
-
-    Searches Yaoundé (or *bbox*) for any POI whose name matches *query*
-    (case-insensitive free-text). Unlike the synced database, this reaches
-    the live Overpass API so users can discover destinations that are not
-    yet in the local DB.
-
-    *app* is accepted for symmetry with the sync functions (kept for
-    optional future persistence of live results); it is not required.
-
-    Returns a list of normalized destination dicts (same shape as the
-    synced destinations), with disallowed venues filtered out.
-    """
-    if not query or not query.strip():
-        return []
-
-    escaped = _escape_overpass_regex(query.strip())
-    overpass_query = f"""
-[out:json][timeout:45];
-(
-  nwr["name"~"{escaped}",i]({bbox});
-);
-out center;
-"""
-    try:
-        logger.info(f"Live Overpass search for '{query}' in {bbox}...")
-        response = requests.get(
-            OVERPASS_URL,
-            params={"data": overpass_query},
-            timeout=45,
-            headers={"User-Agent": "YaoundeGlobeTrotter/1.0"}
-        )
-        response.raise_for_status()
-        data = response.json()
-        elements = data.get("elements", [])
-
-        normalized_list = []
-        for element in elements:
-            try:
-                normalized = _normalize_osm_element(element)
-                if normalized:
-                    normalized_list.append(normalized)
-            except Exception as e:
-                logger.warning(
-                    f"Error normalizing live search element {element.get('id')}: {e}"
-                )
-        return normalized_list[:limit]
-    except requests.exceptions.RequestException as e:
-        logger.warning(f"Live Overpass search failed: {e}")
-        return []
-
-
-def _escape_overpass_regex(value):
-    """Escape a user query for safe embedding in an Overpass regex."""
-    import re
-    # Escape regex metacharacters, keep word chars and spaces.
-    escaped = re.escape(value)
-    # Replace escaped spaces with a generic whitespace matcher for flexibility.
-    escaped = escaped.replace(r'\ ', ' ').replace(' ', r'\s+')
-    return escaped
-
-
 # ---------------------------------------------------------------------------
 # Future-Compatible Provider Architecture
 # ---------------------------------------------------------------------------

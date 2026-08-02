@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
+import '../services/favorites_provider.dart';
 import '../utils/image_paths.dart';
 import '../widgets/auth_background.dart';
 
@@ -38,6 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await AuthProvider().login(_usernameCtrl.text.trim(), _passwordCtrl.text);
+      await FavoritesProvider().loadFavorites().catchError((e) {
+        debugPrint('Error loading favorites after login: $e');
+      });
       // Ensure the login route is removed and return to app root so
       // `AuthGate` can rebuild and show `MainShell` when auth state changes.
       if (mounted) {

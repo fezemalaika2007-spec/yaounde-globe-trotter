@@ -112,6 +112,12 @@ def get_recommendations():
     return _proxy("GET", f"{RECOMMENDATION_SERVICE_URL}/recommendations")
 
 
+@gateway_bp.route("/favorites", methods=["GET", "POST"])
+def favorites():
+    method = request.method
+    return _proxy(method, f"{USER_SERVICE_URL}/favorites")
+
+
 @gateway_bp.route("/sync-destinations", methods=["POST"])
 def sync_destinations():
     return _proxy("POST", f"{RECOMMENDATION_SERVICE_URL}/sync-destinations")

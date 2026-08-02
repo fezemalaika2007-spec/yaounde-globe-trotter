@@ -17,15 +17,18 @@ class FavoritesProvider extends ChangeNotifier {
 
   bool isFavorite(String name) => _favorites.contains(name);
 
-  /// Load favorites from the backend. Swallows errors and leaves the list
-  /// empty so the UI can show an empty state instead of an error page.
-  Future<void> loadFavorites() async {
+  /// Load favorites from the backend.
+  ///
+  /// If [propagateErrors] is true, any exception is rethrown so callers can
+  /// handle it explicitly. Otherwise errors are swallowed and the list is
+  /// reset to empty so UI components can display a neutral empty state.
+  Future<void> loadFavorites({bool propagateErrors = false}) async {
     try {
       final results = await _api.getFavorites();
       _favorites = results.cast<String>();
       notifyListeners();
-    } catch (_) {
-      // On any error, keep an empty list and notify so listeners can update.
+    } catch (e) {
+      if (propagateErrors) rethrow;
       _favorites = [];
       notifyListeners();
     }

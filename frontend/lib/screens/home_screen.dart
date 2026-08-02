@@ -33,20 +33,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadFeatured() async {
     try {
-      // Pull a few real destinations from the API for the home screen.
-      // Bounded with a timeout so a slow/unreachable backend never leaves
-      // the home page janky — the rest of the page renders regardless.
       final destinations = await _api.getDestinations().timeout(
         const Duration(seconds: 4),
       );
       if (mounted) {
         setState(() {
-          // Take first 3-4 destinations to feature on home
-          _featuredDestinations = destinations.take(4).toList();
+          _featuredDestinations = _selectFeaturedDestinations(destinations);
         });
       }
     } catch (_) {
-      // Silently handle — home will just show no featured destinations
+      // Silently handle — home will just show no featured destinations.
     } finally {
       if (mounted) {
         setState(() {
@@ -54,6 +50,98 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+  }
+
+  List<dynamic> _selectFeaturedDestinations(List<dynamic> destinations) {
+    final seenKeys = <String>{};
+    final filtered = <dynamic>[];
+    for (final destination in destinations) {
+      if (destination is! Map<String, dynamic>) continue;
+      if (!_isFeaturedDestinationValid(destination)) continue;
+
+      final key = _normalizeDestinationKey(destination);
+      if (key.isEmpty || seenKeys.contains(key)) continue;
+      seenKeys.add(key);
+      filtered.add(destination);
+      if (filtered.length >= 4) break;
+    }
+    return filtered;
+  }
+
+  bool _isFeaturedDestinationValid(Map<String, dynamic> destination) {
+    final name = (destination['name'] ?? '').toString().trim();
+    if (name.isEmpty || !_hasGoodName(name)) return false;
+    if (!_hasValidImage(destination)) return false;
+    if (!_hasGoodLocation(destination)) return false;
+
+    final desc = (destination['description'] ?? '').toString().trim();
+    if (desc.isEmpty) return false;
+    if (desc.length < 30) return false;
+
+    return true;
+  }
+
+  bool _hasGoodName(String name) {
+    final normalized = name.toLowerCase();
+    if (normalized.length < 4) return false;
+    final badPatterns = [
+      'unnamed',
+      'no name',
+      'road',
+      'street',
+      'path',
+      'route',
+      'way',
+      'voie',
+      'chemin',
+      'ligne',
+      'line',
+      'unknown',
+      'null',
+      'drainage',
+      'track',
+      'roundabout',
+      'bridge',
+      'interchange',
+      'poi',
+      'point of interest',
+    ];
+    return !badPatterns.any(normalized.contains);
+  }
+
+  bool _hasValidImage(Map<String, dynamic> destination) {
+    final image = (destination['image'] ?? '').toString().trim();
+    return image.startsWith('http://') || image.startsWith('https://');
+  }
+
+  bool _hasGoodLocation(Map<String, dynamic> destination) {
+    final area = (destination['area'] ?? '').toString().toLowerCase();
+    final city = (destination['city'] ?? '').toString().toLowerCase();
+    final tags = ((destination['tags'] as List<dynamic>?) ?? [])
+        .map((tag) => tag.toString().toLowerCase())
+        .toList();
+    final name = (destination['name'] ?? '').toString().toLowerCase();
+
+    if (area.contains('yaound') || city.contains('yaound')) return true;
+    if (name.contains('yaound')) return true;
+    if (tags.any((tag) => tag.contains('yaound') || tag.contains('cameroon'))) {
+      return true;
+    }
+    return false;
+  }
+
+  String _normalizeDestinationKey(Map<String, dynamic> destination) {
+    final id = destination['id']?.toString().trim();
+    if (id?.isNotEmpty == true) return id!;
+    final name = (destination['name'] ?? '').toString().trim();
+    final image = (destination['image'] ?? '').toString().trim();
+    if (name.isNotEmpty && image.isNotEmpty) {
+      return '${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim()}|${image.toLowerCase()}';
+    }
+    if (name.isNotEmpty) {
+      return name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+    }
+    return image;
   }
 
   @override

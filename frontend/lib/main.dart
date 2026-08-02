@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'l10n/app_localizations.dart';
 import 'services/auth_provider.dart';
+import 'services/favorites_provider.dart';
 import 'services/theme_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
@@ -147,23 +148,37 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  bool _checkingAuth = true;
+
   @override
   void initState() {
     super.initState();
-    // Kick off the auth-status check in the background — never block the
-    // first frame. The login screen renders immediately; if a stored token
-    // is found, AuthProvider notifies listeners and this widget swaps to
-    // MainShell automatically.
-    AuthProvider().checkAuthStatus().catchError((e) {
-      debugPrint('Error during auth check: $e');
-    });
     AuthProvider().addListener(_onAuthChange);
+    _resolveAuthStatus();
   }
 
   @override
   void dispose() {
     AuthProvider().removeListener(_onAuthChange);
     super.dispose();
+  }
+
+  Future<void> _resolveAuthStatus() async {
+    try {
+      await AuthProvider().checkAuthStatus();
+      if (AuthProvider().isLoggedIn) {
+        await FavoritesProvider().loadFavorites().catchError((e) {
+          debugPrint('Error loading favorites after auth check: $e');
+        });
+      }
+    } catch (e) {
+      debugPrint('Error during auth check: $e');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _checkingAuth = false;
+    });
   }
 
   void _onAuthChange() {
@@ -173,6 +188,10 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingAuth) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final auth = AuthProvider();
     if (auth.isLoggedIn) {
       return MainShell(onLocaleChanged: widget.onLocaleChanged);

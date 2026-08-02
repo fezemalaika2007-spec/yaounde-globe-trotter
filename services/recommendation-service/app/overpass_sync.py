@@ -12,6 +12,7 @@ import datetime
 import requests
 import threading
 from app.image_utils import fetch_wikimedia_image, get_placeholder_image
+from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +44,7 @@ RELEVANT_TAGS = [
     ("amenity", "place_of_worship", "culture"),
     ("amenity", "park", "nature"),
     ("amenity", "cinema", "culture"),
-    ("amenity", "bar", "food"),
-    ("amenity", "pub", "food"),
     ("amenity", "fast_food", "food"),
-    ("amenity", "nightclub", "food"),
     ("amenity", "arts_centre", "culture"),
     
     ("leisure", "park", "nature"),
@@ -112,7 +110,150 @@ RELEVANT_TAGS = [
     ("sport", "running", "sports"),
     ("sport", "cycling", "sports"),
 ]
+DISALLOWED_TAGS = {
+    ("amenity", "bar"),
+    ("amenity", "pub"),
+    ("amenity", "nightclub"),
+    ("amenity", "stripclub"),
+    ("shop", "tobacco"),
+    ("leisure", "adult_gaming_centre"),
+}
 
+DISALLOWED_KEYWORDS = [
+    "alcohol",
+    "smoking",
+    "tobacco",
+    "casino",
+    "gambling",
+    "hookah",
+    "shisha",
+    "cigar",
+]
+
+
+def _is_disallowed_destination(tags):
+    lower_tags = {
+        key.lower(): (value.lower() if isinstance(value, str) else value)
+        for key, value in tags.items()
+    }
+
+    if (lower_tags.get("amenity"), lower_tags.get("bar")) in DISALLOWED_TAGS:
+        return True
+
+    if lower_tags.get("amenity") in {"bar", "pub", "nightclub", "stripclub"}:
+        return True
+    if lower_tags.get("shop") == "tobacco":
+        return True
+    if lower_tags.get("leisure") == "adult_gaming_centre":
+        return True
+
+    if lower_tags.get("smoking") in {"yes", "designated", "permitted"}:
+        return True
+
+    name = lower_tags.get("name", "")
+    description = lower_tags.get("description", "")
+    for keyword in DISALLOWED_KEYWORDS:
+        if keyword in name or keyword in description:
+            return True
+
+    return False
+
+
+def _build_long_description(
+    name,
+    tags,
+    primary_category,
+    cuisine,
+    opening_hours,
+    phone,
+    website,
+    address,
+):
+    description = tags.get("description", "").strip()
+    if description:
+        return description
+
+    parts = []
+    amenity = tags.get("amenity", "")
+    tourism = tags.get("tourism", "")
+    leisure = tags.get("leisure", "")
+
+    if amenity == "restaurant":
+        parts.append(
+            f"{name} is a restaurant in Yaoundé known for {cuisine or 'local'} cuisine."
+        )
+    elif amenity == "cafe":
+        parts.append(
+            f"{name} is a café offering a relaxed spot for coffee and light bites."
+        )
+    elif amenity == "fast_food":
+        parts.append(
+            f"{name} is a fast-food destination popular for quick meals in Yaoundé."
+        )
+    elif tourism == "museum":
+        parts.append(
+            f"{name} is a museum offering cultural exhibits and historical insight."
+        )
+    elif tourism == "viewpoint":
+        parts.append(
+            f"{name} is a scenic viewpoint with great views over Yaoundé."
+        )
+    elif tourism == "hotel" or tourism == "guest_house" or tourism == "hostel":
+        parts.append(
+            f"{name} is a hospitality venue offering stay options for visitors."
+        )
+    elif leisure == "park" or leisure == "garden":
+        parts.append(
+            f"{name} is a green space for outdoor recreation and relaxation."
+        )
+    elif amenity == "library":
+        parts.append(
+            f"{name} is a public library serving readers and researchers."
+        )
+    elif amenity == "theatre" or amenity == "cinema":
+        parts.append(
+            f"{name} is an entertainment venue for films and performances."
+        )
+    elif primary_category == "culture":
+        parts.append(
+            f"{name} is a cultural destination with local significance in Yaoundé."
+        )
+    elif primary_category == "nature":
+        parts.append(
+            f"{name} is a nature destination offering outdoor experiences."
+        )
+    else:
+        parts.append(f"{name} is a destination in Yaoundé, Cameroon.")
+
+    if cuisine and amenity in {"restaurant", "cafe", "fast_food"}:
+        parts.append(f"It features {cuisine} cuisine.")
+    if address:
+        parts.append(f"Located at {address}.")
+    if opening_hours:
+        parts.append(f"Opens: {opening_hours}.")
+    if website:
+        parts.append("Website information is available.")
+    if phone:
+        parts.append("Contact details are provided.")
+
+    return " ".join(parts)
+
+
+def _normalize_image_url(url: str) -> str:
+    """Normalize image URLs by removing query strings and fragments and trailing slashes.
+    This helps deduplicate the same image served with different query params.
+    """
+    if not url:
+        return ""
+    try:
+        p = urlparse(url)
+        # Keep scheme, netloc and path only; normalize scheme/netloc to lowercase
+        scheme = (p.scheme or 'https').lower()
+        netloc = (p.netloc or '').lower()
+        cleaned = urlunparse((scheme, netloc, p.path.rstrip('/'), '', '', ''))
+        return cleaned
+    except Exception:
+        return url.rstrip('/')
 
 # ---------------------------------------------------------------------------
 # Future-Compatible Provider Architecture
@@ -454,6 +595,9 @@ def _normalize_osm_element(element):
     if not name:
         return None  # Skip unnamed elements
 
+    if _is_disallowed_destination(tags):
+        return None
+
     # Determine primary tag/category
     primary_category = "attraction"
     for key, value, category in RELEVANT_TAGS:
@@ -540,21 +684,16 @@ def _normalize_osm_element(element):
             price_level = 2
 
     # 8. Description from tags
-    description = tags.get("description", "")
-    if not description:
-        parts = []
-        if cuisine:
-            parts.append(f"Serves {cuisine} cuisine")
-        if opening_hours:
-            parts.append(f"Open: {opening_hours}")
-        if phone:
-            parts.append(f"Contact: {phone}")
-        if website:
-            parts.append(f"Website available")
-        if parts:
-            description = f"{name} — {' | '.join(parts)}."
-        else:
-            description = f"A {primary_category} destination in Yaoundé, Cameroon."
+    description = _build_long_description(
+        name,
+        tags,
+        primary_category,
+        cuisine,
+        opening_hours,
+        phone,
+        website,
+        address,
+    )
 
     # 9. Activities & Experiences mapping
     activities = _map_activities(tags, primary_category)
@@ -575,9 +714,9 @@ def _normalize_osm_element(element):
     seen_urls = set()
 
     if osm_image and len(image_list) < MAX_IMAGES:
-        normalized_url = osm_image.rstrip('/')
-        if normalized_url not in seen_urls:
-            image_list.append(osm_image)
+        normalized_url = _normalize_image_url(osm_image)
+        if normalized_url and normalized_url not in seen_urls:
+            image_list.append(normalized_url)
             seen_urls.add(normalized_url)
             image_source = "osm"
 
@@ -591,16 +730,16 @@ def _normalize_osm_element(element):
             for img in fetched_images:
                 if len(image_list) >= MAX_IMAGES:
                     break
-                normalized_url = img.rstrip('/')
-                if normalized_url not in seen_urls:
-                    image_list.append(img)
+                normalized_url = _normalize_image_url(img)
+                if normalized_url and normalized_url not in seen_urls:
+                    image_list.append(normalized_url)
                     seen_urls.add(normalized_url)
             if image_list:
                 image_source = "wikimedia"
 
     # Fallback to placeholder if no images found (max 1 placeholder)
     if not image_list:
-        placeholder_img = get_placeholder_image(primary_category, name)
+        placeholder_img = _normalize_image_url(get_placeholder_image(primary_category, name))
         image_list.append(placeholder_img)
         image_source = "placeholder"
 
@@ -613,6 +752,7 @@ def _normalize_osm_element(element):
         "area": area,
         "tags": normalized_tags,
         "description": description,
+        "long_description": description,
         "cost": price_level * 10000 if price_level else None,  # Cost in XAF
         "image": main_image,
         "image_source": image_source,
@@ -772,6 +912,7 @@ def deduplicate_and_sync(incoming_list, app=None):
             area=item["area"],
             tags=item["tags"],
             description=item["description"],
+            long_description=item.get("long_description", item.get("description", "")),
             cost=item["cost"],
             image=item["image"],
             image_source=item["image_source"],
@@ -801,7 +942,7 @@ def deduplicate_and_sync(incoming_list, app=None):
             conn.execute("""
                 UPDATE destinations SET
                     osm_id = ?, name = ?, area = ?, tags = ?, description = ?,
-                    cost = ?, image = ?, image_source = ?, last_synced_at = ?,
+                    long_description = ?, cost = ?, image = ?, image_source = ?, last_synced_at = ?,
                     latitude = ?, longitude = ?, address = ?, category = ?,
                     activities = ?, opening_hours = ?, phone = ?, website = ?,
                     email = ?, price_level = ?, facilities = ?, cuisine = ?,
@@ -809,7 +950,7 @@ def deduplicate_and_sync(incoming_list, app=None):
                 WHERE id = ?
             """, (
                 item["osm_id"], item["name"], item["area"], json.dumps(item["tags"]), item["description"],
-                item["cost"], item["image"], item["image_source"], now,
+                item.get("long_description", item.get("description", "")), item["cost"], item["image"], item["image_source"], now,
                 item["latitude"], item["longitude"], item["address"], item["category"],
                 json.dumps(item["activities"]), item["opening_hours"], item["phone"], item["website"],
                 item["email"], item["price_level"], json.dumps(item["facilities"]), item["cuisine"],

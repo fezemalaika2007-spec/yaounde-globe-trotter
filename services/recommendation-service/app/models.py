@@ -83,6 +83,7 @@ def init_db(app=None):
         ("cuisine", "TEXT DEFAULT ''"),
         ("star_rating", "REAL"),
         ("images", "TEXT DEFAULT '[]'")
+        ,("long_description", "TEXT DEFAULT ''")
     ]
     
     for col_name, col_type in new_columns:
@@ -159,10 +160,9 @@ def upsert_destination(
     osm_id, name, area, tags, description, cost, image, image_source,
     latitude=None, longitude=None, address='', category='', activities=None,
     opening_hours='', phone='', website='', email='', price_level=None,
-    facilities=None, cuisine='', star_rating=None, images=None, app=None
+    facilities=None, cuisine='', star_rating=None, images=None, long_description='', app=None
 ):
     """Insert or update a destination by osm_id (stable OSM identifier)."""
-    import json
     conn = get_connection(app)
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
@@ -175,11 +175,10 @@ def upsert_destination(
     existing = conn.execute("SELECT * FROM destinations WHERE osm_id = ?", (osm_id,)).fetchone()
 
     if existing:
-        # Update — preserve existing average_rating and rating_count
         existing_dict = dict(existing)
         conn.execute("""
             UPDATE destinations SET
-                name = ?, area = ?, tags = ?, description = ?,
+                name = ?, area = ?, tags = ?, description = ?, long_description = ?,
                 cost = ?, image = ?, image_source = ?, last_synced_at = ?,
                 latitude = ?, longitude = ?, address = ?, category = ?,
                 activities = ?, opening_hours = ?, phone = ?, website = ?,
@@ -187,7 +186,8 @@ def upsert_destination(
                 star_rating = ?, images = ?
             WHERE osm_id = ?
         """, (
-            name, area, json.dumps(tags), description, cost, image, image_source, now,
+            name, area, json.dumps(tags), description, long_description,
+            cost, image, image_source, now,
             latitude, longitude, address, category,
             json.dumps(activities_val), opening_hours, phone, website,
             email, price_level, json.dumps(facilities_val), cuisine,
@@ -195,18 +195,17 @@ def upsert_destination(
         ))
         result_id = existing_dict["id"]
     else:
-        # Insert new destination
         dest_id = str(uuid.uuid4())
         conn.execute("""
             INSERT INTO destinations (
-                id, osm_id, name, area, tags, description, cost, image, image_source,
+                id, osm_id, name, area, tags, description, long_description, cost, image, image_source,
                 latitude, longitude, address, category, activities, opening_hours,
                 phone, website, email, price_level, facilities, cuisine, star_rating,
                 images, average_rating, rating_count, last_synced_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0, ?)
         """, (
-            dest_id, osm_id, name, area, json.dumps(tags), description, cost, image, image_source,
+            dest_id, osm_id, name, area, json.dumps(tags), description, long_description, cost, image, image_source,
             latitude, longitude, address, category, json.dumps(activities_val), opening_hours,
             phone, website, email, price_level, json.dumps(facilities_val), cuisine, star_rating,
             json.dumps(images_val), now

@@ -10,10 +10,17 @@ import datetime
 import json
 
 import jwt
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, g
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from app.models import get_user_by_username, create_user, get_user_by_id
+from app.auth_middleware import token_required
+from app.models import (
+    get_user_by_username,
+    create_user,
+    get_user_by_id,
+    get_favorites_for_user,
+    toggle_favorite_for_user,
+)
 
 user_bp = Blueprint("user", __name__)
 
@@ -95,6 +102,29 @@ def login():
 
     token = create_token(username, current_app.config["SECRET_KEY"])
     return jsonify({"token": token}), 200
+
+
+@user_bp.route("/favorites", methods=["GET"])
+@token_required
+def get_favorites():
+    username = g.current_user
+    favorites = get_favorites_for_user(username)
+    return jsonify(favorites), 200
+
+
+@user_bp.route("/favorites", methods=["POST"])
+@token_required
+def toggle_favorite():
+    username = g.current_user
+    data = request.get_json(silent=True) or {}
+    destination_name = data.get("destination")
+    if not destination_name or not destination_name.strip():
+        return jsonify({"error": "destination is required"}), 400
+    try:
+        favorites = toggle_favorite_for_user(username, destination_name)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(favorites), 200
 
 
 # ---------------------------------------------------------------------------

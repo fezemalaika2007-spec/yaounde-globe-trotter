@@ -135,10 +135,7 @@ def get_recommendations():
     """
     username = g.current_user
 
-    return jsonify({
-        "recommendations": [],
-        "message": "Personalized recommendations coming soon",
-    }), 200
+    return jsonify([]), 200
 
 
 @recommendation_bp.route("/sync-destinations", methods=["POST"])

@@ -25,9 +25,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   void initState() {
     super.initState();
     _favProvider.addListener(_onFavChange);
+    _favoriteNames = _favProvider.favorites;
     _fetch();
-    // kick off loading favorites in background; provider will update listeners
-    _favProvider.loadFavorites();
   }
 
   void _onFavChange() {
@@ -44,10 +43,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     try {
       final results = await Future.wait([
         _api.getDestinations(),
-        _api.getFavorites(),
+        _favProvider.loadFavorites(propagateErrors: true),
       ]);
-      _allDestinations = results[0];
-      _favoriteNames = results[1].cast<String>();
+      _allDestinations = results[0] as List<dynamic>;
+      _favoriteNames = _favProvider.favorites;
     } on ApiException catch (e) {
       _error = e.message;
     } catch (_) {
@@ -139,7 +138,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               ? EmptyState(
                   icon: Icons.favorite_border,
                   title: l10n.noFavorites,
-                  message: l10n.noFavoritesMessage,
+                  message: _favoriteNames.isEmpty
+                      ? l10n.noFavoritesMessage
+                      : l10n.noFavorites,
                   onAction: _fetch,
                   actionLabel: l10n.refresh,
                 )

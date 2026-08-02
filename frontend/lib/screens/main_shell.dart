@@ -77,7 +77,10 @@ class _MainShellState extends State<MainShell> {
         built = _DestinationsTab(onLocaleChanged: widget.onLocaleChanged);
         break;
       case 2:
-        built = RecommendationsScreen(onLocaleChanged: widget.onLocaleChanged);
+        built = RecommendationsScreen(
+          onLocaleChanged: widget.onLocaleChanged,
+          onExplore: () => _switchTo(1),
+        );
         break;
       case 3:
         built = FavoritesScreen(onLocaleChanged: widget.onLocaleChanged);
@@ -579,7 +582,7 @@ class _DestinationsTabState extends State<_DestinationsTab> {
         tag: _tagCtrl.text.trim().isEmpty ? null : _tagCtrl.text.trim(),
         maxCost: maxCost,
       );
-      _allDestinations = results;
+      _allDestinations = _deduplicateDestinations(results);
       _applyLocalFilters();
     } on ApiException catch (e) {
       _error = e.message;
@@ -588,6 +591,119 @@ class _DestinationsTabState extends State<_DestinationsTab> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  List<dynamic> _deduplicateDestinations(List<dynamic> destinations) {
+    final seenKeys = <String>{};
+    final unique = <dynamic>[];
+    for (final destination in destinations) {
+      if (destination is! Map<String, dynamic>) continue;
+      if (!_isDestinationValid(destination)) continue;
+      final key = _normalizeDestinationKey(destination);
+      if (key.isEmpty || seenKeys.contains(key)) continue;
+      seenKeys.add(key);
+      unique.add(destination);
+    }
+    return unique;
+  }
+
+  bool _isDestinationValid(Map<String, dynamic> destination) {
+    final name = (destination['name'] ?? '').toString().trim();
+    if (name.isEmpty || !_hasGoodName(name)) return false;
+    if (!_hasValidImage(destination)) return false;
+    if (!_hasGoodLocation(destination)) return false;
+    if (!_hasGoodDescription(destination)) return false;
+    return true;
+  }
+
+  bool _hasGoodName(String name) {
+    final normalized = name.toLowerCase();
+    if (normalized.length < 4) return false;
+    final badPatterns = [
+      'unnamed',
+      'no name',
+      'road',
+      'street',
+      'path',
+      'route',
+      'way',
+      'voie',
+      'chemin',
+      'ligne',
+      'line',
+      'unknown',
+      'null',
+      'drainage',
+      'track',
+      'roundabout',
+      'bridge',
+      'interchange',
+      'poi',
+      'point of interest',
+    ];
+    return !badPatterns.any(normalized.contains);
+  }
+
+  bool _hasValidImage(Map<String, dynamic> destination) {
+    final image = (destination['image'] ?? '').toString().trim();
+    if (image.isEmpty) return false;
+    if (image.startsWith('http://') || image.startsWith('https://')) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _hasGoodLocation(Map<String, dynamic> destination) {
+    final area = (destination['area'] ?? '').toString().toLowerCase();
+    final city = (destination['city'] ?? '').toString().toLowerCase();
+    final tags = ((destination['tags'] as List<dynamic>?) ?? [])
+        .map((tag) => tag.toString().toLowerCase())
+        .toList();
+    final name = (destination['name'] ?? '').toString().toLowerCase();
+
+    if (area.contains('yaound') || city.contains('yaound')) return true;
+    if (name.contains('yaound')) return true;
+    if (tags.any((tag) => tag.contains('yaound') || tag.contains('cameroon'))) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _hasGoodDescription(Map<String, dynamic> destination) {
+    final desc = (destination['description'] ?? '').toString().trim();
+    if (desc.isEmpty) {
+      final tags = (destination['tags'] as List<dynamic>?) ?? [];
+      final category = (destination['category'] ?? '').toString().trim();
+      return tags.length >= 2 || category.isNotEmpty;
+    }
+    if (desc.length < 30) return false;
+    final badDescPatterns = [
+      'no description',
+      'n/a',
+      'none',
+      'unknown',
+      'no details',
+      'no info',
+    ];
+    return !badDescPatterns.any(desc.toLowerCase().contains);
+  }
+
+  String _normalizeDestinationKey(Map<String, dynamic> destination) {
+    final id = destination['id']?.toString().trim();
+    if (id?.isNotEmpty == true) return id!;
+    final name = (destination['name'] ?? '').toString().trim();
+    final image = (destination['image'] ?? '').toString().trim();
+    if (name.isNotEmpty && image.isNotEmpty) {
+      return '${_normalizeString(name)}|${image.toLowerCase()}';
+    }
+    if (name.isNotEmpty) {
+      return _normalizeString(name);
+    }
+    return image;
+  }
+
+  String _normalizeString(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
   }
 
   void _applyLocalFilters() {

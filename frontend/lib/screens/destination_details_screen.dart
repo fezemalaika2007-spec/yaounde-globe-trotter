@@ -15,6 +15,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   late Map<String, dynamic> _dest;
   final _favProvider = FavoritesProvider();
   bool _isFav = false;
+  int _currentImageIndex = 0;
+  final PageController _pageController = PageController();
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   @override
   void dispose() {
     _favProvider.removeListener(_onFavChange);
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -58,11 +61,25 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   Widget _buildGallery() {
     final List<dynamic> images = _dest['images'] ?? [];
     final String fallbackImage = _dest['image'] ?? '';
-    final galleryImages = images.isNotEmpty
-        ? images
-        : (fallbackImage.isNotEmpty ? [fallbackImage] : []);
 
-    if (galleryImages.isEmpty) {
+    final seen = <String>{};
+    final uniqueGalleryImages = <String>[];
+
+    for (final image in images) {
+      final imageUrl = image.toString().trim();
+      if (imageUrl.isEmpty || seen.contains(imageUrl)) continue;
+      seen.add(imageUrl);
+      uniqueGalleryImages.add(imageUrl);
+    }
+
+    if (uniqueGalleryImages.isEmpty && fallbackImage.isNotEmpty) {
+      final normalizedFallback = fallbackImage.trim();
+      if (normalizedFallback.isNotEmpty) {
+        uniqueGalleryImages.add(normalizedFallback);
+      }
+    }
+
+    if (uniqueGalleryImages.isEmpty) {
       return Container(
         height: 220,
         color: Theme.of(context).colorScheme.primaryContainer,
@@ -70,27 +87,94 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
       );
     }
 
-    return SizedBox(
-      height: 220,
-      child: Image.network(
-        galleryImages.first.toString(),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            color: Theme.of(context).colorScheme.secondaryContainer,
-            child: const Icon(Icons.broken_image, size: 48),
-          );
-        },
-      ),
+    final captionsCount = uniqueGalleryImages.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 220,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: uniqueGalleryImages.length,
+            onPageChanged: (idx) {
+              if (!mounted) return;
+              setState(() => _currentImageIndex = idx);
+            },
+            itemBuilder: (context, index) {
+              final url = uniqueGalleryImages[index];
+              final caption = _buildImageCaption(
+                index,
+                uniqueGalleryImages.length,
+              );
+              return Image.network(
+                url,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                semanticLabel: caption,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Theme.of(context).colorScheme.secondaryContainer,
+                    child: const Icon(Icons.broken_image, size: 48),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(captionsCount, (i) {
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: _currentImageIndex == i ? 10 : 6,
+              height: _currentImageIndex == i ? 10 : 6,
+              decoration: BoxDecoration(
+                color: _currentImageIndex == i
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onBackground.withOpacity(0.3),
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            _buildImageCaption(_currentImageIndex, captionsCount),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.3),
+          ),
+        ),
+      ],
     );
+  }
+
+  String _buildImageCaption(int index, int total) {
+    final String name = _dest['name'] ?? 'Destination';
+    final String category = (_dest['category'] ?? '').toString();
+    final String desc =
+        (_dest['long_description'] ?? _dest['description'] ?? '').toString();
+    final snippet = desc.isNotEmpty
+        ? (desc.length > 140 ? '${desc.substring(0, 140).trim()}...' : desc)
+        : '';
+    final imagePart = 'Image ${index + 1} of $total';
+    final parts = <String>[];
+    parts.add('$name${category.isNotEmpty ? ' — $category' : ''}');
+    if (snippet.isNotEmpty) parts.add(snippet);
+    parts.add(imagePart);
+    return parts.join(' — ');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final String name = _dest['name'] ?? 'Destination';
-    final String description = _dest['description'] ?? '';
+    final String description =
+        _dest['long_description'] ?? _dest['description'] ?? '';
     final String address = _dest['address'] ?? '';
     final double? lat = _dest['latitude'] != null
         ? (_dest['latitude'] as num).toDouble()

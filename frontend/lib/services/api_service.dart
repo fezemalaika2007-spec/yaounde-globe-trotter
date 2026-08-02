@@ -163,7 +163,19 @@ class ApiService {
     ).replace(queryParameters: {'limit': limit.toString()});
     final response = await _get(uri, headers: _authHeaders(token));
     final body = _decode(response);
-    if (response.statusCode == 200) return body as List<dynamic>;
+    if (response.statusCode == 200) {
+      if (body is Map && body.containsKey('recommendations')) {
+        final recommendations = body['recommendations'];
+        if (recommendations is List<dynamic>) {
+          return recommendations;
+        }
+      }
+      if (body is List<dynamic>) return body;
+      throw ApiException(
+        response.statusCode,
+        'Unexpected recommendations format',
+      );
+    }
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 
@@ -234,7 +246,16 @@ class ApiService {
     final response = await _get(uri, headers: _authHeaders(token));
     final body = _decode(response);
     if (response.statusCode == 200) {
-      return (body as List<dynamic>).cast<String>();
+      if (body is List<dynamic>) {
+        return body.cast<String>();
+      }
+      if (body is Map && body.containsKey('favorites')) {
+        final favorites = body['favorites'];
+        if (favorites is List<dynamic>) {
+          return favorites.cast<String>();
+        }
+      }
+      throw ApiException(response.statusCode, 'Unexpected favorites format');
     }
     throw ApiException(response.statusCode, _errorMessage(body));
   }
@@ -250,7 +271,16 @@ class ApiService {
     );
     final body = _decode(response);
     if (response.statusCode == 200) {
-      return (body as List<dynamic>).cast<String>();
+      if (body is List<dynamic>) {
+        return body.cast<String>();
+      }
+      if (body is Map && body.containsKey('favorites')) {
+        final favorites = body['favorites'];
+        if (favorites is List<dynamic>) {
+          return favorites.cast<String>();
+        }
+      }
+      throw ApiException(response.statusCode, 'Unexpected favorites format');
     }
     throw ApiException(response.statusCode, _errorMessage(body));
   }

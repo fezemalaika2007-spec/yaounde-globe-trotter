@@ -17,4 +17,7 @@ class ApiConfig {
   static const String recommendations = '/recommendations';
   static const String itineraries = '/itineraries';
   static const String favorites = '/favorites';
+
+  /// Live internet search for destinations in Yaoundé (Overpass-backed).
+  static const String search = '/search';
 }

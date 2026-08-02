@@ -82,6 +82,9 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
                                   imageUrl,
                                   fit: BoxFit.cover,
                                   gaplessPlayback: true,
+                                  // Decode at a bounded width so the UI loads
+                                  // images fast and avoids huge memory spikes.
+                                  cacheWidth: 600,
                                   loadingBuilder:
                                       (context, child, loadingProgress) {
                                         if (loadingProgress == null) {

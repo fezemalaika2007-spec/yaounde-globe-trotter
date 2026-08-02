@@ -78,6 +78,9 @@ class _DestinationCardState extends State<DestinationCard> {
         fit: BoxFit.cover,
         width: double.infinity,
         height: 160,
+        gaplessPlayback: true,
+        // Decode at a bounded width so images load fast and memory stays low.
+        cacheWidth: 900,
         errorBuilder: (context, error, stackTrace) {
           return Container(
             color: Theme.of(context).colorScheme.primaryContainer,

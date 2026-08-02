@@ -154,6 +154,38 @@ class ApiService {
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 
+  /// Live internet search for destinations in Yaoundé.
+  ///
+  /// Queries the backend `/search` endpoint, which live-searches OpenStreetMap
+  /// (Overpass) for places matching [query] whose names match a real,
+  /// verified Yaoundé destination. This lets users find places that are not
+  /// yet in the local database.
+  Future<List<dynamic>> searchDestinations(
+    String query, {
+    int limit = 12,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return [];
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.search}',
+    ).replace(queryParameters: {'q': trimmed, 'limit': limit.toString()});
+    final response = await _get(uri);
+    final body = _decode(response);
+    if (response.statusCode == 200) {
+      if (body is List<dynamic>) return body;
+      if (body is Map &&
+          body.containsKey('results') &&
+          body['results'] is List) {
+        return body['results'] as List<dynamic>;
+      }
+      throw ApiException(
+        response.statusCode,
+        'Unexpected search results format',
+      );
+    }
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
   // Recommendations
   Future<List<dynamic>> getRecommendations({int limit = 5}) async {
     final token = await getToken();

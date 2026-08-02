@@ -7,6 +7,8 @@ Routes:
   POST /sync-destinations             — Trigger Overpass sync (admin)
 """
 import json
+import logging
+
 from flask import Blueprint, request, jsonify, g, current_app
 
 from app.auth_middleware import token_required
@@ -15,8 +17,12 @@ from app.models import (
     upsert_rating, get_user_rating
 )
 from app.overpass_sync import sync_destinations as _sync_destinations
+from app.overpass_sync import search_overpass as _live_search
+from app.recommendations import get_recommendations as _score_recommendations
 
 recommendation_bp = Blueprint("recommendation", __name__)
+
+logger = logging.getLogger(__name__)
 
 
 @recommendation_bp.route("/", methods=["GET"])
@@ -126,16 +132,68 @@ def submit_rating(dest_id):
 def get_recommendations():
     """Return personalised destination recommendations for the logged-in user.
 
-    Currently returns a placeholder empty result. The recommendation
-    engine plumbing (calling User Service for preferences, Itinerary
-    Service for past itineraries) is wired up structurally but the
-    actual scoring/personalization logic is a future concern.
+    Scores all destinations based on:
+      - the user's preferences (collected at registration)
+      - the user's favorite places
+      - popularity (average rating / rating count)
+      - content quality (real images, rich descriptions)
 
     Requires: Authorization: Bearer <token>
     """
     username = g.current_user
+    try:
+        limit = int(request.args.get("limit", 6))
+    except (ValueError, TypeError):
+        limit = 6
+    limit = max(1, min(limit, 24))
 
-    return jsonify([]), 200
+    destinations = get_all_destinations()
+    if not destinations:
+        return jsonify([]), 200
+
+    auth_token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    try:
+        recs = _score_recommendations(username, destinations, auth_token, limit=limit)
+    except Exception as e:
+        logger.exception("Recommendation engine failed, falling back to popular places")
+        # Fallback: just return the best-rated/quality destinations.
+        recs = sorted(
+            destinations,
+            key=lambda d: (
+                float(d.get("average_rating") or 0.0),
+                d.get("rating_count") or 0,
+                len((d.get("description") or "").strip()),
+            ),
+            reverse=True,
+        )[:limit]
+
+    return jsonify(recs), 200
+
+
+@recommendation_bp.route("/search", methods=["GET"])
+def live_search_destinations():
+    """Live internet search for destinations in Yaoundé via Overpass.
+
+    Query parameter:
+        q – the place name to search for (e.g. "museum", "Mfoundi")
+
+    Searches OpenStreetMap for matching places inside the Yaoundé bounding
+    box and returns normalized destination objects — this lets the app find
+    places that are not yet stored in the local database.
+
+    Returns a JSON list (possibly empty).
+    """
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([]), 200
+    try:
+        limit = int(request.args.get("limit", 12))
+    except (ValueError, TypeError):
+        limit = 12
+    limit = max(1, min(limit, 24))
+
+    results = _live_search(q, app=current_app._get_current_object(), limit=limit)
+    return jsonify(results), 200
 
 
 @recommendation_bp.route("/sync-destinations", methods=["POST"])

@@ -54,6 +54,7 @@ services:
       - PORT=5003
       - SECRET_KEY=${SECRET_KEY:-globetrotter-secret-change-in-prod}
       - DATABASE_PATH=/recommendation-service/database/recommendations.db
+      - USER_SERVICE_URL=http://user-service:5001
     networks:
       - globetrotter-net
 

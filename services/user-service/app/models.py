@@ -145,3 +145,26 @@ def toggle_favorite_for_user(username, destination_name, app=None):
     conn.commit()
     conn.close()
     return get_favorites_for_user(username, app)
+
+
+def get_preferences_for_user(username, app=None):
+    """Return (preferences, favorites) for a username, or ([], []) if unknown.
+
+    This is the data contract consumed by the Recommendation Service's
+    scoring engine (recommendations.py) via the internal endpoint.
+    """
+    user = get_user_by_username(username, app)
+    if not user:
+        return [], []
+
+    try:
+        prefs = (
+            json.loads(user["preferences"])
+            if isinstance(user["preferences"], str)
+            else user["preferences"]
+        )
+    except (json.JSONDecodeError, TypeError):
+        prefs = []
+
+    favorites = get_favorites_for_user(username, app)
+    return prefs or [], favorites or []

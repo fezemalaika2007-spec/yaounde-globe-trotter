@@ -118,6 +118,12 @@ def favorites():
     return _proxy(method, f"{USER_SERVICE_URL}/favorites")
 
 
+@gateway_bp.route("/search", methods=["GET"])
+def search_destinations():
+    """Live internet search for destinations in Yaoundé (Overpass)."""
+    return _proxy("GET", f"{RECOMMENDATION_SERVICE_URL}/search")
+
+
 @gateway_bp.route("/sync-destinations", methods=["POST"])
 def sync_destinations():
     return _proxy("POST", f"{RECOMMENDATION_SERVICE_URL}/sync-destinations")

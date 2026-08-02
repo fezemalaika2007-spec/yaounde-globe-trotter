@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
@@ -550,22 +551,70 @@ class _DestinationsTabState extends State<_DestinationsTab> {
 
   List<dynamic> _allDestinations = [];
   List<dynamic> _filteredDestinations = [];
+  List<dynamic> _liveResults = [];
   bool _loading = true;
+  bool _liveSearching = false;
   String? _error;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(_applyLocalFilters);
+    // Local filtering is immediate; live (internet) search is debounced so
+    // we don't hammer the backend on every keystroke.
+    _searchCtrl.addListener(_onSearchChanged);
     _fetch();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _tagCtrl.dispose();
     _costCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    final query = _searchCtrl.text.trim();
+    _applyLocalFilters();
+    if (query.length < 2) {
+      if (_liveResults.isNotEmpty || _liveSearching) {
+        setState(() {
+          _liveResults = [];
+          _liveSearching = false;
+        });
+      }
+      return;
+    }
+    _liveSearching = true;
+    setState(() {});
+    _searchDebounce = Timer(const Duration(milliseconds: 450), () {
+      _performLiveSearch(query);
+    });
+  }
+
+  Future<void> _performLiveSearch(String query) async {
+    try {
+      final results = await _api.searchDestinations(query, limit: 12);
+      final deduped = _deduplicateDestinations(results);
+      if (mounted) {
+        setState(() {
+          _liveResults = deduped;
+          _liveSearching = false;
+        });
+      }
+    } catch (_) {
+      // Live search is a convenience — failures should never block browsing
+      // the local destination list.
+      if (mounted) {
+        setState(() {
+          _liveResults = [];
+          _liveSearching = false;
+        });
+      }
+    }
   }
 
   Future<void> _fetch() async {
@@ -720,9 +769,33 @@ class _DestinationsTabState extends State<_DestinationsTab> {
     setState(() {});
   }
 
+  /// Merged view: local filtered destinations first, then unique live
+  /// internet results appended. Live results are deduped against local ones
+  /// by [key] so the same place never appears twice.
+  List<dynamic> get _visibleDestinations {
+    if (_liveResults.isEmpty) return _filteredDestinations;
+    final seenKeys = <String>{};
+    final merged = <dynamic>[];
+    for (final d in _filteredDestinations) {
+      if (d is! Map<String, dynamic>) continue;
+      final key = _normalizeDestinationKey(d);
+      if (key.isNotEmpty) seenKeys.add(key);
+      merged.add(d);
+    }
+    for (final d in _liveResults) {
+      if (d is! Map<String, dynamic>) continue;
+      final key = _normalizeDestinationKey(d);
+      if (key.isNotEmpty && seenKeys.contains(key)) continue;
+      if (key.isNotEmpty) seenKeys.add(key);
+      merged.add(d);
+    }
+    return merged;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final query = _searchCtrl.text.trim();
     return Column(
       children: [
         Padding(
@@ -804,17 +877,79 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                     ],
                   ),
                 )
-              : _filteredDestinations.isEmpty
-              ? EmptyState(
-                  icon: Icons.explore_outlined,
-                  title: l10n.noDestinations,
-                  message: l10n.nothingHere,
-                  onAction: _fetch,
-                  actionLabel: l10n.refresh,
+              : _visibleDestinations.isEmpty
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_liveSearching)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 12),
+                            Flexible(
+                              child: Text('Searching online for “$query”...'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Expanded(
+                      child: EmptyState(
+                        icon: Icons.explore_outlined,
+                        title: l10n.noDestinations,
+                        message: query.isEmpty
+                            ? l10n.nothingHere
+                            : 'No places found locally. Keep typing to '
+                                  'search the internet for real Yaoundé '
+                                  'destinations.',
+                        onAction: _fetch,
+                        actionLabel: l10n.refresh,
+                      ),
+                    ),
+                  ],
                 )
-              : DestinationGrid(
-                  destinations: _filteredDestinations
-                      .cast<Map<String, dynamic>>(),
+              : Column(
+                  children: [
+                    if (query.isNotEmpty && _liveSearching)
+                      const LinearProgressIndicator(minHeight: 2),
+                    if (query.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 6, 12, 2),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.public, size: 16),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _liveSearching
+                                    ? 'Searching the internet '
+                                          'for “$query”...'
+                                    : 'Showing local matches + live '
+                                          'internet results for “$query”',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Expanded(
+                      child: DestinationGrid(
+                        destinations: _visibleDestinations
+                            .cast<Map<String, dynamic>>(),
+                      ),
+                    ),
+                  ],
                 ),
         ),
       ],

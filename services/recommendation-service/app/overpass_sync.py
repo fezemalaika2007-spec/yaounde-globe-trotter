@@ -7,11 +7,16 @@ Supports periodic background synchronization.
 """
 import json
 import logging
+import re
 import time
 import datetime
 import requests
 import threading
-from app.image_utils import fetch_wikimedia_image, get_placeholder_image
+from app.image_utils import (
+    fetch_wikimedia_image,
+    get_placeholder_image,
+    get_placeholder_pool,
+)
 from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
@@ -159,6 +164,87 @@ def _is_disallowed_destination(tags):
     return False
 
 
+def _has_junk_description(text):
+    """Detect unusable / non-descriptive raw OSM description strings.
+
+    Examples of junk we reject:
+        "#GGK Diocèse d'Obala", "no description", "n/a", "???", "null",
+        "opening hours", "horaire", etc.
+    """
+    if not text:
+        return True
+    cleaned = text.strip()
+    if len(cleaned) < 10:
+        return True
+    lower = cleaned.lower()
+    if "#" in cleaned:  # hashtags / social metadata are not descriptions
+        return True
+    if lower.startswith(("no ", "none", "n/a", "na ", "null", "unknown", "???")):
+        return True
+    if lower in {"opening hours", "horaire", "horaire :", "open", "closed"}:
+        return True
+    return False
+
+
+def _safe_description(text):
+    """Return a usable description or empty string, stripping junk."""
+    if _has_junk_description(text):
+        return ""
+    return text.strip()
+
+
+# Generic / non-destination names that should never be shown to travellers.
+_JUNK_NAME_PATTERNS = [
+    "bench",
+    "bus stop",
+    "stop",
+    "parking",
+    "wc",
+    "toilet",
+    "roundabout",
+    "traffic",
+    "signal",
+    "hydrant",
+    "manhole",
+    "street lamp",
+    "address point",
+    "entrance",
+    "gate",
+    "fence",
+    "wall",
+    "bollard",
+    "bench 1",
+    "bench 2",
+    "poi",
+    "fixme",
+    "no name",
+    "unnamed",
+]
+
+
+def _has_junk_name(name):
+    """Reject names that don't represent a real travel destination."""
+    if not name:
+        return True
+    lower = name.lower().strip()
+    if len(lower) < 3:
+        return True
+    # Pure generic labels like "Restaurant", "Pharmacy", "Hotel" without a
+    # distinctive part are not useful to travellers.
+    generic_nouns = {
+        "restaurant", "cafe", "hotel", "bar", "shop", "supermarket",
+        "pharmacy", "hospital", "church", "school", "market",
+        "fast food", "fast-food", "bakery", "hôtel", "mosquée",
+        "église", "clinique", "marché", "parking", "bureau",
+    }
+    if lower in generic_nouns or lower.rstrip(" .") in generic_nouns:
+        return True
+    for pattern in _JUNK_NAME_PATTERNS:
+        if pattern in lower:
+            return True
+    return False
+
+
 def _build_long_description(
     name,
     tags,
@@ -169,72 +255,153 @@ def _build_long_description(
     website,
     address,
 ):
-    description = tags.get("description", "").strip()
-    if description:
-        return description
-
+    description = _safe_description(tags.get("description", ""))
     parts = []
+
     amenity = tags.get("amenity", "")
     tourism = tags.get("tourism", "")
     leisure = tags.get("leisure", "")
+    historic = tags.get("historic", "")
+    natural = tags.get("natural", "")
+    shop = tags.get("shop", "")
+    sport = tags.get("sport", "")
 
+    # First sentence: what the place is.
     if amenity == "restaurant":
         parts.append(
-            f"{name} is a restaurant in Yaoundé known for {cuisine or 'local'} cuisine."
+            f"{name} is a restaurant in Yaoundé known for {cuisine or 'local'} cuisine, "
+            f"offering a genuine taste of {cuisine or 'Cameroonian'} flavours."
         )
     elif amenity == "cafe":
         parts.append(
-            f"{name} is a café offering a relaxed spot for coffee and light bites."
+            f"{name} is a café in Yaoundé offering a relaxed spot for coffee, "
+            f"snacks and light bites."
         )
     elif amenity == "fast_food":
         parts.append(
-            f"{name} is a fast-food destination popular for quick meals in Yaoundé."
+            f"{name} is a fast-food spot in Yaoundé popular for quick, "
+            f"affordable meals on the go."
         )
     elif tourism == "museum":
         parts.append(
-            f"{name} is a museum offering cultural exhibits and historical insight."
+            f"{name} is a museum in Yaoundé where visitors can explore "
+            f"cultural exhibits, historical artefacts and local heritage."
         )
     elif tourism == "viewpoint":
         parts.append(
-            f"{name} is a scenic viewpoint with great views over Yaoundé."
+            f"{name} is a scenic viewpoint in Yaoundé offering panoramic views "
+            f"over the city and its green hills."
         )
-    elif tourism == "hotel" or tourism == "guest_house" or tourism == "hostel":
+    elif tourism in {"hotel", "guest_house", "hostel", "motel", "apartment", "chalet"}:
         parts.append(
-            f"{name} is a hospitality venue offering stay options for visitors."
+            f"{name} is a hospitality venue in Yaoundé offering comfortable "
+            f"stay options for visitors."
         )
-    elif leisure == "park" or leisure == "garden":
+    elif leisure in {"park", "garden"} or amenity == "park":
         parts.append(
-            f"{name} is a green space for outdoor recreation and relaxation."
+            f"{name} is a green space in Yaoundé, ideal for outdoor recreation, "
+            f"relaxation and family outings."
+        )
+    elif leisure == "nature_reserve" or natural == "forest" or tags.get("boundary") == "national_park":
+        parts.append(
+            f"{name} is a natural reserve in the Yaoundé area, rich in "
+            f"biodiversity and perfect for hiking and wildlife watching."
+        )
+    elif tourism == "zoo":
+        parts.append(
+            f"{name} is a zoo in the Yaoundé area where visitors can observe "
+            f"local and exotic wildlife in a family-friendly setting."
+        )
+    elif historic:
+        parts.append(
+            f"{name} is a historic site in Yaoundé with significant cultural "
+            f"and architectural value."
         )
     elif amenity == "library":
         parts.append(
-            f"{name} is a public library serving readers and researchers."
+            f"{name} is a public library in Yaoundé serving readers, students "
+            f"and researchers."
         )
-    elif amenity == "theatre" or amenity == "cinema":
+    elif amenity in {"theatre", "cinema"}:
         parts.append(
-            f"{name} is an entertainment venue for films and performances."
+            f"{name} is an entertainment venue in Yaoundé hosting films, "
+            f"performances and cultural events."
+        )
+    elif amenity == "marketplace" or shop in {"mall", "department_store", "supermarket"}:
+        parts.append(
+            f"{name} is a lively shopping destination in Yaoundé where visitors "
+            f"can experience local commerce and daily life."
+        )
+    elif amenity == "place_of_worship":
+        parts.append(
+            f"{name} is a place of worship in Yaoundé, notable for its "
+            f"architecture and spiritual significance."
+        )
+    elif amenity in {"pharmacy", "hospital", "clinic"}:
+        parts.append(
+            f"{name} is a healthcare facility in Yaoundé providing essential "
+            f"medical services to residents and visitors."
+        )
+    elif amenity in {"bank", "bureau_de_change"}:
+        parts.append(
+            f"{name} is a financial services point in Yaoundé, useful for "
+            f"banking and currency exchange needs."
+        )
+    elif sport:
+        parts.append(
+            f"{name} is a sports destination in Yaoundé offering facilities "
+            f"for {sport} and active recreation."
         )
     elif primary_category == "culture":
         parts.append(
-            f"{name} is a cultural destination with local significance in Yaoundé."
+            f"{name} is a cultural destination in Yaoundé with local "
+            f"significance and visitor interest."
         )
     elif primary_category == "nature":
         parts.append(
-            f"{name} is a nature destination offering outdoor experiences."
+            f"{name} is a nature destination around Yaoundé offering outdoor "
+            f"experiences and scenic surroundings."
         )
     else:
         parts.append(f"{name} is a destination in Yaoundé, Cameroon.")
 
+    # Second sentence: practical visitor information.
+    info = []
     if cuisine and amenity in {"restaurant", "cafe", "fast_food"}:
-        parts.append(f"It features {cuisine} cuisine.")
+        info.append(f"The venue specialises in {cuisine} cuisine")
     if address:
-        parts.append(f"Located at {address}.")
+        info.append(f"It is located at {address}")
     if opening_hours:
-        parts.append(f"Opens: {opening_hours}.")
-    if website:
-        parts.append("Website information is available.")
+        info.append(f"typical opening hours are {opening_hours}")
     if phone:
-        parts.append("Contact details are provided.")
+        info.append("phone contact is available for enquiries")
+    if website:
+        info.append("further details can be found on its website")
+
+    if info:
+        sentence = ", and ".join(info) + "."
+        parts.append(sentence.capitalize())
+
+    # Third sentence: recommendation/context.
+    if description:
+        parts.append(description)
+
+    if primary_category == "nature":
+        parts.append(
+            "It is a great stop for travellers who enjoy the outdoors and photography."
+        )
+    elif primary_category in {"culture", "attraction"}:
+        parts.append(
+            "It is a worthwhile stop for travellers interested in the culture and history of Yaoundé."
+        )
+    elif primary_category == "food":
+        parts.append(
+            "It is a good option for travellers who want to experience the local food scene."
+        )
+    elif primary_category == "accommodation":
+        parts.append(
+            "It is a convenient base for exploring the rest of Yaoundé."
+        )
 
     return " ".join(parts)
 
@@ -254,6 +421,69 @@ def _normalize_image_url(url: str) -> str:
         return cleaned
     except Exception:
         return url.rstrip('/')
+
+def search_overpass(query, bbox=YAOUNDE_BBOX, limit=20, app=None):
+    """Perform a LIVE internet search against the OpenStreetMap Overpass API.
+
+    Searches Yaoundé (or *bbox*) for any POI whose name matches *query*
+    (case-insensitive free-text). Unlike the synced database, this reaches
+    the live Overpass API so users can discover destinations that are not
+    yet in the local DB.
+
+    *app* is accepted for symmetry with the sync functions (kept for
+    optional future persistence of live results); it is not required.
+
+    Returns a list of normalized destination dicts (same shape as the
+    synced destinations), with disallowed venues filtered out.
+    """
+    if not query or not query.strip():
+        return []
+
+    escaped = _escape_overpass_regex(query.strip())
+    overpass_query = f"""
+[out:json][timeout:45];
+(
+  nwr["name"~"{escaped}",i]({bbox});
+);
+out center;
+"""
+    try:
+        logger.info(f"Live Overpass search for '{query}' in {bbox}...")
+        response = requests.get(
+            OVERPASS_URL,
+            params={"data": overpass_query},
+            timeout=45,
+            headers={"User-Agent": "YaoundeGlobeTrotter/1.0"}
+        )
+        response.raise_for_status()
+        data = response.json()
+        elements = data.get("elements", [])
+
+        normalized_list = []
+        for element in elements:
+            try:
+                normalized = _normalize_osm_element(element)
+                if normalized:
+                    normalized_list.append(normalized)
+            except Exception as e:
+                logger.warning(
+                    f"Error normalizing live search element {element.get('id')}: {e}"
+                )
+        return normalized_list[:limit]
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"Live Overpass search failed: {e}")
+        return []
+
+
+def _escape_overpass_regex(value):
+    """Escape a user query for safe embedding in an Overpass regex."""
+    import re
+    # Escape regex metacharacters, keep word chars and spaces.
+    escaped = re.escape(value)
+    # Replace escaped spaces with a generic whitespace matcher for flexibility.
+    escaped = escaped.replace(r'\ ', ' ').replace(' ', r'\s+')
+    return escaped
+
 
 # ---------------------------------------------------------------------------
 # Future-Compatible Provider Architecture
@@ -598,6 +828,9 @@ def _normalize_osm_element(element):
     if _is_disallowed_destination(tags):
         return None
 
+    if _has_junk_name(name):
+        return None
+
     # Determine primary tag/category
     primary_category = "attraction"
     for key, value, category in RELEVANT_TAGS:
@@ -777,6 +1010,59 @@ def _normalize_osm_element(element):
 # Deduplication and Database Synchronization
 # ---------------------------------------------------------------------------
 
+def _minimize_placeholder_reuse(items):
+    """Reassign placeholder images so the same image is reused as little as possible.
+
+    Placeholder pools are small (3-6 real Yaoundé images per category), so perfect
+    uniqueness is impossible for hundreds of destinations. However, we can avoid
+    immediately repeating an image that is already used by another destination in
+    the same category: the deterministic pick is kept only when the image is not
+    yet over-used, otherwise the least-used pool entry is chosen instead.
+
+    The returned dict maps image URL -> number of times it was *used* in this pass
+    (used to build the "usage" map so later items see earlier assignments).
+    """
+    usage = {}
+    for item in items:
+        if item.get("image_source") != "placeholder":
+            continue
+        category = item.get("category", "attraction")
+        pool = get_placeholder_pool(category)
+        if not pool:
+            continue
+        current = item.get("image", "")
+        if not current:
+            continue
+        # Keep the deterministic pick unless it's already used somewhere else.
+        if usage.get(current, 0) < 1:
+            usage[current] = usage.get(current, 0) + 1
+            continue
+        # Pick the least-used image in the pool (tie-broken lexicographically).
+        best = min(pool, key=lambda u: (usage.get(u, 0), u))
+        if best != current:
+            item["image"] = best
+            images = item.get("images") or []
+            if images:
+                item["images"] = [
+                    best
+                    if _normalize_image_url(i) == _normalize_image_url(current)
+                    else i
+                    for i in images
+                ]
+                unique_images = []
+                seen = set()
+                for img in item["images"]:
+                    n = _normalize_image_url(img)
+                    if n and n not in seen:
+                        seen.add(n)
+                        unique_images.append(img)
+                item["images"] = unique_images
+            else:
+                item["images"] = [best]
+        usage[best] = usage.get(best, 0) + 1
+    return usage
+
+
 def deduplicate_and_sync(incoming_list, app=None):
     """Filter out duplicate destinations, keeping the one with richer information.
     Ensures ratings of updated destinations are preserved by updating the existing database row.
@@ -900,6 +1186,10 @@ def deduplicate_and_sync(incoming_list, app=None):
 
     conn.close()
 
+    # Minimize placeholder image reuse so the same real Yaoundé image is not
+    # repeated across many different destinations.
+    _minimize_placeholder_reuse(final_incoming)
+
     # Now write new unique ones to DB
     count = 0
     for item in final_incoming:
@@ -995,6 +1285,57 @@ def sync_destinations(app=None):
     set_last_synced_now(app)
     logger.info(f"Synchronized {count} destinations from Overpass")
     return count
+
+
+def search_overpass(query: str, app=None, limit=12):
+    """Live-search OpenStreetMap Overpass for matching places in Yaoundé.
+
+    This powers the "search the internet" feature: when a user searches a
+    destination that is not yet in our local database, we query Overpass
+    for places whose name matches the query (case-insensitive substring)
+    within the Yaoundé bounding box, normalize them with the same pipeline,
+    and return them so the app can show results that we don't have locally.
+
+    Returns a list of normalized destination dicts (already junk-filtered).
+    """
+    if not query or not query.strip():
+        return []
+    q = query.strip()
+    try:
+        # Overpass regex search over names (case-insensitive).
+        escaped = re.escape(q.lower())
+        search_query = f"""
+[out:json][timeout:30];
+(
+  nwr["name"~"{escaped}",i]({YAOUNDE_BBOX});
+  nwr["alt_name"~"{escaped}",i]({YAOUNDE_BBOX});
+);
+out center 12;
+"""
+        response = requests.get(
+            OVERPASS_URL,
+            params={"data": search_query},
+            timeout=30,
+            headers={"User-Agent": "YaoundeGlobeTrotter/1.0"},
+        )
+        response.raise_for_status()
+        data = response.json()
+        elements = data.get("elements", [])
+
+        results = []
+        for element in elements:
+            try:
+                normalized = _normalize_osm_element(element)
+                if normalized and _has_junk_name(normalized["name"]) is False:
+                    results.append(normalized)
+                    if len(results) >= limit:
+                        break
+            except Exception:
+                continue
+        return results
+    except Exception as e:
+        logger.warning(f"Live Overpass search failed for '{query}': {e}")
+        return []
 
 
 # ---------------------------------------------------------------------------

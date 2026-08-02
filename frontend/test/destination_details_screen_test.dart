@@ -32,7 +32,7 @@ void main() {
     );
     expect(captionFinder, findsOneWidget);
 
-    // Name should be visible
-    expect(find.text('Test Place'), findsOneWidget);
+    // Name should be visible (appears in AppBar title and body headline)
+    expect(find.text('Test Place'), findsAtLeastNWidgets(1));
   });
 }

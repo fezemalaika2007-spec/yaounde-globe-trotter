@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/favorites_provider.dart';
+import '../utils/destination_filters.dart';
 
 class DestinationDetailScreen extends StatefulWidget {
   final Map<String, dynamic> destination;
@@ -62,22 +63,10 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     final List<dynamic> images = _dest['images'] ?? [];
     final String fallbackImage = _dest['image'] ?? '';
 
-    final seen = <String>{};
-    final uniqueGalleryImages = <String>[];
-
-    for (final image in images) {
-      final imageUrl = image.toString().trim();
-      if (imageUrl.isEmpty || seen.contains(imageUrl)) continue;
-      seen.add(imageUrl);
-      uniqueGalleryImages.add(imageUrl);
-    }
-
-    if (uniqueGalleryImages.isEmpty && fallbackImage.isNotEmpty) {
-      final normalizedFallback = fallbackImage.trim();
-      if (normalizedFallback.isNotEmpty) {
-        uniqueGalleryImages.add(normalizedFallback);
-      }
-    }
+    // Normalized dedup: strips query strings/fragments and lowercases
+    // scheme/netloc so the same photo served with different URL params
+    // never appears more than once.
+    final uniqueGalleryImages = uniqueImages(images, fallback: fallbackImage);
 
     if (uniqueGalleryImages.isEmpty) {
       return Container(
@@ -133,9 +122,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
               decoration: BoxDecoration(
                 color: _currentImageIndex == i
                     ? Theme.of(context).colorScheme.primary
-                    : Theme.of(
-                        context,
-                      ).colorScheme.onBackground.withOpacity(0.3),
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
                 shape: BoxShape.circle,
               ),
             );

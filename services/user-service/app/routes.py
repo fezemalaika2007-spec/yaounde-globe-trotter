@@ -20,6 +20,7 @@ from app.models import (
     get_user_by_id,
     get_favorites_for_user,
     toggle_favorite_for_user,
+    get_preferences_for_user,
 )
 
 user_bp = Blueprint("user", __name__)
@@ -142,4 +143,25 @@ def internal_get_user_preferences(user_id):
     except (json.JSONDecodeError, TypeError):
         prefs = []
     return jsonify({"user_id": user_id, "username": user["username"], "preferences": prefs}), 200
+
+
+@user_bp.route("/internal/users/preferences", methods=["GET"])
+@token_required
+def internal_get_current_user_preferences():
+    """Return the authenticated user's preferences + favorites.
+
+    JWT-protected internal endpoint consumed by the Recommendation
+    Service's scoring engine. The username is taken from the token's
+    subject claim, so no user_id needs to be passed.
+
+    Returns:
+        { "username": ..., "preferences": [...], "favorites": [...] }
+    """
+    username = g.current_user
+    preferences, favorites = get_preferences_for_user(username)
+    return jsonify({
+        "username": username,
+        "preferences": preferences,
+        "favorites": favorites,
+    }), 200
 

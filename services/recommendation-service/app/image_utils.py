@@ -13,6 +13,7 @@ Strategy:
 3. Fall back to a category-based placeholder image chosen by the
    place's primary tag.
 """
+import hashlib
 import logging
 import requests
 
@@ -183,63 +184,86 @@ def _fetch_commons_category_images(category_name):
     return urls
 
 
+# Real Yaoundé images from Wikimedia Commons, organized by category.
+_YaoundeImages = {
+    "food": [
+        "https://upload.wikimedia.org/wikipedia/commons/f/fe/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._02.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/1/10/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._04.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/f/f4/Bois_Saint_Anastasie_-_Yaound%C3%A9_02.jpg",
+    ],
+    "nature": [
+        "https://upload.wikimedia.org/wikipedia/commons/5/56/Nature_Yaound%C3%A9_Cameroun.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/7/7c/Les_Cascades_du_Mfoundi_-_Yaound%C3%A9_01.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/5/5b/Nature_in_Yaound%C3%A9.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/5/58/Bananier_%C3%A0_Yaound%C3%A9_en_novembre_1973.jpg",
+    ],
+    "culture": [
+        "https://upload.wikimedia.org/wikipedia/commons/9/9f/YaoundeNationalMuseum.png",
+        "https://upload.wikimedia.org/wikipedia/commons/9/94/Mus%C3%A9eNationalYaound%C3%A9.png",
+        "https://upload.wikimedia.org/wikipedia/commons/1/1c/BLackitude_Museum.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/2/20/Mus%C3%A9e_National_Yaound%C3%A9.jpg",
+    ],
+    "market": [
+        "https://upload.wikimedia.org/wikipedia/commons/d/da/March%C3%A9_central_-_Central_market_%28interior%29_in_Yaound%C3%A9.JPG",
+        "https://upload.wikimedia.org/wikipedia/commons/1/15/Cameroon_Market%28Yaound%C3%A9%29.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/5/57/Street_next_to_Central_Market_Yaound%C3%A9_2014.JPG",
+        "https://upload.wikimedia.org/wikipedia/commons/8/80/Yaound%C3%A9_view_from_central_market_%282014%29.JPG",
+    ],
+    "accommodation": [
+        "https://upload.wikimedia.org/wikipedia/commons/9/96/Hilton_Hotel_in_Yaound%C3%A9_%282014%29.JPG",
+        "https://upload.wikimedia.org/wikipedia/commons/f/f6/Hilton_Hotel_Yaound%C3%A9.JPG",
+        "https://upload.wikimedia.org/wikipedia/commons/b/b6/Hotel_de_ville_Yaound%C3%A9_Cameroun.jpg",
+    ],
+    "sports": [
+        "https://upload.wikimedia.org/wikipedia/commons/4/43/YaoundeSportPalace.png",
+        "https://upload.wikimedia.org/wikipedia/commons/4/45/Stade_annex_1_de_Yaound%C3%A9.jpg",
+    ],
+    "attraction": [
+        "https://upload.wikimedia.org/wikipedia/commons/0/02/Monument_Yaound%C3%A9.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/1/15/Yaound%C3%A9_vue_monument_4.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/f/f2/Monument_j%27aime_mon_pays_03.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/e/e7/Bois_Sainte_Anastasie%2C_Yaound%C3%A9%2C_Cameroun.jpg",
+    ],
+}
+
+# Alias kept in CamelCase for backward compatibility with any external callers.
+_YAOUNDE_IMAGES = _YaoundeImages
+
+
+def get_placeholder_pool(category="attraction"):
+    """Return the real Yaoundé placeholder image pool for a category.
+
+    The pool is used both by [get_placeholder_image] (deterministic pick)
+    and by the sync/deduplication logic (diversity-aware assignment) so
+    that the same image is reused as little as possible.
+    """
+    return _YAOUNDE_IMAGES.get(category, _YAOUNDE_IMAGES["attraction"])
+
+
+def _deterministic_index(seed, pool_size):
+    """Deterministic, stable index derived from *seed*.
+
+    Uses MD5 instead of Python's built-in hash() because hash() is
+    randomized per process (PYTHONHASHSEED), which caused placeholders
+    to reshuffle on every sync and created many duplicate images.
+    """
+    import hashlib
+    digest = hashlib.md5(str(seed).encode("utf-8")).hexdigest()
+    return int(digest, 16) % pool_size
+
+
 def get_placeholder_image(category, name=""):
     """Return a category-based placeholder image URL.
 
     Uses REAL Wikimedia Commons images of Yaoundé, Cameroon, sourced
     from Commons categories. Each category has multiple image options
-    cycled through based on a simple hash of the destination name,
-    so different destinations show different real images.
-    These are fallbacks when no Wikidata/Wikimedia image could be
-    found for the specific OSM element.
+    cycled through based on a deterministic (MD5) hash of the
+    destination name, so the same place always gets the same image
+    across restarts and different places get variety.
     """
+    images = get_placeholder_pool(category)
 
-    # Real Yaoundé images from Wikimedia Commons, organized by category
-    yaounde_images = {
-        "food": [
-            "https://upload.wikimedia.org/wikipedia/commons/f/fe/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._02.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/1/10/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._04.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/f/f4/Bois_Saint_Anastasie_-_Yaound%C3%A9_02.jpg",
-        ],
-        "nature": [
-            "https://upload.wikimedia.org/wikipedia/commons/5/56/Nature_Yaound%C3%A9_Cameroun.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/7/7c/Les_Cascades_du_Mfoundi_-_Yaound%C3%A9_01.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/5/5b/Nature_in_Yaound%C3%A9.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/5/58/Bananier_%C3%A0_Yaound%C3%A9_en_novembre_1973.jpg",
-        ],
-        "culture": [
-            "https://upload.wikimedia.org/wikipedia/commons/9/9f/YaoundeNationalMuseum.png",
-            "https://upload.wikimedia.org/wikipedia/commons/9/94/Mus%C3%A9eNationalYaound%C3%A9.png",
-            "https://upload.wikimedia.org/wikipedia/commons/1/1c/BLackitude_Museum.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/2/20/Mus%C3%A9e_National_Yaound%C3%A9.jpg",
-        ],
-        "market": [
-            "https://upload.wikimedia.org/wikipedia/commons/d/da/March%C3%A9_central_-_Central_market_%28interior%29_in_Yaound%C3%A9.JPG",
-            "https://upload.wikimedia.org/wikipedia/commons/1/15/Cameroon_Market%28Yaound%C3%A9%29.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/5/57/Street_next_to_Central_Market_Yaound%C3%A9_2014.JPG",
-            "https://upload.wikimedia.org/wikipedia/commons/8/80/Yaound%C3%A9_view_from_central_market_%282014%29.JPG",
-        ],
-        "accommodation": [
-            "https://upload.wikimedia.org/wikipedia/commons/9/96/Hilton_Hotel_in_Yaound%C3%A9_%282014%29.JPG",
-            "https://upload.wikimedia.org/wikipedia/commons/f/f6/Hilton_Hotel_Yaound%C3%A9.JPG",
-            "https://upload.wikimedia.org/wikipedia/commons/b/b6/Hotel_de_ville_Yaound%C3%A9_Cameroun.jpg",
-        ],
-        "sports": [
-            "https://upload.wikimedia.org/wikipedia/commons/4/43/YaoundeSportPalace.png",
-            "https://upload.wikimedia.org/wikipedia/commons/4/45/Stade_annex_1_de_Yaound%C3%A9.jpg",
-        ],
-        "attraction": [
-            "https://upload.wikimedia.org/wikipedia/commons/0/02/Monument_Yaound%C3%A9.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/1/15/Yaound%C3%A9_vue_monument_4.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/f/f2/Monument_j%27aime_mon_pays_03.jpg",
-            "https://upload.wikimedia.org/wikipedia/commons/e/e7/Bois_Sainte_Anastasie%2C_Yaound%C3%A9%2C_Cameroun.jpg",
-        ],
-    }
-
-    # Default to "attraction" if category unknown
-    images = yaounde_images.get(category, yaounde_images["attraction"])
-
-    # Use a deterministic index based on hash of name or category for consistency
+    # Use a deterministic index based on name or category for consistency
     seed = name if name else category
-    index = abs(hash(seed)) % len(images)
+    index = _deterministic_index(seed, len(images))
     return images[index]

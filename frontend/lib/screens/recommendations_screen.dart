@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
-import '../widgets/destination_grid.dart';
+import '../widgets/destination_grid_card.dart';
 import '../widgets/empty_state.dart';
 
-/// Recommendations page — shows live recommendations from the backend.
+/// Recommendations page — shows live, structured recommendations from the
+/// backend (Top Rated, Popular Right Now, Newly Added, category sections).
 class RecommendationsScreen extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
   final VoidCallback? onExplore;
@@ -22,7 +23,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
   final _api = ApiService();
   bool _loading = true;
   String? _error;
-  List<dynamic> _recommendations = [];
+  List<RecommendationSection> _sections = [];
 
   @override
   void initState() {
@@ -37,11 +38,9 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     });
 
     try {
-      final results = await _api.getRecommendations(limit: 6);
+      final sections = await _api.getRecommendationSections(limit: 5);
       if (mounted) {
-        setState(() {
-          _recommendations = _deduplicateRecommendations(results);
-        });
+        setState(() => _sections = sections);
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -50,64 +49,6 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  List<dynamic> _deduplicateRecommendations(List<dynamic> results) {
-    final seenKeys = <String>{};
-    final unique = <dynamic>[];
-    for (final destination in results) {
-      if (destination is! Map<String, dynamic>) continue;
-      if (!_isRecommendationValid(destination)) continue;
-      final key = _normalizeDestinationKey(destination);
-      if (key.isEmpty || seenKeys.contains(key)) continue;
-      seenKeys.add(key);
-      unique.add(destination);
-    }
-    return unique;
-  }
-
-  bool _isRecommendationValid(Map<String, dynamic> destination) {
-    final name = (destination['name'] ?? '').toString().trim();
-    if (name.isEmpty) return false;
-    final normalized = name.toLowerCase();
-    final badPatterns = [
-      'unnamed',
-      'no name',
-      'road',
-      'street',
-      'path',
-      'route',
-      'way',
-      'voie',
-      'chemin',
-      'ligne',
-      'line',
-      'unknown',
-      'null',
-      'drainage',
-      'track',
-      'roundabout',
-      'bridge',
-      'interchange',
-    ];
-    if (badPatterns.any(normalized.contains)) return false;
-
-    final desc = (destination['description'] ?? '').toString().trim();
-    if (desc.isNotEmpty && desc.length < 20) return false;
-
-    return true;
-  }
-
-  String _normalizeDestinationKey(Map<String, dynamic> destination) {
-    final id = destination['id']?.toString().trim();
-    if (id?.isNotEmpty == true) return id!;
-
-    final name = (destination['name'] ?? '').toString().trim();
-    if (name.isNotEmpty) {
-      return name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
-    }
-
-    return (destination['image'] ?? '').toString().trim();
   }
 
   @override
@@ -150,7 +91,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       );
     }
 
-    if (_recommendations.isEmpty) {
+    if (_sections.isEmpty) {
       return EmptyState(
         icon: Icons.star_outline,
         title: l10n.noRecommendations,
@@ -171,28 +112,62 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(
-                l10n.personalizedForYou,
+                'Recommended for You',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                l10n.recommendationsPlaceholder,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  height: 1.4,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            DestinationGrid(
-              destinations: _recommendations.cast<Map<String, dynamic>>(),
-            ),
+            const SizedBox(height: 8),
+            for (final section in _sections) _buildSection(section),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSection(RecommendationSection section) {
+    final theme = Theme.of(context);
+    if (section.items.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              section.title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 200,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: section.items.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
+                  child: SizedBox(
+                    width: 150,
+                    child: DestinationGridCard(
+                      destination: section.items[index],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -17,7 +17,7 @@ from app.image_utils import (
     get_placeholder_image,
     get_placeholder_pool,
 )
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -407,20 +407,64 @@ def _build_long_description(
 
 
 def _normalize_image_url(url: str) -> str:
-    """Normalize image URLs by removing query strings and fragments and trailing slashes.
-    This helps deduplicate the same image served with different query params.
+    """Normalize image URLs to a canonical form for robust deduplication.
+
+    Rules applied (in order):
+    - Enforces HTTPS (http://foo -> https://foo, so http and https are the same)
+    - Removes 'www.' prefix from the host
+    - Lowercases scheme and host
+    - Removes query strings ('?...') and fragments ('#...')
+    - Removes trailing slashes
+    - For Wikimedia Commons, removes thumbnail paths to get the original image URL.
+      e.g. /thumb/c/c3/img.jpg/100px-img.jpg -> /c/c3/img.jpg
+    - Canonicalizes percent-encoding: decodes then re-encodes with uppercase hex
+      so %c3%a9 == %C3%A9, and treats encoded vs literal special characters the same.
     """
     if not url:
         return ""
     try:
         p = urlparse(url)
-        # Keep scheme, netloc and path only; normalize scheme/netloc to lowercase
-        scheme = (p.scheme or 'https').lower()
-        netloc = (p.netloc or '').lower()
-        cleaned = urlunparse((scheme, netloc, p.path.rstrip('/'), '', '', ''))
-        return cleaned
-    except Exception:
-        return url.rstrip('/')
+
+        # 1) Force HTTPS scheme. http and https are treated as identical for
+        # dedup purposes (the same photo is served over both).
+        scheme = "https"
+
+        # 2) Normalize netloc: lowercase, strip userinfo, strip port, strip www.
+        netloc = (p.netloc or "").lower()
+        if "@" in netloc:
+            netloc = netloc.rsplit("@", 1)[-1]
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
+        # Drop the port if it's a default 80/443 on http/https.
+        if netloc.endswith(":80") and scheme == "http":
+            netloc = netloc[:-3]
+        elif netloc.endswith(":443") and scheme == "https":
+            netloc = netloc[:-4]
+
+        # 3) Normalize path.
+        path = p.path
+
+        # Special handling for Wikimedia Commons thumbnails:
+        # /thumb/<a>/<ab>/<File>/<NNNpx-<File>> -> /<a>/<ab>/<File>
+        if "upload.wikimedia.org" in netloc:
+            path = re.sub(r'/thumb/(.+?)/[^/]+$', r'/\1', path)
+
+        # 4) Canonicalize percent-encoding: unquote then quote.
+        from urllib.parse import unquote, quote
+        unquoted = unquote(path)
+        # Never re-encode '/' separators or ':' (keep path structure).
+        canonical_path = quote(unquoted, safe="/:,. _-()'")
+
+        # 5) Strip trailing slashes (after canonicalization).
+        canonical_path = canonical_path.rstrip("/")
+
+        # 6) Drop query string and fragment entirely.
+        return f"{scheme}://{netloc}{canonical_path}"
+
+    except Exception as e:
+        logger.warning(f"URL normalization failed for '{url}': {e}")
+        # Fallback for malformed URLs
+        return url.strip().lower().rstrip("/")
 
 # ---------------------------------------------------------------------------
 # Future-Compatible Provider Architecture
@@ -875,45 +919,51 @@ def _normalize_osm_element(element):
     MAX_IMAGES = 6
     wikidata_id = tags.get("wikidata", "")
     wikipedia = tags.get("wikipedia", "")
-    osm_image = tags.get("image") or tags.get("contact:image") or ""
     
-    image_list = []
-    image_source = "placeholder"
+    # Step 1: Collect all potential URLs from all sources
+    potential_urls = []
+    osm_image_val = tags.get("image") or tags.get("contact:image") or ""
+    if osm_image_val:
+        potential_urls.append(osm_image_val)
 
-    # Track seen URLs for deduplication
-    seen_urls = set()
-
-    if osm_image and len(image_list) < MAX_IMAGES:
-        normalized_url = _normalize_image_url(osm_image)
-        if normalized_url and normalized_url not in seen_urls:
-            image_list.append(normalized_url)
-            seen_urls.add(normalized_url)
-            image_source = "osm"
-
-    if (wikidata_id or wikipedia) and len(image_list) < MAX_IMAGES:
-        fetched_images, verified = fetch_wikimedia_image(
+    # Step 2: Fetch from Wikimedia if applicable
+    wikimedia_urls, wikimedia_verified = [], False
+    if (wikidata_id or wikipedia):
+        wikimedia_urls, wikimedia_verified = fetch_wikimedia_image(
             wikidata_id=wikidata_id,
             wikipedia_title=wikipedia,
             place_name=name
         )
-        if fetched_images and verified:
-            for img in fetched_images:
-                if len(image_list) >= MAX_IMAGES:
-                    break
-                normalized_url = _normalize_image_url(img)
-                if normalized_url and normalized_url not in seen_urls:
-                    image_list.append(normalized_url)
-                    seen_urls.add(normalized_url)
-            if image_list:
-                image_source = "wikimedia"
+        if wikimedia_urls:
+            potential_urls.extend(wikimedia_urls)
 
-    # Fallback to placeholder if no images found (max 1 placeholder)
-    if not image_list:
-        placeholder_img = _normalize_image_url(get_placeholder_image(primary_category, name))
-        image_list.append(placeholder_img)
-        image_source = "placeholder"
+    # Step 3: Normalize and deduplicate
+    image_list = []
+    seen_urls = set()
+    for url in potential_urls:
+        if len(image_list) >= MAX_IMAGES:
+            break
+        normalized_url = _normalize_image_url(url)
+        if normalized_url and normalized_url not in seen_urls:
+            image_list.append(normalized_url)
+            seen_urls.add(normalized_url)
 
-    # Main image (backward compatibility)
+    # Step 4: Determine image source and apply placeholder if needed.
+    image_source = "placeholder"
+    if image_list:
+        if wikimedia_urls:
+            image_source = "wikimedia"
+        elif osm_image_val:
+            image_source = "osm"
+    else:
+        # No real image found — assign a deterministic placeholder now so the
+        # gallery is never empty. The global re-diversity pass in
+        # _minimize_placeholder_reuse() will still spread these out across the pool.
+        fallback_url = get_placeholder_image(primary_category, name)
+        if fallback_url:
+            image_list = [_normalize_image_url(fallback_url)]
+
+    # Main image (for legacy API compatibility) is the first in the list.
     main_image = image_list[0] if image_list else ""
 
     return {
@@ -939,7 +989,7 @@ def _normalize_osm_element(element):
         "facilities": facilities,
         "cuisine": cuisine,
         "star_rating": star_rating,
-        "images": image_list
+        "images": image_list  # The full, deduplicated list
     }
 
 
@@ -947,58 +997,114 @@ def _normalize_osm_element(element):
 # Deduplication and Database Synchronization
 # ---------------------------------------------------------------------------
 
-def _minimize_placeholder_reuse(items):
-    """Reassign placeholder images so the same image is reused as little as possible.
+def _minimize_placeholder_reuse(items, used_real_images):
+    """Assign placeholder images with STRICT GLOBAL UNIQUENESS.
 
-    Placeholder pools are small (3-6 real Yaoundé images per category), so perfect
-    uniqueness is impossible for hundreds of destinations. However, we can avoid
-    immediately repeating an image that is already used by another destination in
-    the same category: the deterministic pick is kept only when the image is not
-    yet over-used, otherwise the least-used pool entry is chosen instead.
+    This function is called after real images have been deduplicated. It enforces
+    the hard rule that NO image URL may appear more than once across the entire
+    dataset — this includes placeholder images.
 
-    The returned dict maps image URL -> number of times it was *used* in this pass
-    (used to build the "usage" map so later items see earlier assignments).
+    It handles two types of items:
+    1. Items that were originally placeholders.
+    2. Items that had real images, but all were duplicates and were removed.
+
+    For each such destination, it assigns the *least-used* placeholder from the
+    appropriate category pool, but ONLY if that image has not already been used
+    anywhere (real or placeholder). If every image in the pool is already taken,
+    the destination is left with NO image (empty list and empty main image) rather
+    than reusing an existing one. This is intentional: per the product requirement,
+    it is better for a destination to have no image than to show a duplicate.
     """
-    usage = {}
+    # Track every image URL already assigned globally (real images + placeholders).
+    # Start with the real images that were kept.
+    used_globally = set(used_real_images)
+    if isinstance(used_globally, (list, tuple)):
+        used_globally = {_normalize_image_url(u) for u in used_globally}
+
+    # Build the full, ordered list of all placeholder pool URLs (deduplicated).
+    category_keys = [
+        "food", "nature", "culture", "market", "accommodation",
+        "sports", "attraction", "general",
+    ]
+    all_placeholder_images = []
+    seen_pool = set()
+    for category in category_keys:
+        for image in get_placeholder_pool(category):
+            n = _normalize_image_url(image)
+            if n and n not in seen_pool:
+                seen_pool.add(n)
+                all_placeholder_images.append(n)
+
+    # Track global usage count per placeholder image (for even distribution).
+    placeholder_usage = {n: 0 for n in all_placeholder_images}
+
     for item in items:
         if item.get("image_source") != "placeholder":
             continue
-        category = item.get("category", "attraction")
+
+        category = item.get("category", "general")
         pool = get_placeholder_pool(category)
         if not pool:
             continue
-        current = item.get("image", "")
-        if not current:
-            continue
-        # Keep the deterministic pick unless it's already used somewhere else.
-        if usage.get(current, 0) < 1:
-            usage[current] = usage.get(current, 0) + 1
-            continue
-        # Pick the least-used image in the pool (tie-broken lexicographically).
-        best = min(pool, key=lambda u: (usage.get(u, 0), u))
-        if best != current:
-            item["image"] = best
-            images = item.get("images") or []
-            if images:
-                item["images"] = [
-                    best
-                    if _normalize_image_url(i) == _normalize_image_url(current)
-                    else i
-                    for i in images
-                ]
-                unique_images = []
-                seen = set()
-                for img in item["images"]:
-                    n = _normalize_image_url(img)
-                    if n and n not in seen:
-                        seen.add(n)
-                        unique_images.append(img)
-                item["images"] = unique_images
-            else:
-                item["images"] = [best]
-        usage[best] = usage.get(best, 0) + 1
-    return usage
 
+        # Candidate images for this category + general fallback, in order.
+        candidate_urls = []
+        for p in pool:
+            n = _normalize_image_url(p)
+            if n and n not in used_globally:
+                candidate_urls.append(n)
+        if not candidate_urls:
+            for p in get_placeholder_pool("general"):
+                n = _normalize_image_url(p)
+                if n and n not in used_globally:
+                    candidate_urls.append(n)
+
+        if not candidate_urls:
+            # No unused image available anywhere — leave the destination with NO
+            # image rather than duplicate an existing one.
+            item["images"] = []
+            item["image"] = ""
+            item["image_source"] = "placeholder"
+            continue
+
+        # Pick the least-used candidate (deterministic tie-break by URL).
+        best_choice = min(candidate_urls, key=lambda u: (placeholder_usage.get(u, 0), u))
+
+        item["images"] = [best_choice]
+        item["image"] = best_choice
+        item["image_source"] = "placeholder"
+
+        # Mark this image as used globally so it can never be assigned twice.
+        used_globally.add(best_choice)
+        placeholder_usage[best_choice] = placeholder_usage.get(best_choice, 0) + 1
+
+def _deduplicate_real_images(items):
+    """
+    Ensures that a real image URL is used for at most one destination.
+    If a destination's images are all removed, it's marked as a placeholder.
+    Returns the set of all real image URLs that were used.
+    """
+    used_real_images = set()
+    for item in sorted(items, key=lambda x: get_completeness_score(x), reverse=True):
+        if item.get("image_source") in ("osm", "wikimedia"):
+            unique_images_for_item = []
+            original_images = item.get("images", [])
+            
+            for img_url in original_images:
+                normalized = _normalize_image_url(img_url)
+                if normalized not in used_real_images:
+                    unique_images_for_item.append(img_url)
+                    used_real_images.add(normalized)
+            
+            item["images"] = unique_images_for_item
+            
+            # If all images were duplicates, this destination becomes a placeholder
+            if not item["images"]:
+                item["image_source"] = "placeholder"
+                item["image"] = "" # Will be filled in by _minimize_placeholder_reuse
+            else:
+                item["image"] = item["images"][0]
+    return used_real_images
 
 def deduplicate_and_sync(incoming_list, app=None):
     """Filter out duplicate destinations, keeping the one with richer information.
@@ -1006,194 +1112,128 @@ def deduplicate_and_sync(incoming_list, app=None):
     """
     from app.models import get_connection, get_all_destinations, upsert_destination
 
-    # 1. Deduplicate the incoming list among itself
-    unique_incoming = {}
-
     def get_completeness_score(d):
         score = 0
-        if d.get("image") and "placeholder" not in d.get("image_source", ""): score += 1
-        if d.get("address"): score += 1
-        if d.get("description") and "A " not in d["description"]: score += 1
-        if d.get("opening_hours"): score += 1
-        if d.get("phone"): score += 1
+        if not d: return 0
+        if d.get("image") and d.get("image_source") != "placeholder": score += 5
+        if d.get("long_description") and len(d.get("long_description", "")) > 100: score += 3
+        if d.get("address"): score += 2
         if d.get("website"): score += 1
-        if d.get("email"): score += 1
-        if d.get("price_level"): score += 1
-        if d.get("cuisine"): score += 1
-        if d.get("star_rating"): score += 1
-        if len(d.get("facilities", [])) > 0: score += 1
-        if len(d.get("activities", [])) > 0: score += 1
-        if len(d.get("images", [])) > 1: score += 1
+        if d.get("phone"): score += 1
+        if d.get("opening_hours"): score += 1
+        score += len(d.get("facilities", [])) / 5.0
         return score
 
-    # Group incoming items by name (lowercase)
+    # 1. Deduplicate the incoming list based on name and location proximity
     name_groups = {}
     for item in incoming_list:
         name_key = item["name"].lower().strip()
         name_groups.setdefault(name_key, []).append(item)
 
     final_incoming = []
-    discarded_osm_ids = []
-
     for name_key, items in name_groups.items():
-        # Within each name group, deduplicate based on distance (~300m = 0.0027 degrees)
+        # Sort by completeness to process richer items first
+        sorted_items = sorted(items, key=lambda x: get_completeness_score(x), reverse=True)
         resolved = []
-        for item in items:
-            lat1 = item["latitude"]
-            lon1 = item["longitude"]
-
+        for item in sorted_items:
+            lat1 = item.get("latitude")
+            lon1 = item.get("longitude")
             if lat1 is None or lon1 is None:
-                final_incoming.append(item)
+                if not any(r["name"].lower().strip() == item["name"].lower().strip() for r in resolved):
+                    resolved.append(item)
                 continue
 
-            duplicate_found = False
-            for r_idx, r_item in enumerate(resolved):
-                lat2 = r_item["latitude"]
-                lon2 = r_item["longitude"]
-
+            is_duplicate = False
+            for r_item in resolved:
+                lat2 = r_item.get("latitude")
+                lon2 = r_item.get("longitude")
+                if lat2 is None or lon2 is None:
+                    continue
+                
+                # Check for proximity (approx 300m)
                 dist = ((lat1 - lat2)**2 + (lon1 - lon2)**2)**0.5
                 if dist < 0.0027:
-                    duplicate_found = True
-                    # Compare completeness score
-                    score_new = get_completeness_score(item)
-                    score_existing = get_completeness_score(r_item)
-                    if score_new > score_existing:
-                        # Keep richer one, discard poorer one
-                        discarded_osm_ids.append(r_item["osm_id"])
-                        resolved[r_idx] = item
-                    else:
-                        discarded_osm_ids.append(item["osm_id"])
+                    is_duplicate = True
                     break
-            if not duplicate_found:
+            if not is_duplicate:
                 resolved.append(item)
         final_incoming.extend(resolved)
 
-    # 2. Group existing database records by name and check distance
+    # 2. Compare with existing DB entries to decide on updates vs. inserts
     conn = get_connection(app)
     existing_destinations = conn.execute("SELECT id, osm_id, name, latitude, longitude FROM destinations").fetchall()
-    existing_map = {d["osm_id"]: d for d in existing_destinations}
+    existing_map_by_name = {}
+    for d in existing_destinations:
+        existing_map_by_name.setdefault(d["name"].lower().strip(), []).append(d)
 
     db_updates = []
+    items_to_insert = []
+    
+    # Sort by completeness score descending to give richer items priority for image claims
+    final_incoming.sort(key=get_completeness_score, reverse=True)
 
     for item in final_incoming:
-        lat1 = item["latitude"]
-        lon1 = item["longitude"]
-        osm_id = item["osm_id"]
-
-        # If exact OSM ID already exists, we will just upsert it natively
-        if osm_id in existing_map:
-            continue
-
-        # Check for matching name/distance in DB under a different OSM ID (e.g. node vs way duplicate)
-        db_duplicate = None
-        for db_dest in existing_destinations:
-            if db_dest["name"].lower().strip() == item["name"].lower().strip():
-                lat2 = db_dest["latitude"]
-                lon2 = db_dest["longitude"]
-                if lat1 is not None and lon1 is not None and lat2 is not None and lon2 is not None:
-                    dist = ((lat1 - lat2)**2 + (lon1 - lon2)**2)**0.5
-                    if dist < 0.0027:
-                        db_duplicate = db_dest
-                        break
-
-        if db_duplicate:
-            # Duplicate found in DB under a different OSM ID! Check completeness to see if we replace it
-            db_full = conn.execute("SELECT * FROM destinations WHERE id = ?", (db_duplicate["id"],)).fetchone()
-            db_full_dict = dict(db_full)
-            for k in ["tags", "activities", "facilities", "images"]:
-                if k in db_full_dict and isinstance(db_full_dict[k], str):
-                    try:
-                        db_full_dict[k] = json.loads(db_full_dict[k])
-                    except:
-                        db_full_dict[k] = []
-
-            score_db = get_completeness_score(db_full_dict)
+        name_key = item["name"].lower().strip()
+        db_duplicates = existing_map_by_name.get(name_key, [])
+        
+        is_update_of = None
+        if db_duplicates:
+            lat1 = item.get("latitude")
+            lon1 = item.get("longitude")
+            if lat1 is not None and lon1 is not None:
+                for db_dest in db_duplicates:
+                    lat2 = db_dest.get("latitude")
+                    lon2 = db_dest.get("longitude")
+                    if lat2 is not None and lon2 is not None:
+                        dist = ((lat1 - lat2)**2 + (lon1 - lon2)**2)**0.5
+                        if dist < 0.0027:
+                            is_update_of = db_dest
+                            break
+        
+        if is_update_of:
+            db_full = conn.execute("SELECT * FROM destinations WHERE id = ?", (is_update_of["id"],)).fetchone()
+            score_db = get_completeness_score(dict(db_full))
             score_incoming = get_completeness_score(item)
-
-            if score_incoming > score_db:
-                # The incoming one is richer! Update the existing DB row to point to new osm_id and values
-                # This preserves the UUID "id" of the record so user ratings are NOT lost!
-                logger.info(f"Replacing duplicate DB entry {db_duplicate['osm_id']} with richer incoming {osm_id}")
-                db_updates.append((db_duplicate["id"], item))
-                discarded_osm_ids.append(db_duplicate["osm_id"])
+            if score_incoming >= score_db:
+                logger.info(f"Replacing duplicate DB entry {is_update_of['osm_id']} with richer incoming {item['osm_id']}")
+                db_updates.append((is_update_of["id"], item))
             else:
-                # DB entry is richer! Discard the incoming duplicate.
-                logger.info(f"Discarding duplicate incoming {osm_id} in favor of richer DB entry {db_duplicate['osm_id']}")
-                discarded_osm_ids.append(osm_id)
+                logger.info(f"Discarding duplicate incoming {item['osm_id']} in favor of richer DB entry {is_update_of['osm_id']}")
+        else:
+            items_to_insert.append(item)
 
     conn.close()
 
-    # Minimize placeholder image reuse so the same real Yaoundé image is not
-    # repeated across many different destinations.
-    _minimize_placeholder_reuse(final_incoming)
+    # 3. Enforce image uniqueness across the entire set of items to be inserted/updated
+    all_items_to_process = [item for _, item in db_updates] + items_to_insert
+    
+    # First, ensure real images are not duplicated across destinations
+    used_real_images = _deduplicate_real_images(all_items_to_process)
+    
+    # Second, for all destinations that are now placeholders, assign them diverse images
+    _minimize_placeholder_reuse(all_items_to_process, used_real_images)
 
-    # Now write new unique ones to DB
+    # 4. Write to DB
     count = 0
-    for item in final_incoming:
-        if item["osm_id"] in discarded_osm_ids:
-            continue
-
-        upsert_destination(
-            osm_id=item["osm_id"],
-            name=item["name"],
-            area=item["area"],
-            tags=item["tags"],
-            description=item["description"],
-            long_description=item.get("long_description", item.get("description", "")),
-            cost=item["cost"],
-            image=item["image"],
-            image_source=item["image_source"],
-            latitude=item["latitude"],
-            longitude=item["longitude"],
-            address=item["address"],
-            category=item["category"],
-            activities=item["activities"],
-            opening_hours=item["opening_hours"],
-            phone=item["phone"],
-            website=item["website"],
-            email=item["email"],
-            price_level=item["price_level"],
-            facilities=item["facilities"],
-            cuisine=item["cuisine"],
-            star_rating=item["star_rating"],
-            images=item["images"],
-            app=app
-        )
+    # Perform inserts
+    for item in items_to_insert:
+        upsert_destination(app=app, **item)
         count += 1
-
-    # Perform updates for richer duplicate matches (reusing database ID)
+        
+    # Perform updates for richer duplicate matches
     if db_updates:
         conn = get_connection(app)
         for dest_id, item in db_updates:
-            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            conn.execute("""
-                UPDATE destinations SET
-                    osm_id = ?, name = ?, area = ?, tags = ?, description = ?,
-                    long_description = ?, cost = ?, image = ?, image_source = ?, last_synced_at = ?,
-                    latitude = ?, longitude = ?, address = ?, category = ?,
-                    activities = ?, opening_hours = ?, phone = ?, website = ?,
-                    email = ?, price_level = ?, facilities = ?, cuisine = ?,
-                    star_rating = ?, images = ?
-                WHERE id = ?
-            """, (
-                item["osm_id"], item["name"], item["area"], json.dumps(item["tags"]), item["description"],
-                item.get("long_description", item.get("description", "")), item["cost"], item["image"], item["image_source"], now,
-                item["latitude"], item["longitude"], item["address"], item["category"],
-                json.dumps(item["activities"]), item["opening_hours"], item["phone"], item["website"],
-                item["email"], item["price_level"], json.dumps(item["facilities"]), item["cuisine"],
-                item["star_rating"], json.dumps(item["images"]), dest_id
-            ))
+            # Create a dictionary for the item, excluding osm_id for the update
+            update_data = item.copy()
+            update_data['id'] = dest_id # specify the record to update
+            upsert_destination(app=app, **update_data)
             count += 1
-        conn.commit()
         conn.close()
 
-    # Clean up duplicate rows in DB if they match discarded ones
-    if discarded_osm_ids:
-        conn = get_connection(app)
-        for d_id in discarded_osm_ids:
-            conn.execute("DELETE FROM destinations WHERE osm_id = ?", (d_id,))
-        conn.commit()
-        conn.close()
+    # Note: The logic for deleting discarded OSM IDs is removed as the upsert/update
+    # logic based on our primary key (UUID) and completeness score handles this implicitly.
+    # We are replacing poorer records with richer ones, not just deleting.
 
     return count
 

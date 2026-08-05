@@ -19,6 +19,7 @@ from app.models import (
 from app.overpass_sync import sync_destinations as _sync_destinations
 from app.overpass_sync import search_overpass as _live_search
 from app.recommendations import get_recommendations as _score_recommendations
+from app.recommendations import get_sectioned_recommendations as _section_recommendations
 
 recommendation_bp = Blueprint("recommendation", __name__)
 
@@ -130,34 +131,41 @@ def submit_rating(dest_id):
 @recommendation_bp.route("/recommendations", methods=["GET"])
 @token_required
 def get_recommendations():
-    """Return personalised destination recommendations for the logged-in user.
+    """Return destination recommendations for the logged-in user.
 
-    Scores all destinations based on:
-      - the user's preferences (collected at registration)
-      - the user's favorite places
-      - popularity (average rating / rating count)
-      - content quality (real images, rich descriptions)
+    Returns a structured, section-based response (interim heuristic engine):
+
+        {
+          "sections": [
+             {"title": "Top Rated in Yaoundé", "type": "top_rated",
+              "items": [destination, ...]},
+             ...
+          ],
+          "recommendations": [destination, ...]   // flat list for backward compat
+        }
+
+    Sections include "Top Rated in Yaoundé", "Popular Right Now", "Newly Added"
+    and category sections. The personalization engine can later be swapped for a
+    real behaviour-based engine without changing this response shape.
 
     Requires: Authorization: Bearer <token>
     """
-    username = g.current_user
     try:
-        limit = int(request.args.get("limit", 6))
+        limit = int(request.args.get("limit", 5))
     except (ValueError, TypeError):
-        limit = 6
+        limit = 5
     limit = max(1, min(limit, 24))
 
     destinations = get_all_destinations()
     if not destinations:
-        return jsonify([]), 200
+        return jsonify({"sections": [], "recommendations": []}), 200
 
     auth_token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
     try:
-        recs = _score_recommendations(username, destinations, auth_token, limit=limit)
-    except Exception as e:
-        logger.exception("Recommendation engine failed, falling back to popular places")
-        # Fallback: just return the best-rated/quality destinations.
-        recs = sorted(
+        payload = _section_recommendations(destinations, token=auth_token, limit=limit)
+    except Exception:
+        logger.exception("Sectioned recommendation engine failed, falling back to popular places")
+        fallback = sorted(
             destinations,
             key=lambda d: (
                 float(d.get("average_rating") or 0.0),
@@ -166,8 +174,23 @@ def get_recommendations():
             ),
             reverse=True,
         )[:limit]
+        payload = {"sections": [{"title": "Popular Right Now", "type": "popular", "items": fallback}]}
 
-    return jsonify(recs), 200
+    # Flatten all section items into a single recommendations list for
+    # backward compatibility with clients that expect a plain list.
+    flat = []
+    seen = set()
+    for section in payload.get("sections", []):
+        for item in section.get("items", []):
+            key = item.get("id") or item.get("name") or ""
+            if key and key in seen:
+                continue
+            if key:
+                seen.add(key)
+            flat.append(item)
+
+    payload["recommendations"] = flat
+    return jsonify(payload), 200
 
 
 @recommendation_bp.route("/search", methods=["GET"])

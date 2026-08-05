@@ -16,6 +16,12 @@ from app.recommendations import (
     _popularity_score,
     _quality_score,
     get_recommendations,
+    get_sectioned_recommendations,
+    _top_rated,
+    _popular_right_now,
+    _newly_added,
+    _category_section,
+    MIN_RATING_COUNT_FOR_TOP,
 )
 
 
@@ -140,3 +146,51 @@ class TestGetRecommendations:
         assert len(results) > 0
         first = results[0]
         assert first["name"] is not None
+
+
+class TestSectionedRecommendations:
+    def test_top_rated_requires_min_count(self):
+        # Single 5-star with rating_count 1 should NOT be top rated.
+        dests = [
+            {"name": "One Star", "average_rating": 5.0, "rating_count": 1},
+            {"name": "Steady", "average_rating": 4.0, "rating_count": 10},
+        ]
+        top = _top_rated(dests, limit=5)
+        assert all(d["rating_count"] >= MIN_RATING_COUNT_FOR_TOP for d in top)
+        assert any(d["name"] == "Steady" for d in top)
+
+    def test_popular_right_now(self):
+        dests = [
+            {"name": "A", "average_rating": 4.0, "rating_count": 50},
+            {"name": "B", "average_rating": 5.0, "rating_count": 1},
+        ]
+        popular = _popular_right_now(dests, limit=5)
+        assert popular[0]["name"] == "A"
+
+    def test_newly_added_sorts_by_sync_time(self):
+        dests = [
+            {"name": "Old", "last_synced_at": "2020-01-01T00:00:00"},
+            {"name": "New", "last_synced_at": "2024-01-01T00:00:00"},
+        ]
+        new = _newly_added(dests, limit=5)
+        assert new[0]["name"] == "New"
+
+    def test_category_section_filters(self):
+        dests = [
+            {"name": "Park", "category": "nature"},
+            {"name": "Museum", "category": "culture"},
+        ]
+        items = _category_section(dests, "nature", limit=5)
+        assert len(items) == 1 and items[0]["name"] == "Park"
+
+    def test_get_sectioned_returns_sections_shape(self):
+        payload = get_sectioned_recommendations(SAMPLE_DESTINATIONS, limit=5)
+        assert "sections" in payload
+        assert isinstance(payload["sections"], list)
+        # There should be at least one section with items.
+        assert any(s.get("items") for s in payload["sections"])
+        # Section titles should be real, non-empty strings.
+        for section in payload["sections"]:
+            assert section.get("title")
+            assert section.get("type")
+            assert isinstance(section.get("items"), list)

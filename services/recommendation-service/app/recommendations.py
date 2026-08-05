@@ -174,3 +174,146 @@ def get_recommendations(username, destinations, token, limit=6):
 
     return selected
 
+
+# ---------------------------------------------------------------------------
+# Structured, section-based recommendations (interim logic)
+# ---------------------------------------------------------------------------
+#
+# Before we have enough per-user behavioural data, we present recommendations
+# in recognizable, real sections (similar to how Airbnb / Booking.com surface
+# "Popular homes", "Trending destinations", "Top experiences"):
+#
+#   - "Top Rated in Yaoundé"  -> highest average_rating with a rating_count
+#                                minimum (avoid surfacing a place with one 5-star).
+#   - "Popular Right Now"     -> most recent ratings / interactions (popularity).
+#   - "Newly Added"           -> most recently synced destinations.
+#   - Category sections       -> "Nature & Parks", "Food & Markets", etc.
+#
+# The response shape is fixed so this heuristic engine can later be swapped for
+# a real personalization engine (search history, favourites, behaviour) without
+# changing the API contract.
+
+
+# Minimum rating count before a place counts as "top rated".
+MIN_RATING_COUNT_FOR_TOP = 3
+
+# Human-friendly section titles mapped from our internal category labels.
+CATEGORY_SECTION_TITLES = {
+    "nature": "Nature & Parks",
+    "food": "Food & Dining",
+    "market": "Markets & Shopping",
+    "culture": "Culture & Museums",
+    "accommodation": "Places to Stay",
+    "sports": "Sports & Recreation",
+    "attraction": "Top Attractions",
+    "health": "Health & Wellness",
+    "transport": "Getting Around",
+    "services": "Useful Services",
+    "business": "Business & Events",
+    "finance": "Banking & Finance",
+}
+
+
+def _top_rated(destinations, limit):
+    """Destinations with the highest average_rating and a meaningful count."""
+    eligible = [
+        d for d in destinations
+        if (d.get("rating_count") or 0) >= MIN_RATING_COUNT_FOR_TOP
+        and (d.get("average_rating") or 0) > 0
+    ]
+    eligible.sort(
+        key=lambda d: (
+            float(d.get("average_rating") or 0.0),
+            d.get("rating_count") or 0,
+        ),
+        reverse=True,
+    )
+    return eligible[:limit]
+
+
+def _popular_right_now(destinations, limit):
+    """Most rated / interacted destinations as a simple popularity signal."""
+    scored = []
+    for d in destinations:
+        count = d.get("rating_count") or 0
+        avg = float(d.get("average_rating") or 0.0)
+        # Heuristic: popularity signal weights recent interactions (count) and
+        # a reasonable rating. A place with many ratings ranks above a single 5-star.
+        score = count + (avg * count * 0.5)
+        scored.append((score, d))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [d for _, d in scored[:limit] if _popularity_score(d) > 0]
+
+
+def _newly_added(destinations, limit):
+    """Most recently synced destinations the user likely hasn't seen yet."""
+    def _synced_ts(d):
+        raw = d.get("last_synced_at") or ""
+        return raw
+    eligible = [d for d in destinations if d.get("last_synced_at")]
+    eligible.sort(key=_synced_ts, reverse=True)
+    return eligible[:limit]
+
+
+def _category_section(destinations, category, limit):
+    """Top items from a single destination category."""
+    members = [d for d in destinations if (d.get("category") or "").lower() == category]
+    members.sort(
+        key=lambda d: (
+            float(d.get("average_rating") or 0.0),
+            d.get("rating_count") or 0,
+            len((d.get("long_description") or d.get("description") or "").strip()),
+        ),
+        reverse=True,
+    )
+    return members[:limit]
+
+
+def get_sectioned_recommendations(destinations, token="", limit=5):
+    """Return a structured, section-based set of recommendations.
+
+    This is the interim heuristic engine. It returns a fixed shape:
+        {
+          "sections": [
+             {"title": ..., "type": ..., "items": [destination, ...]},
+             ...
+          ]
+        }
+
+    Both the personalised [get_recommendations] and this sectioned engine return
+    destinations in the same destination-dict shape, so swapping the engine later
+    (real personalization) will not change the API contract.
+    """
+    # Only ever show destinations that have a real image — placeholders should
+    # not dominate the curated recommendation sections.
+    with_images = [
+        d for d in destinations
+        if d.get("image_source") not in ("placeholder", "") and (d.get("image") or "")
+    ]
+    # If there are very few real images, fall back to any destination with a
+    # meaningful description so the page is never empty.
+    pool = with_images if len(with_images) >= 4 else destinations
+
+    sections = []
+
+    top = _top_rated(pool, limit)
+    if top:
+        sections.append({"title": "Top Rated in Yaoundé", "type": "top_rated", "items": top})
+
+    popular = _popular_right_now(pool, limit)
+    if popular:
+        sections.append({"title": "Popular Right Now", "type": "popular", "items": popular})
+
+    new = _newly_added(pool, limit)
+    if new:
+        sections.append({"title": "Newly Added", "type": "new_added", "items": new})
+
+    # Category sections — only include categories that have real, image-bearing
+    # destinations so the page has genuine structure and variety.
+    for cat, title in CATEGORY_SECTION_TITLES.items():
+        items = _category_section(pool, cat, limit)
+        if items:
+            sections.append({"title": title, "type": f"category_{cat}", "items": items})
+
+    return {"sections": sections}
+

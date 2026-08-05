@@ -5,6 +5,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config/api_config.dart';
 
+/// A structured recommendation section returned by the backend.
+class RecommendationSection {
+  final String title;
+  final String type;
+  final List<Map<String, dynamic>> items;
+  const RecommendationSection({
+    required this.title,
+    required this.type,
+    required this.items,
+  });
+}
+
 /// Centralized service for all HTTP calls to the GlobeTrotter backend.
 class ApiService {
   static final ApiService _instance = ApiService._();
@@ -203,6 +215,73 @@ class ApiService {
         }
       }
       if (body is List<dynamic>) return body;
+      throw ApiException(
+        response.statusCode,
+        'Unexpected recommendations format',
+      );
+    }
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// Returns structured recommendation sections from the backend.
+  ///
+  /// The backend returns
+  ///     { "sections": [ {"title": ..., "type": ..., "items": [destination, ...]}, ... ],
+  ///       "recommendations": [...] }
+  /// Each destination is a `Map<String, dynamic>`. This method parses the
+  /// sections into [RecommendationSection] objects for the UI.
+  Future<List<RecommendationSection>> getRecommendationSections({
+    int limit = 5,
+  }) async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.recommendations}',
+    ).replace(queryParameters: {'limit': limit.toString()});
+    final response = await _get(uri, headers: _authHeaders(token));
+    final body = _decode(response);
+    if (response.statusCode == 200) {
+      if (body is Map && body.containsKey('sections')) {
+        final sectionsRaw = body['sections'];
+        if (sectionsRaw is List<dynamic>) {
+          final sections = <RecommendationSection>[];
+          for (final raw in sectionsRaw) {
+            if (raw is Map == false) continue;
+            final title = (raw['title'] ?? '').toString();
+            final type = (raw['type'] ?? '').toString();
+            final items = <Map<String, dynamic>>[];
+            final itemsRaw = raw['items'];
+            if (itemsRaw is List<dynamic>) {
+              for (final item in itemsRaw) {
+                if (item is Map) {
+                  items.add(Map<String, dynamic>.from(item));
+                }
+              }
+            }
+            if (title.isNotEmpty && items.isNotEmpty) {
+              sections.add(
+                RecommendationSection(title: title, type: type, items: items),
+              );
+            }
+          }
+          return sections;
+        }
+      } else if (body is List<dynamic>) {
+        // Backward-compat: a plain list of destinations.
+        final flat = <Map<String, dynamic>>[];
+        for (final item in body) {
+          if (item is Map) flat.add(Map<String, dynamic>.from(item));
+        }
+        if (flat.isNotEmpty) {
+          return [
+            RecommendationSection(
+              title: 'Recommended for You',
+              type: 'flat',
+              items: flat,
+            ),
+          ];
+        }
+      }
       throw ApiException(
         response.statusCode,
         'Unexpected recommendations format',

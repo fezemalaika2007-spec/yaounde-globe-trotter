@@ -103,8 +103,7 @@ def fetch_wikimedia_image(wikidata_id="", wikipedia_title="", place_name=""):
     )
 
     if not name_matches:
-        logger.info(f"Entity name '{entity_name}' doesn't match place '{place_name}'. Skipping image.")
-        return ([], False)
+        logger.info(f"Entity name '{entity_name}' doesn't match place '{place_name}'. Marking as unverified.")
 
     # Get the image filename from P18 property
     claims = entity.get("claims", {})
@@ -129,7 +128,7 @@ def fetch_wikimedia_image(wikidata_id="", wikipedia_title="", place_name=""):
 
     if image_urls:
         logger.info(f"Found {len(image_urls)} Wikimedia images for '{place_name}'")
-        return (image_urls, True)
+        return (image_urls, name_matches)
 
     return ([], False)
 
@@ -189,25 +188,38 @@ _YaoundeImages = {
     "food": [
         "https://upload.wikimedia.org/wikipedia/commons/f/fe/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._02.jpg",
         "https://upload.wikimedia.org/wikipedia/commons/1/10/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._04.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/f/f4/Bois_Saint_Anastasie_-_Yaound%C3%A9_02.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/a/a4/Open_air_kitchen%2C_Yaounde%2C_Cameroon.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/e/e1/Yaounde_Egusi.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/5/52/A_butcher_in_Yaound%C3%A9.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/f/f2/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._03.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/a/a2/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._01.jpg",
     ],
     "nature": [
         "https://upload.wikimedia.org/wikipedia/commons/5/56/Nature_Yaound%C3%A9_Cameroun.jpg",
         "https://upload.wikimedia.org/wikipedia/commons/7/7c/Les_Cascades_du_Mfoundi_-_Yaound%C3%A9_01.jpg",
         "https://upload.wikimedia.org/wikipedia/commons/5/5b/Nature_in_Yaound%C3%A9.jpg",
         "https://upload.wikimedia.org/wikipedia/commons/5/58/Bananier_%C3%A0_Yaound%C3%A9_en_novembre_1973.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/d/d3/Overlook_on_the_edge_of_Yaounde.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/e/e7/Bois_Sainte_Anastasie%2C_Yaound%C3%A9%2C_Cameroun.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/a/ac/Les_Cascades_du_Mfoundi_-_Yaound%C3%A9_02.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/1/1b/Overlook_on_the_edge_of_Yaounde.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/9/99/Les_chutes_de_la_lob%C3%A9_kribi_cameroon1.jpg",
     ],
     "culture": [
         "https://upload.wikimedia.org/wikipedia/commons/9/9f/YaoundeNationalMuseum.png",
         "https://upload.wikimedia.org/wikipedia/commons/9/94/Mus%C3%A9eNationalYaound%C3%A9.png",
         "https://upload.wikimedia.org/wikipedia/commons/1/1c/BLackitude_Museum.jpg",
         "https://upload.wikimedia.org/wikipedia/commons/2/20/Mus%C3%A9e_National_Yaound%C3%A9.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/0/09/The_Star_Building%2C_Yaound%C3%A9%2C_Cameroon.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/8/8b/Prime_Minister_Building%2C_Yaound%C3%A9%2C_Cameroon.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/5/53/Les_benedictins1k.JPG",
     ],
     "market": [
         "https://upload.wikimedia.org/wikipedia/commons/d/da/March%C3%A9_central_-_Central_market_%28interior%29_in_Yaound%C3%A9.JPG",
         "https://upload.wikimedia.org/wikipedia/commons/1/15/Cameroon_Market%28Yaound%C3%A9%29.jpg",
         "https://upload.wikimedia.org/wikipedia/commons/5/57/Street_next_to_Central_Market_Yaound%C3%A9_2014.JPG",
         "https://upload.wikimedia.org/wikipedia/commons/8/80/Yaound%C3%A9_view_from_central_market_%282014%29.JPG",
+        "https://upload.wikimedia.org/wikipedia/commons/0/04/March%C3%A9_d%27Ekounou_%28Yaound%C3%A9%29_%282%29.jpg",
     ],
     "accommodation": [
         "https://upload.wikimedia.org/wikipedia/commons/9/96/Hilton_Hotel_in_Yaound%C3%A9_%282014%29.JPG",
@@ -217,12 +229,28 @@ _YaoundeImages = {
     "sports": [
         "https://upload.wikimedia.org/wikipedia/commons/4/43/YaoundeSportPalace.png",
         "https://upload.wikimedia.org/wikipedia/commons/4/45/Stade_annex_1_de_Yaound%C3%A9.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/2/21/Soccer_Training_in_the_Yaound%C3%A9_town.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/5/5e/Club_mundi.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/1/13/Charlotte_Dipanda%2C_Live_Concert_at_Palais_de_Sport_Yaound%C3%A9.JPG",
     ],
     "attraction": [
         "https://upload.wikimedia.org/wikipedia/commons/0/02/Monument_Yaound%C3%A9.jpg",
         "https://upload.wikimedia.org/wikipedia/commons/1/15/Yaound%C3%A9_vue_monument_4.jpg",
         "https://upload.wikimedia.org/wikipedia/commons/f/f2/Monument_j%27aime_mon_pays_03.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/e/e7/Bois_Sainte_Anastasie%2C_Yaound%C3%A9%2C_Cameroun.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/c/c8/1Place_de_l%27ind%C3%A9pendance_hypodrome_Yaound%C3%A9_%2810%29.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/c/c8/1Place_de_l%27ind%C3%A9pendance_hypodrome_Yaound%C3%A9_%282%29.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/a/af/1Place_de_l%27ind%C3%A9pendance_hypodrome_Yaound%C3%A9_%287%29.jpg",
+    ],
+    "general": [
+        "https://upload.wikimedia.org/wikipedia/commons/c/c1/Prime_Minister_Building%2C_Yaound%C3%A9%2C_Cameroon.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/d/dc/Prime_Minister_Building_Yaound%C3%A9%2C_Cameroon.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/1/10/Yaound%C3%A9_1.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/f/f4/Bois_Saint_Anastasie_-_Yaound%C3%A9_02.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/e/e2/Entrance%2C_Botanical_Garden_and_Eco-Park%2C_Sitakunda_%2801%29.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/9/93/Boat_in_the_Jamuna_Bridge_West_Bank_Eco-Park%2C_Bangladesh.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/5/53/Damas_Yaound%C3%A9_4.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/a/ab/Pr%C3%A9sident_de_la_FECAFOOT_Samuel_Eto%27o_et_le_Ministre_de_Sport_Camerounais.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/5/5b/Flooding_in_Cameroon_%28MODIS_2022-09-13%29.jpg",
     ],
 }
 
@@ -237,7 +265,7 @@ def get_placeholder_pool(category="attraction"):
     and by the sync/deduplication logic (diversity-aware assignment) so
     that the same image is reused as little as possible.
     """
-    return _YAOUNDE_IMAGES.get(category, _YAOUNDE_IMAGES["attraction"])
+    return _YAOUNDE_IMAGES.get(category, _YAOUNDE_IMAGES["general"])
 
 
 def _deterministic_index(seed, pool_size):

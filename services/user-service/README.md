@@ -3,6 +3,12 @@
 Manages user accounts, authentication (JWT), preferences and favorites for
 the GlobeTrotter Yaoundé travel assistant.
 
+## Database
+
+The User Service connects to its own online PostgreSQL database, configured
+via the `DATABASE_URL` environment variable (never hardcoded, never committed).
+Tables are created automatically on first run via `init_db()`.
+
 ## Running the service
 
 ```bash

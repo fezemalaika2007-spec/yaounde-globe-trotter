@@ -3,6 +3,13 @@
 Manages travel itineraries for the GlobeTrotter Yaoundé travel assistant:
 create, list, scoped to the authenticated user, with JWT auth.
 
+## Database
+
+The Itinerary Service connects to its own online PostgreSQL database,
+configured via the `DATABASE_URL` environment variable (never hardcoded,
+never committed). Tables are created automatically on first run via
+`init_db()`.
+
 ## Running the service
 
 ```bash

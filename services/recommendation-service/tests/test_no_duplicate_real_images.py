@@ -16,6 +16,7 @@ Run from services/recommendation-service:
 This test is part of the permanent app-wide test suite, not a one-off.
 """
 import json
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -28,13 +29,24 @@ if _service_dir not in sys.path:
     sys.path.insert(0, _service_dir)
 
 from app import create_app
-from app.models import init_db, get_all_destinations
 from app.image_utils import _normalize_image_url
 
 
 @pytest.fixture(scope="module")
 def all_destinations():
-    """Return all destinations currently in the DB."""
+    """Return all destinations currently in the DB.
+
+    Requires the online PostgreSQL connection string (DATABASE_URL). If it is
+    not configured (e.g. in CI without credentials), the test is skipped so the
+    suite still passes without network/DB access.
+    """
+    if not (os.environ.get("DATABASE_URL") or "").strip():
+        pytest.skip(
+            "DATABASE_URL not set; skipping online no-duplicate-image check."
+        )
+
+    from app.models import init_db, get_all_destinations
+
     app = create_app()
     with app.app_context():
         init_db(app)

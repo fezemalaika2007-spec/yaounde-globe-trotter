@@ -130,7 +130,7 @@ def favorites():
 
 @gateway_bp.route("/search", methods=["GET"])
 def search_destinations():
-    """Live internet search for destinations in Yaoundé (Overpass)."""
+    """Live internet search for destinations in Yaoundé (Foursquare)."""
     return _proxy("GET", f"{RECOMMENDATION_SERVICE_URL}/search")
 
 

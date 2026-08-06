@@ -204,10 +204,10 @@ class ApiService {
 
   /// Live internet search for destinations in Yaoundé.
   ///
-  /// Queries the backend `/search` endpoint, which live-searches OpenStreetMap
-  /// (Overpass) for places matching [query] whose names match a real,
-  /// verified Yaoundé destination. This lets users find places that are not
-  /// yet in the local database.
+  /// Queries the backend `/search` endpoint, which live-searches Foursquare
+  /// for places matching [query] whose names match a real, photo-bearing
+  /// Yaoundé destination. This lets users find places that are not yet in the
+  /// local database.
   Future<List<dynamic>> searchDestinations(
     String query, {
     int limit = 12,

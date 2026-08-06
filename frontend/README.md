@@ -23,7 +23,8 @@ covers:
 - **Destination detail screen** (`test/destination_details_screen_test.dart`) —
   gallery dedup, real-name captions, image detail / price display.
 - **Recommendations screen** (`test/recommendations_screen_test.dart`) —
-  structured sections (Top Rated / Popular / Newly Added) render correctly.
+  categorized sections (Most Popular / Highly Rated / Recently Added /
+  Less Costly) render correctly.
 
 Run the full suite:
 

@@ -2,7 +2,9 @@
 
 Single public entry point for the GlobeTrotter Yaoundé travel assistant. It
 contains **no business logic** — it proxies requests to the User, Itinerary,
-and Recommendation services.
+and Recommendation services. Behind the gateway, each backend service owns its
+own online PostgreSQL database (configured via `DATABASE_URL`), but the
+gateway itself only routes requests and is database-agnostic.
 
 ## Running the service
 

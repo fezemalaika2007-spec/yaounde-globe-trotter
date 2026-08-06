@@ -10,31 +10,31 @@ if _service_dir not in sys.path:
 import json
 import os
 import pytest
-import tempfile
 
 from app import create_app
-from app.models import init_db, get_db_path
+from app.models import init_db
 
 
 @pytest.fixture
 def client():
-    """Create a Flask test client with a temporary database."""
+    """Create a Flask test client against the configured online PostgreSQL DB.
+
+    The User Service now uses an online PostgreSQL database configured via
+    the DATABASE_URL environment variable (never hardcoded). If DATABASE_URL
+    is not set, the tests skip gracefully so the suite stays runnable without
+    cloud credentials.
+    """
+    if not os.environ.get("DATABASE_URL"):
+        pytest.skip("DATABASE_URL not set; skipping PostgreSQL-backed tests")
+
     app = create_app()
     app.config["TESTING"] = True
-    # Use temp dir for database
-    tmp_dir = tempfile.mkdtemp()
-    db_path = os.path.join(tmp_dir, "test_users.db")
-    app.config["DATABASE"] = db_path
 
     with app.app_context():
         init_db(app)
 
     with app.test_client() as client:
         yield client
-
-    # Cleanup
-    if os.path.exists(db_path):
-        os.remove(db_path)
 
 
 # ---- Registration Tests ----

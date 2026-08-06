@@ -15,10 +15,8 @@ def create_app():
     app.config["SECRET_KEY"] = os.environ.get(
         "SECRET_KEY", "globetrotter-secret-change-in-prod"
     )
-    app.config["DATABASE"] = os.environ.get(
-        "DATABASE_PATH",
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "database", "users.db")
-    )
+    # Online PostgreSQL connection string (from env, never hardcoded).
+    app.config["DATABASE"] = os.environ.get("DATABASE_URL", "")
 
     init_db(app)
 
@@ -26,4 +24,3 @@ def create_app():
     app.register_blueprint(user_bp)
 
     return app
-

@@ -1,297 +1,63 @@
 """recommendation-service/image_utils.py
 
-Wikidata/Wikimedia Commons image fetching with entity verification,
-plus category-based placeholder image generation.
+Image URL helpers for the Recommendation Service.
 
-Strategy:
-1. If OSM element has a "wikidata" or "wikipedia" tag, attempt to fetch
-   a representative image via the Wikidata/Wikimedia Commons API (free,
-   no key required).
-2. Verify the fetched image actually corresponds to the correct entity
-   by checking the Wikidata entity's label/description against the OSM
-   place name. If uncertain, discard and fall back to placeholder.
-3. Fall back to a category-based placeholder image chosen by the
-   place's primary tag.
+The old curated placeholder pool (_YaoundeImages) and the Wikidata/Wikimedia
+image-fetching pipeline have been REMOVED entirely. The app now sources all
+destination photos directly from the Foursquare Places API, where each photo
+is already attached to a specific venue — so there is no shared image pool
+that can run out and cause duplicate-image bugs.
+
+This module now only keeps the URL-normalization helper used for the global
+no-duplicate-image safety net.
 """
-import hashlib
 import logging
-import requests
+import re
+from urllib.parse import urlparse, unquote, quote
 
 logger = logging.getLogger(__name__)
 
-WIKIDATA_API = "https://www.wikidata.org/wiki/Special:EntityData"
-COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 
+def normalize_image_url(url: str) -> str:
+    """Normalize an image URL to a canonical form for robust deduplication.
 
-def fetch_wikimedia_image(wikidata_id="", wikipedia_title="", place_name=""):
-    """Try to fetch representative images for a place from Wikidata/Wikimedia.
-
-    Args:
-        wikidata_id: OSM wikidata tag (e.g. "Q12345")
-        wikipedia_title: OSM wikipedia tag (e.g. "en:Mont Fébé")
-        place_name: The place name from OSM, used for verification
-
-    Returns:
-        Tuple of (list_of_image_urls, verified_bool)
+    Rules applied (in order):
+    - Enforces HTTPS (http://foo -> https://foo, so http and https are the same)
+    - Removes 'www.' prefix from the host
+    - Lowercases scheme and host
+    - Removes trailing slashes
+    - For Wikimedia Commons URLs, removes thumbnail paths to get the original
+      image URL (kept for backward-compat with any already-stored data).
     """
-    image_urls = []
-    entity_id = wikidata_id
-
-    # If no wikidata ID but we have a Wikipedia title, try to extract it
-    if not entity_id and wikipedia_title:
-        parts = wikipedia_title.split(":", 1)
-        page_title = parts[-1].replace(" ", "_") if len(parts) > 1 else wikipedia_title.replace(" ", "_")
-        lang = parts[0] if len(parts) > 1 else "en"
-        lang_map = {"en": "en", "fr": "fr", "de": "de", "es": "es"}
-        wiki_lang = lang_map.get(lang, "en")
-
-        try:
-            wiki_resp = requests.get(
-                f"https://{wiki_lang}.wikipedia.org/w/api.php",
-                params={
-                    "action": "query",
-                    "prop": "pageprops",
-                    "titles": page_title,
-                    "format": "json",
-                },
-                timeout=10,
-                headers={"User-Agent": "YaoundeGlobeTrotter/1.0"}
-            )
-            wiki_data = wiki_resp.json()
-            pages = wiki_data.get("query", {}).get("pages", {})
-            for pid, page_info in pages.items():
-                if pid != "-1" and "pageprops" in page_info:
-                    entity_id = page_info["pageprops"].get("wikibase_item", "")
-                    break
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"Wikipedia API request failed: {e}")
-
-    if not entity_id:
-        return ([], False)
-
-    # Fetch Wikidata entity data to get the image (P18 property)
-    try:
-        wd_resp = requests.get(
-            f"https://www.wikidata.org/wiki/Special:EntityData/{entity_id}.json",
-            timeout=10,
-            headers={"User-Agent": "YaoundeGlobeTrotter/1.0"}
-        )
-        wd_resp.raise_for_status()
-        wd_data = wd_resp.json()
-    except requests.exceptions.RequestException as e:
-        logger.warning(f"Wikidata API request failed: {e}")
-        return ([], False)
-
-    entity = wd_data.get("entities", {}).get(entity_id, {})
-
-    # Verify the entity's label matches the place name (fuzzy match)
-    labels = entity.get("labels", {})
-    entity_name = ""
-    for lang_code in ["en", "fr", "de", "es"]:
-        if lang_code in labels:
-            entity_name = labels[lang_code].get("value", "").lower()
-            break
-    if not entity_name and labels:
-        entity_name = list(labels.values())[0].get("value", "").lower()
-
-    # Check if the place name is contained in the entity name or vice versa
-    place_lower = place_name.lower().strip()
-    name_matches = (
-        place_lower in entity_name or
-        entity_name in place_lower or
-        place_lower.split(",")[0].strip() in entity_name
-    )
-
-    if not name_matches:
-        logger.info(f"Entity name '{entity_name}' doesn't match place '{place_name}'. Marking as unverified.")
-
-    # Get the image filename from P18 property
-    claims = entity.get("claims", {})
-    p18 = claims.get("P18", [])
-    for claim in p18:
-        image_filename = claim.get("mainsnak", {}).get("datavalue", {}).get("value", "")
-        if image_filename:
-            # Build Commons image URL
-            image_url = _build_commons_url(image_filename)
-            if image_url and image_url not in image_urls:
-                image_urls.append(image_url)
-
-    # Also try P373 (Commons category) for images
-    p373 = claims.get("P373", [])
-    if p373:
-        commons_category = p373[0].get("mainsnak", {}).get("datavalue", {}).get("value", "")
-        if commons_category:
-            cat_urls = _fetch_commons_category_images(commons_category)
-            for url in cat_urls:
-                if url not in image_urls:
-                    image_urls.append(url)
-
-    if image_urls:
-        logger.info(f"Found {len(image_urls)} Wikimedia images for '{place_name}'")
-        return (image_urls, name_matches)
-
-    return ([], False)
-
-
-def _build_commons_url(filename):
-    """Build a direct Wikimedia Commons image URL from a filename.
-
-    Uses the standard Commons URL pattern with thumbnailing.
-    """
-    if not filename:
+    if not url:
         return ""
-    # Replace spaces with underscores
-    safe_name = filename.replace(" ", "_")
-    # Hash-based path for Commons URLs
-    import hashlib
-    m = hashlib.md5(safe_name.encode("utf-8")).hexdigest()
-    base_url = f"https://upload.wikimedia.org/wikipedia/commons/{m[0]}/{m[0:2]}/{safe_name}"
-    # Return a thumbnail version (800px wide max)
-    return f"{base_url}"
-
-
-def _fetch_commons_category_images(category_name):
-    """Fetch a list of representative images from a Wikimedia Commons category."""
-    urls = []
     try:
-        resp = requests.get(
-            COMMONS_API,
-            params={
-                "action": "query",
-                "list": "categorymembers",
-                "cmtitle": f"Category:{category_name}",
-                "cmtype": "file",
-                "cmlimit": 8,
-                "format": "json",
-            },
-            timeout=10,
-            headers={"User-Agent": "YaoundeGlobeTrotter/1.0"}
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        members = data.get("query", {}).get("categorymembers", [])
-        for member in members:
-            title = member.get("title", "")
-            if title and ("jpg" in title.lower() or "jpeg" in title.lower() or "png" in title.lower()):
-                # Extract filename from title (remove "File:" prefix)
-                filename = title.replace("File:", "", 1)
-                url = _build_commons_url(filename)
-                if url and url not in urls:
-                    urls.append(url)
-    except requests.exceptions.RequestException as e:
-        logger.warning(f"Commons API request failed for category '{category_name}': {e}")
-    return urls
+        p = urlparse(url)
+        scheme = "https"
+        netloc = (p.netloc or "").lower()
+        if "@" in netloc:
+            netloc = netloc.rsplit("@", 1)[-1]
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
+
+        path = p.path
+
+        # Wikimedia Commons thumbnails: /thumb/<a>/<ab>/<File>/<NNNpx-<File>>
+        # -> /<a>/<ab>/<File>
+        if "upload.wikimedia.org" in netloc:
+            path = re.sub(r'/thumb/(.+?)/[^/]+$', r'/\1', path)
+
+        unquoted = unquote(path)
+        canonical_path = quote(unquoted, safe="/:,. _-()'")
+        canonical_path = canonical_path.rstrip("/")
+
+        return f"{scheme}://{netloc}{canonical_path}"
+    except Exception as e:
+        logger.warning(f"URL normalization failed for '{url}': {e}")
+        return url.strip().lower().rstrip("/")
 
 
-# Real Yaoundé images from Wikimedia Commons, organized by category.
-_YaoundeImages = {
-    "food": [
-        "https://upload.wikimedia.org/wikipedia/commons/f/fe/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._02.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/1/10/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._04.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/a/a4/Open_air_kitchen%2C_Yaounde%2C_Cameroon.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/e/e1/Yaounde_Egusi.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/5/52/A_butcher_in_Yaound%C3%A9.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/f/f2/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._03.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/a/a2/Restaurant_Raphaelo_-_Odza%2C_Yaound%C3%A9._01.jpg",
-    ],
-    "nature": [
-        "https://upload.wikimedia.org/wikipedia/commons/5/56/Nature_Yaound%C3%A9_Cameroun.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/7/7c/Les_Cascades_du_Mfoundi_-_Yaound%C3%A9_01.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/5/5b/Nature_in_Yaound%C3%A9.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/5/58/Bananier_%C3%A0_Yaound%C3%A9_en_novembre_1973.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/d/d3/Overlook_on_the_edge_of_Yaounde.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/e/e7/Bois_Sainte_Anastasie%2C_Yaound%C3%A9%2C_Cameroun.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/a/ac/Les_Cascades_du_Mfoundi_-_Yaound%C3%A9_02.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/1/1b/Overlook_on_the_edge_of_Yaounde.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/9/99/Les_chutes_de_la_lob%C3%A9_kribi_cameroon1.jpg",
-    ],
-    "culture": [
-        "https://upload.wikimedia.org/wikipedia/commons/9/9f/YaoundeNationalMuseum.png",
-        "https://upload.wikimedia.org/wikipedia/commons/9/94/Mus%C3%A9eNationalYaound%C3%A9.png",
-        "https://upload.wikimedia.org/wikipedia/commons/1/1c/BLackitude_Museum.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/2/20/Mus%C3%A9e_National_Yaound%C3%A9.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/0/09/The_Star_Building%2C_Yaound%C3%A9%2C_Cameroon.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/8/8b/Prime_Minister_Building%2C_Yaound%C3%A9%2C_Cameroon.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/5/53/Les_benedictins1k.JPG",
-    ],
-    "market": [
-        "https://upload.wikimedia.org/wikipedia/commons/d/da/March%C3%A9_central_-_Central_market_%28interior%29_in_Yaound%C3%A9.JPG",
-        "https://upload.wikimedia.org/wikipedia/commons/1/15/Cameroon_Market%28Yaound%C3%A9%29.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/5/57/Street_next_to_Central_Market_Yaound%C3%A9_2014.JPG",
-        "https://upload.wikimedia.org/wikipedia/commons/8/80/Yaound%C3%A9_view_from_central_market_%282014%29.JPG",
-        "https://upload.wikimedia.org/wikipedia/commons/0/04/March%C3%A9_d%27Ekounou_%28Yaound%C3%A9%29_%282%29.jpg",
-    ],
-    "accommodation": [
-        "https://upload.wikimedia.org/wikipedia/commons/9/96/Hilton_Hotel_in_Yaound%C3%A9_%282014%29.JPG",
-        "https://upload.wikimedia.org/wikipedia/commons/f/f6/Hilton_Hotel_Yaound%C3%A9.JPG",
-        "https://upload.wikimedia.org/wikipedia/commons/b/b6/Hotel_de_ville_Yaound%C3%A9_Cameroun.jpg",
-    ],
-    "sports": [
-        "https://upload.wikimedia.org/wikipedia/commons/4/43/YaoundeSportPalace.png",
-        "https://upload.wikimedia.org/wikipedia/commons/4/45/Stade_annex_1_de_Yaound%C3%A9.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/2/21/Soccer_Training_in_the_Yaound%C3%A9_town.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/5/5e/Club_mundi.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/1/13/Charlotte_Dipanda%2C_Live_Concert_at_Palais_de_Sport_Yaound%C3%A9.JPG",
-    ],
-    "attraction": [
-        "https://upload.wikimedia.org/wikipedia/commons/0/02/Monument_Yaound%C3%A9.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/1/15/Yaound%C3%A9_vue_monument_4.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/f/f2/Monument_j%27aime_mon_pays_03.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/c/c8/1Place_de_l%27ind%C3%A9pendance_hypodrome_Yaound%C3%A9_%2810%29.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/c/c8/1Place_de_l%27ind%C3%A9pendance_hypodrome_Yaound%C3%A9_%282%29.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/a/af/1Place_de_l%27ind%C3%A9pendance_hypodrome_Yaound%C3%A9_%287%29.jpg",
-    ],
-    "general": [
-        "https://upload.wikimedia.org/wikipedia/commons/c/c1/Prime_Minister_Building%2C_Yaound%C3%A9%2C_Cameroon.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/d/dc/Prime_Minister_Building_Yaound%C3%A9%2C_Cameroon.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/1/10/Yaound%C3%A9_1.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/f/f4/Bois_Saint_Anastasie_-_Yaound%C3%A9_02.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/e/e2/Entrance%2C_Botanical_Garden_and_Eco-Park%2C_Sitakunda_%2801%29.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/9/93/Boat_in_the_Jamuna_Bridge_West_Bank_Eco-Park%2C_Bangladesh.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/5/53/Damas_Yaound%C3%A9_4.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/a/ab/Pr%C3%A9sident_de_la_FECAFOOT_Samuel_Eto%27o_et_le_Ministre_de_Sport_Camerounais.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/5/5b/Flooding_in_Cameroon_%28MODIS_2022-09-13%29.jpg",
-    ],
-}
-
-# Alias kept in CamelCase for backward compatibility with any external callers.
-_YAOUNDE_IMAGES = _YaoundeImages
-
-
-def get_placeholder_pool(category="attraction"):
-    """Return the real Yaoundé placeholder image pool for a category.
-
-    The pool is used both by [get_placeholder_image] (deterministic pick)
-    and by the sync/deduplication logic (diversity-aware assignment) so
-    that the same image is reused as little as possible.
-    """
-    return _YAOUNDE_IMAGES.get(category, _YAOUNDE_IMAGES["general"])
-
-
-def _deterministic_index(seed, pool_size):
-    """Deterministic, stable index derived from *seed*.
-
-    Uses MD5 instead of Python's built-in hash() because hash() is
-    randomized per process (PYTHONHASHSEED), which caused placeholders
-    to reshuffle on every sync and created many duplicate images.
-    """
-    import hashlib
-    digest = hashlib.md5(str(seed).encode("utf-8")).hexdigest()
-    return int(digest, 16) % pool_size
-
-
-def get_placeholder_image(category, name=""):
-    """Return a category-based placeholder image URL.
-
-    Uses REAL Wikimedia Commons images of Yaoundé, Cameroon, sourced
-    from Commons categories. Each category has multiple image options
-    cycled through based on a deterministic (MD5) hash of the
-    destination name, so the same place always gets the same image
-    across restarts and different places get variety.
-    """
-    images = get_placeholder_pool(category)
-
-    # Use a deterministic index based on name or category for consistency
-    seed = name if name else category
-    index = _deterministic_index(seed, len(images))
-    return images[index]
+# Backward-compatible alias used by the tests.
+def _normalize_image_url(url: str) -> str:
+    """Alias for [normalize_image_url]."""
+    return normalize_image_url(url)

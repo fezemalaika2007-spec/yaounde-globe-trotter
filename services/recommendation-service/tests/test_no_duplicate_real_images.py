@@ -2,8 +2,9 @@
 
 App-wide no-duplicate-image test.
 
-Enforces the hard product rule: NO image URL (real OR placeholder) may appear
-more than once across the entire destinations dataset.
+Enforces the hard product rule: NO image URL may appear more than once across
+the entire destinations dataset. Since we now source all images from
+Foursquare (each photo is unique to its venue), this is a pure safety net.
 
 The test reads every destination from the database, collects every image URL
 (including the `image` main field and every entry in the `images` gallery),
@@ -12,7 +13,7 @@ normalizes each URL, and asserts that no normalized URL appears more than once.
 Run from services/recommendation-service:
     python -m pytest tests/test_no_duplicate_real_images.py -q
 
-This test is part of the permanent app-wide test suite (Step 8), not a one-off.
+This test is part of the permanent app-wide test suite, not a one-off.
 """
 import json
 import sys
@@ -28,7 +29,7 @@ if _service_dir not in sys.path:
 
 from app import create_app
 from app.models import init_db, get_all_destinations
-from app.overpass_sync import _normalize_image_url
+from app.image_utils import _normalize_image_url
 
 
 @pytest.fixture(scope="module")
@@ -52,10 +53,7 @@ def _iter_image_urls(destination):
 
 
 def test_no_duplicate_images_across_dataset(all_destinations):
-    """Assert no normalized image URL appears more than once across the dataset.
-
-    This applies to BOTH real and placeholder images — the strict rule.
-    """
+    """Assert no normalized image URL appears more than once across the dataset."""
     if not all_destinations:
         pytest.skip("No destinations in database to test.")
 

@@ -225,11 +225,13 @@ class ApiService {
 
   /// Returns structured recommendation sections from the backend.
   ///
-  /// The backend returns
-  ///     { "sections": [ {"title": ..., "type": ..., "items": [destination, ...]}, ... ],
+  /// The backend returns a categorized object:
+  ///     { "sections": [ {"title": ..., "type": ..., "items": [...]}, ... ],
+  ///       "most_popular": [...], "highly_rated": [...],
+  ///       "recently_added": [...], "less_costly": [...], ...,
   ///       "recommendations": [...] }
   /// Each destination is a `Map<String, dynamic>`. This method parses the
-  /// sections into [RecommendationSection] objects for the UI.
+  /// named category keys into [RecommendationSection] objects for the UI.
   Future<List<RecommendationSection>> getRecommendationSections({
     int limit = 5,
   }) async {
@@ -241,6 +243,67 @@ class ApiService {
     final response = await _get(uri, headers: _authHeaders(token));
     final body = _decode(response);
     if (response.statusCode == 200) {
+      // Prefer the named category keys (most_popular, highly_rated, ...).
+      const namedCategories = <String, String>{
+        'most_popular': 'Most Popular',
+        'highly_rated': 'Highly Rated',
+        'recently_added': 'Recently Added',
+        'less_costly': 'Less Costly',
+        'food_markets': 'Food & Markets',
+        'nature_parks': 'Nature & Parks',
+      };
+      if (body is Map) {
+        final namedSections = <RecommendationSection>[];
+        for (final entry in namedCategories.entries) {
+          final raw = body[entry.key];
+          if (raw is List<dynamic> && raw.isNotEmpty) {
+            final items = <Map<String, dynamic>>[];
+            for (final item in raw) {
+              if (item is Map) {
+                items.add(Map<String, dynamic>.from(item));
+              }
+            }
+            if (items.isNotEmpty) {
+              namedSections.add(
+                RecommendationSection(
+                  title: entry.value,
+                  type: entry.key,
+                  items: items,
+                ),
+              );
+            }
+          }
+        }
+        // If we found named categories, also include any generic category
+        // sections from the `sections` list that aren't already covered.
+        if (namedSections.isNotEmpty && body.containsKey('sections')) {
+          final sectionsRaw = body['sections'];
+          if (sectionsRaw is List<dynamic>) {
+            final existingTypes = namedSections.map((s) => s.type).toSet();
+            for (final raw in sectionsRaw) {
+              if (raw is Map == false) continue;
+              final title = (raw['title'] ?? '').toString();
+              final type = (raw['type'] ?? '').toString();
+              if (existingTypes.contains(type)) continue;
+              final items = <Map<String, dynamic>>[];
+              final itemsRaw = raw['items'];
+              if (itemsRaw is List<dynamic>) {
+                for (final item in itemsRaw) {
+                  if (item is Map) {
+                    items.add(Map<String, dynamic>.from(item));
+                  }
+                }
+              }
+              if (title.isNotEmpty && items.isNotEmpty) {
+                namedSections.add(
+                  RecommendationSection(title: title, type: type, items: items),
+                );
+              }
+            }
+          }
+        }
+        if (namedSections.isNotEmpty) return namedSections;
+      }
       if (body is Map && body.containsKey('sections')) {
         final sectionsRaw = body['sections'];
         if (sectionsRaw is List<dynamic>) {

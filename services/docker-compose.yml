@@ -3,8 +3,13 @@ version: "3.9"
 # Phase 2 Microservices Architecture
 # --------------------------------
 # Three independent services + API Gateway on a shared Docker network.
-# Each service has its own SQLite database (no shared DB access).
-# All services communicate through the API Gateway on port 5000.
+# Each service connects to its own online PostgreSQL database (Neon),
+# configured via the DATABASE_URL environment variable. No local database
+# containers are used — the databases live online.
+#
+# Set these in a .env file (never committed):
+#   DATABASE_URL=postgresql://<user>:<password>@<host>/<dbname>?sslmode=require
+#   FOURSQUARE_API_KEY=<your_foursquare_key>
 
 services:
 
@@ -15,12 +20,10 @@ services:
     container_name: user-service
     ports:
       - "5001:5001"
-    volumes:
-      - user-db:/user-service/database
     environment:
       - PORT=5001
       - SECRET_KEY=${SECRET_KEY:-globetrotter-secret-change-in-prod}
-      - DATABASE_PATH=/user-service/database/users.db
+      - DATABASE_URL=${USER_DATABASE_URL:-${DATABASE_URL}}
     networks:
       - globetrotter-net
 
@@ -31,29 +34,26 @@ services:
     container_name: itinerary-service
     ports:
       - "5002:5002"
-    volumes:
-      - itinerary-db:/itinerary-service/database
     environment:
       - PORT=5002
       - SECRET_KEY=${SECRET_KEY:-globetrotter-secret-change-in-prod}
-      - DATABASE_PATH=/itinerary-service/database/itineraries.db
+      - DATABASE_URL=${ITINERARY_DATABASE_URL:-${DATABASE_URL}}
     networks:
       - globetrotter-net
 
   # --- Recommendation Service (port 5003) ---
-  # Owns: destinations (Overpass-driven), ratings, recommendations
-  # Has outbound internet access for Overpass + Wikidata/Wikimedia calls
+  # Owns: destinations (Foursquare-driven), ratings, recommendations
+  # Has outbound internet access for Foursquare API calls
   recommendation-service:
     build: ./recommendation-service
     container_name: recommendation-service
     ports:
       - "5003:5003"
-    volumes:
-      - rec-db:/recommendation-service/database
     environment:
       - PORT=5003
       - SECRET_KEY=${SECRET_KEY:-globetrotter-secret-change-in-prod}
-      - DATABASE_PATH=/recommendation-service/database/recommendations.db
+      - DATABASE_URL=${RECOMMENDATION_DATABASE_URL:-${DATABASE_URL}}
+      - FOURSQUARE_API_KEY=${FOURSQUARE_API_KEY}
       - USER_SERVICE_URL=http://user-service:5001
     networks:
       - globetrotter-net
@@ -77,12 +77,6 @@ services:
       - recommendation-service
     networks:
       - globetrotter-net
-
-# --- Named volumes for each service's database ---
-volumes:
-  user-db:
-  itinerary-db:
-  rec-db:
 
 networks:
   globetrotter-net:

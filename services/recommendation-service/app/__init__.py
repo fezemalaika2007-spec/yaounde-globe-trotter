@@ -13,10 +13,8 @@ def create_app():
     app.config["SECRET_KEY"] = os.environ.get(
         "SECRET_KEY", "globetrotter-secret-change-in-prod"
     )
-    app.config["DATABASE"] = os.environ.get(
-        "DATABASE_PATH",
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "database", "recommendations.db")
-    )
+    # Online PostgreSQL connection string (from env, never hardcoded).
+    app.config["DATABASE"] = os.environ.get("DATABASE_URL", "")
 
     from app.routes import recommendation_bp
     app.register_blueprint(recommendation_bp)

@@ -3,8 +3,9 @@
 Routes:
   GET  /destinations                  — List/search destinations (public)
   POST /destinations/<id>/rating      — Submit/update a rating (JWT required)
-  GET  /recommendations               — Placeholder recommendations (JWT required)
-  POST /sync-destinations             — Trigger Overpass sync (admin)
+  GET  /recommendations               — Categorized recommendations (JWT required)
+  GET  /search                        — Live Foursquare search (public)
+  POST /sync-destinations             — Trigger Foursquare sync (admin)
 """
 import json
 import logging
@@ -16,9 +17,8 @@ from app.models import (
     get_all_destinations, get_destination_by_id,
     upsert_rating, get_user_rating
 )
-from app.overpass_sync import sync_destinations as _sync_destinations
-from app.overpass_sync import search_overpass as _live_search
-from app.recommendations import get_recommendations as _score_recommendations
+from app.foursquare_sync import sync_destinations as _sync_destinations
+from app.foursquare_sync import search_foursquare as _live_search
 from app.recommendations import get_sectioned_recommendations as _section_recommendations
 
 recommendation_bp = Blueprint("recommendation", __name__)
@@ -131,22 +131,20 @@ def submit_rating(dest_id):
 @recommendation_bp.route("/recommendations", methods=["GET"])
 @token_required
 def get_recommendations():
-    """Return destination recommendations for the logged-in user.
+    """Return categorized destination recommendations for the logged-in user.
 
-    Returns a structured, section-based response (interim heuristic engine):
+    Returns a structured, categorized response:
 
         {
-          "sections": [
-             {"title": "Top Rated in Yaoundé", "type": "top_rated",
-              "items": [destination, ...]},
-             ...
-          ],
-          "recommendations": [destination, ...]   // flat list for backward compat
+          "most_popular": [destination, ...],   // highest rating_count
+          "highly_rated": [destination, ...],   // highest average_rating (min count)
+          "recently_added": [destination, ...], // most recently synced
+          "less_costly": [destination, ...],    // lowest known cost (XAF)
+          "food_markets": [destination, ...],   // extra: popular food/market tag
+          "nature_parks": [destination, ...],   // extra: popular nature tag
+          "sections": [ ... ],                  // backward-compat flat sections
+          "recommendations": [destination, ...] // flat list for backward compat
         }
-
-    Sections include "Top Rated in Yaoundé", "Popular Right Now", "Newly Added"
-    and category sections. The personalization engine can later be swapped for a
-    real behaviour-based engine without changing this response shape.
 
     Requires: Authorization: Bearer <token>
     """
@@ -158,23 +156,13 @@ def get_recommendations():
 
     destinations = get_all_destinations()
     if not destinations:
-        return jsonify({"sections": [], "recommendations": []}), 200
+        return jsonify({
+            "most_popular": [], "highly_rated": [], "recently_added": [],
+            "less_costly": [], "sections": [], "recommendations": []
+        }), 200
 
     auth_token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
-    try:
-        payload = _section_recommendations(destinations, token=auth_token, limit=limit)
-    except Exception:
-        logger.exception("Sectioned recommendation engine failed, falling back to popular places")
-        fallback = sorted(
-            destinations,
-            key=lambda d: (
-                float(d.get("average_rating") or 0.0),
-                d.get("rating_count") or 0,
-                len((d.get("description") or "").strip()),
-            ),
-            reverse=True,
-        )[:limit]
-        payload = {"sections": [{"title": "Popular Right Now", "type": "popular", "items": fallback}]}
+    payload = _section_recommendations(destinations, token=auth_token, limit=limit)
 
     # Flatten all section items into a single recommendations list for
     # backward compatibility with clients that expect a plain list.
@@ -195,14 +183,13 @@ def get_recommendations():
 
 @recommendation_bp.route("/search", methods=["GET"])
 def live_search_destinations():
-    """Live internet search for destinations in Yaoundé via Overpass.
+    """Live search for destinations in Yaoundé via Foursquare.
 
     Query parameter:
         q – the place name to search for (e.g. "museum", "Mfoundi")
 
-    Searches OpenStreetMap for matching places inside the Yaoundé bounding
-    box and returns normalized destination objects — this lets the app find
-    places that are not yet stored in the local database.
+    Searches Foursquare for matching places inside the Yaoundé radius and
+    returns normalized destination objects that have real photos.
 
     Returns a JSON list (possibly empty).
     """
@@ -221,9 +208,12 @@ def live_search_destinations():
 
 @recommendation_bp.route("/sync-destinations", methods=["POST"])
 def trigger_sync():
-    """Manually trigger an Overpass sync to refresh destination data."""
+    """Manually trigger a Foursquare sync to refresh destination data."""
     try:
-        count = _sync_destinations(app=current_app._get_current_object())
-        return jsonify({"message": f"Synchronized {count} destinations from Overpass"}), 200
+        stats, count = _sync_destinations(app=current_app._get_current_object())
+        return jsonify({
+            "message": f"Synchronized {count} destinations from Foursquare",
+            "stats": stats,
+        }), 200
     except Exception as e:
         return jsonify({"error": f"Sync failed: {str(e)}"}), 500

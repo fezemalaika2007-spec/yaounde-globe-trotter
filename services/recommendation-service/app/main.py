@@ -9,24 +9,28 @@ if _root_dir not in sys.path:
 
 from app import create_app
 from app.models import init_db
-from app.overpass_sync import sync_destinations, start_periodic_sync
+from app.foursquare_sync import sync_destinations, start_periodic_sync
 
 app = create_app()
 
 
 def _background_initial_sync(app):
-    """Run the initial Overpass sync in a background thread.
+    """Run the initial Foursquare sync in a background thread.
 
     This ensures the Flask server starts listening immediately,
     preventing 503 responses from the API gateway while the
-    potentially long-running Overpass query completes.
+    potentially long-running Foursquare call completes.
     """
     with app.app_context():
         try:
-            count = sync_destinations(app)
-            print(f"Initial Overpass sync completed: {count} destinations")
+            stats, count = sync_destinations(app)
+            print(
+                f"Initial Foursquare sync completed: {count} destinations "
+                f"({stats.get('total_venues', 0)} found, "
+                f"{stats.get('kept', 0)} kept)"
+            )
         except Exception as e:
-            print(f"Initial Overpass sync failed (will use cached data): {e}")
+            print(f"Initial Foursquare sync failed (will use cached data): {e}")
 
         # Start periodic background sync (every 12 hours)
         start_periodic_sync(app)
@@ -37,7 +41,7 @@ if __name__ == "__main__":
     with app.app_context():
         init_db(app)
 
-    # Start initial Overpass sync in background so server starts immediately
+    # Start initial Foursquare sync in background so server starts immediately
     sync_thread = threading.Thread(
         target=_background_initial_sync,
         args=(app,),

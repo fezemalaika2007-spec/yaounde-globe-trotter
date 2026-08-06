@@ -130,6 +130,9 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     final theme = Theme.of(context);
     if (section.items.isEmpty) return const SizedBox.shrink();
 
+    // Show a metric relevant to the category type.
+    final metric = _metricForType(section.type);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -137,11 +140,25 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              section.title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    section.title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (metric.isNotEmpty)
+                  Text(
+                    metric,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -170,5 +187,25 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
         ],
       ),
     );
+  }
+
+  /// Returns a short header label describing the ranking metric for a
+  /// recommendation category, or an empty string if none applies.
+  String _metricForType(String type) {
+    switch (type) {
+      case 'most_popular':
+        return 'Most rated';
+      case 'highly_rated':
+        return 'By rating';
+      case 'recently_added':
+        return 'Newest';
+      case 'less_costly':
+        return 'Lowest price';
+      case 'food_markets':
+      case 'nature_parks':
+        return 'Top picks';
+      default:
+        return '';
+    }
   }
 }

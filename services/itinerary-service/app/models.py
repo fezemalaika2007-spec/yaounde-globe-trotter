@@ -1,35 +1,42 @@
 """itinerary-service/models.py
 
-SQLite database models for the Itinerary Service.
+PostgreSQL database models for the Itinerary Service.
 Owns: itineraries table (id, user_id, title, destinations, start_date, end_date, notes, created_at)
+
+The database connection string is read from the DATABASE_URL environment
+variable and is never hardcoded.
 """
 import os
-import sqlite3
 import uuid
 import datetime
+import json
+
+import psycopg2
 
 
-def get_db_path(app=None):
-    if app:
+def _get_database_url(app=None):
+    """Return the PostgreSQL connection string from env or app config."""
+    if app and app.config.get("DATABASE"):
         return app.config["DATABASE"]
-    return os.environ.get(
-        "DATABASE_PATH",
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "database", "itineraries.db")
-    )
+    url = os.environ.get("DATABASE_URL", "")
+    if not url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable is required to connect to "
+            "the online PostgreSQL database."
+        )
+    return url
 
 
 def get_connection(app=None):
-    db_path = get_db_path(app)
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    """Get a PostgreSQL connection."""
+    return psycopg2.connect(_get_database_url(app))
 
 
 def init_db(app=None):
+    """Create the itineraries table if it doesn't exist."""
     conn = get_connection(app)
-    conn.execute("""
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS itineraries (
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
@@ -43,35 +50,43 @@ def init_db(app=None):
         )
     """)
     conn.commit()
+    cur.close()
     conn.close()
 
 
 def get_itineraries_for_user(username, app=None):
     conn = get_connection(app)
-    cursor = conn.execute("SELECT * FROM itineraries WHERE username = ? ORDER BY created_at DESC", (username,))
-    rows = cursor.fetchall()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM itineraries WHERE username = %s ORDER BY created_at DESC", (username,))
+    rows = cur.fetchall()
+    results = [_row_to_dict(r, cur) for r in rows]
+    cur.close()
     conn.close()
-    return [dict(r) for r in rows]
+    return results
 
 
 def get_itineraries_by_user_id(user_id, app=None):
     conn = get_connection(app)
-    cursor = conn.execute("SELECT * FROM itineraries WHERE user_id = ? ORDER BY created_at DESC", (user_id,))
-    rows = cursor.fetchall()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM itineraries WHERE user_id = %s ORDER BY created_at DESC", (user_id,))
+    rows = cur.fetchall()
+    results = [_row_to_dict(r, cur) for r in rows]
+    cur.close()
     conn.close()
-    return [dict(r) for r in rows]
+    return results
 
 
 def create_itinerary(username, user_id, title, destinations, start_date, end_date, notes, app=None):
-    import json
     itinerary_id = str(uuid.uuid4())
     created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     conn = get_connection(app)
-    conn.execute(
-        "INSERT INTO itineraries (id, user_id, username, title, destinations, start_date, end_date, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO itineraries (id, user_id, username, title, destinations, start_date, end_date, notes, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (itinerary_id, user_id, username, title, json.dumps(destinations), start_date, end_date, notes, created_at)
     )
     conn.commit()
+    cur.close()
     conn.close()
     return {
         "id": itinerary_id,
@@ -84,3 +99,16 @@ def create_itinerary(username, user_id, title, destinations, start_date, end_dat
         "created_at": created_at,
     }
 
+
+def _row_to_dict(row, cursor):
+    """Convert a psycopg2 row to a dict, parsing JSON columns."""
+    if row is None:
+        return None
+    cols = [d[0] for d in cursor.description]
+    d = dict(zip(cols, row))
+    if isinstance(d.get("destinations"), str):
+        try:
+            d["destinations"] = json.loads(d["destinations"])
+        except (json.JSONDecodeError, TypeError):
+            d["destinations"] = []
+    return d

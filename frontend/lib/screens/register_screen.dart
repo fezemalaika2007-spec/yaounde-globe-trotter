@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../utils/image_paths.dart';
 import '../widgets/auth_background.dart';
+import 'verify_email_screen.dart';
 
 /// All possible preference tags the backend understands.
 const _allTags = [
@@ -31,6 +32,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _selectedTags = <String>[];
@@ -42,6 +44,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _usernameCtrl.dispose();
+    _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     super.dispose();
@@ -62,23 +65,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      await AuthProvider().register(
+      final result = await AuthProvider().register(
         _usernameCtrl.text.trim(),
+        _emailCtrl.text.trim(),
         _passwordCtrl.text,
         List.from(_selectedTags),
       );
       if (mounted) {
-        // Show success message and navigate to login screen
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).registrationSuccess),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.pushReplacementNamed(
+        // Navigate to the email-verification screen with the returned code
+        // (the backend returns it for local/dev testing).
+        final code = (result['verification_code'] ?? '').toString();
+        Navigator.pushReplacement(
           context,
-          '/login',
-          arguments: widget.onLocaleChanged,
+          MaterialPageRoute(
+            builder: (_) => VerifyEmailScreen(
+              username: _usernameCtrl.text.trim(),
+              initialCode: code,
+              onLocaleChanged: widget.onLocaleChanged,
+            ),
+          ),
         );
       }
     } on ApiException catch (e) {
@@ -126,6 +131,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     validator: (v) => v == null || v.trim().isEmpty
                         ? l10n.enterUsername
                         : null,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Please enter your email';
+                      }
+                      final email = v.trim();
+                      final valid = RegExp(
+                        r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                      ).hasMatch(email);
+                      return valid ? null : 'Please enter a valid email';
+                    },
                   ),
                   const SizedBox(height: 14),
                   TextFormField(

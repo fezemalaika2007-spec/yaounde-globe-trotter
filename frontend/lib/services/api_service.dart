@@ -115,6 +115,7 @@ class ApiService {
   // Auth
   Future<Map<String, dynamic>> register({
     required String username,
+    required String email,
     required String password,
     required List<String> preferences,
   }) async {
@@ -124,12 +125,47 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'username': username,
+        'email': email,
         'password': password,
         'preferences': preferences,
       }),
     );
     final body = _decode(response);
     if (response.statusCode == 201) return body;
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// Verify a freshly-registered user's email with the code returned at
+  /// registration (returned by the backend for local/dev testing).
+  Future<Map<String, dynamic>> verifyEmail({
+    required String username,
+    required String code,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.verify}');
+    final response = await _post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'username': username, 'code': code}),
+    );
+    final body = _decode(response);
+    if (response.statusCode == 200) return body;
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// Authenticate with a Google ID token. Returns the JWT.
+  Future<String> googleLogin({required String idToken}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.googleAuth}');
+    final response = await _post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'id_token': idToken}),
+    );
+    final body = _decode(response);
+    if (response.statusCode == 200) {
+      final token = body['token'] as String;
+      await saveToken(token);
+      return token;
+    }
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 

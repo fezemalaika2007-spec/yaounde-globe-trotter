@@ -40,17 +40,31 @@ class AuthProvider extends ChangeNotifier {
   ///
   /// After successful registration the user is redirected to the login
   /// screen so they can log in with their new credentials.
-  Future<void> register(
+  Future<Map<String, dynamic>> register(
     String username,
+    String email,
     String password,
     List<String> preferences,
   ) async {
-    await _api.register(
+    return await _api.register(
       username: username,
+      email: email,
       password: password,
       preferences: preferences,
     );
     // Do NOT auto-login — user should log in manually.
+  }
+
+  /// Verify the user's email with the code returned at registration.
+  Future<void> verifyEmail(String username, String code) async {
+    await _api.verifyEmail(username: username, code: code);
+  }
+
+  /// Log in with a Google ID token.
+  Future<void> googleLogin(String idToken) async {
+    await _api.googleLogin(idToken: idToken);
+    _isLoggedIn = true;
+    notifyListeners();
   }
 
   /// Log out: clear the stored token.

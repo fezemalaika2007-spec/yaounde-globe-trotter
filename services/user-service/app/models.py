@@ -47,6 +47,10 @@ def init_db(app=None):
             id TEXT PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            email TEXT DEFAULT '',
+            is_verified BOOLEAN DEFAULT FALSE,
+            verification_code TEXT DEFAULT '',
+            auth_provider TEXT DEFAULT 'local',
             preferences TEXT DEFAULT '[]',
             created_at TEXT NOT NULL
         )
@@ -61,6 +65,18 @@ def init_db(app=None):
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     """)
+    # Ensure the new columns exist (safe migration for existing DBs).
+    cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users'")
+    existing_cols = {r[0] for r in cur.fetchall()}
+    col_sql = {
+        "email": "ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''",
+        "is_verified": "ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE",
+        "verification_code": "ALTER TABLE users ADD COLUMN verification_code TEXT DEFAULT ''",
+        "auth_provider": "ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local'",
+    }
+    for col, sql in col_sql.items():
+        if col not in existing_cols:
+            cur.execute(sql)
     conn.commit()
     cur.close()
     conn.close()
@@ -104,6 +120,123 @@ def create_user(username, password_hash, preferences, app=None):
     cur.close()
     conn.close()
     return {"id": user_id, "username": username, "preferences": preferences, "created_at": created_at}
+
+
+def get_user_by_email(email, app=None):
+    """Return a user dict by email, or None."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+    row = cur.fetchone()
+    result = _row_to_dict(row, cur) if row else None
+    cur.close()
+    conn.close()
+    return result
+
+
+def create_user_with_email(
+    username, password_hash, email, preferences,
+    verification_code="", app=None
+):
+    """Create a local user with an email and verification code.
+
+    The user starts as unverified (is_verified=False) until they confirm
+    their email with the verification code.
+    """
+    user_id = str(uuid.uuid4())
+    created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO users (id, username, password_hash, email, is_verified, "
+        "verification_code, auth_provider, preferences, created_at) "
+        "VALUES (%s, %s, %s, %s, %s, %s, 'local', %s, %s)",
+        (
+            user_id, username, password_hash, email, False, verification_code,
+            json.dumps(preferences), created_at,
+        ),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {
+        "id": user_id,
+        "username": username,
+        "email": email,
+        "is_verified": False,
+        "preferences": preferences,
+        "created_at": created_at,
+    }
+
+
+def create_google_user(username, email, preferences, app=None):
+    """Create (or return existing) a user authenticated via Google.
+
+    Google users are automatically verified (their email is already
+    confirmed by Google). Returns the user dict.
+    """
+    existing = get_user_by_email(email, app)
+    if existing:
+        return existing
+    user_id = str(uuid.uuid4())
+    created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO users (id, username, password_hash, email, is_verified, "
+        "verification_code, auth_provider, preferences, created_at) "
+        "VALUES (%s, %s, '', %s, TRUE, '', 'google', %s, %s)",
+        (
+            user_id, username, email, json.dumps(preferences), created_at,
+        ),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {
+        "id": user_id,
+        "username": username,
+        "email": email,
+        "is_verified": True,
+        "preferences": preferences,
+        "created_at": created_at,
+    }
+
+
+def set_verification_code(username, code, app=None):
+    """Store a verification code for a username (for email verification)."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET verification_code = %s WHERE username = %s",
+        (code, username),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def verify_user(username, code, app=None):
+    """Mark a user as verified if the code matches.
+
+    Returns True on success, False if the code is wrong or user not found.
+    """
+    user = get_user_by_username(username, app)
+    if not user:
+        return False
+    if user.get("verification_code") != code:
+        return False
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET is_verified = TRUE, verification_code = '' "
+        "WHERE username = %s",
+        (username,),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return True
 
 
 def get_favorites_for_user(username, app=None):

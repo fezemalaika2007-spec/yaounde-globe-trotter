@@ -13,6 +13,8 @@ class ApiConfig {
 
   static const String register = '/register';
   static const String login = '/login';
+  static const String verify = '/verify';
+  static const String googleAuth = '/auth/google';
   static const String destinations = '/destinations';
   static const String recommendations = '/recommendations';
   static const String itineraries = '/itineraries';

@@ -93,6 +93,16 @@ def login():
     return _proxy("POST", f"{USER_SERVICE_URL}/login")
 
 
+@gateway_bp.route("/verify", methods=["POST"])
+def verify():
+    return _proxy("POST", f"{USER_SERVICE_URL}/verify")
+
+
+@gateway_bp.route("/auth/google", methods=["POST"])
+def google_auth():
+    return _proxy("POST", f"{USER_SERVICE_URL}/auth/google")
+
+
 # ---------------------------------------------------------------------------
 # Destination & Recommendation routes → Recommendation Service
 # ---------------------------------------------------------------------------

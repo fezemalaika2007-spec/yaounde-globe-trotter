@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../utils/image_paths.dart';

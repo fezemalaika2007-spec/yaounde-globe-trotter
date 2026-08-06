@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yaounde_trip/screens/recommendations_screen.dart';
-import 'package:yaounde_trip/services/api_service.dart';
 import 'package:yaounde_trip/widgets/destination_grid_card.dart';
 
 /// Test that the Recommendations screen renders structured sections.

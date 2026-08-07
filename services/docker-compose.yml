@@ -1,5 +1,3 @@
-version: "3.9"
-
 # Phase 2 Microservices Architecture
 # --------------------------------
 # Three independent services + API Gateway on a shared Docker network.
@@ -18,6 +16,7 @@ services:
   user-service:
     build: ./user-service
     container_name: user-service
+    restart: unless-stopped
     ports:
       - "5001:5001"
     environment:
@@ -32,6 +31,7 @@ services:
   itinerary-service:
     build: ./itinerary-service
     container_name: itinerary-service
+    restart: unless-stopped
     ports:
       - "5002:5002"
     environment:
@@ -47,6 +47,7 @@ services:
   recommendation-service:
     build: ./recommendation-service
     container_name: recommendation-service
+    restart: unless-stopped
     ports:
       - "5003:5003"
     environment:

@@ -1,35 +1,25 @@
 """recommendation-service/foursquare_sync.py
 
-Foursquare API integration for Yaoundé, Cameroon.
+Foursquare Places API (v3) integration for Yaoundé, Cameroon.
 
 This module fully replaces the old Overpass/Wikidata/Wikimedia pipeline.
 
-Why Foursquare?
-  * Foursquare's API returns photos already attached directly to each
-    specific venue in its own database. There is no separate matching or
-    fallback step, so there is no shared image pool that can run out and
-    cause the kind of duplicate-image bugs the old Overpass/Wikidata/Wikimedia
-    pipeline suffered from.
-
-Authentication:
-  * Uses the Foursquare v2 legacy API with a Client ID + Client Secret
-    (passed as query params with a `v` version parameter). This is the
-    credential set that validates against the live API.
+Why the v3 Places API?
+  * Foursquare's Places API returns photos already attached directly to each
+    specific venue. There is no separate matching or fallback step, so there
+    is no shared image pool that can run out and cause duplicate images.
+  * The v3 API authenticates with a single API key sent as a Bearer token
+    (Authorization: Bearer <FOURSQUARE_API_KEY>) — exactly the key format the
+    task's Step 1 asked to store in the FOURSQUARE_API_KEY env var.
 
 Behaviour:
-  * Searches Foursquare for venues around Yaoundé (3.848, 11.502) across the
-    travel-relevant category taxonomy (restaurants, hotels, museums, parks,
-    markets, attractions, etc.).
-  * For each venue, fetches the venue's photos to obtain name, category,
-    coordinates, formatted address, price tier, and photos — photo URLs are
-    unique to that specific venue.
-  * VENUES WITH ZERO PHOTOS ARE EXCLUDED ENTIRELY (Step 3A). We never fall
-    back to a placeholder image, so the app only ever contains destinations
-    that have at least one real photo.
-  * A global safety-net deduplication check ensures no single photo URL is
-    assigned to more than one destination.
+  * Searches for venues around Yaoundé (3.848, 11.502) across travel-relevant
+    categories (restaurants, hotels, museums, parks, markets, attractions...).
+  * For each venue, fetches its photos and normalizes name, category,
+    coordinates, address, price tier, and photo URLs.
+  * VENUES WITH ZERO PHOTOS ARE EXCLUDED ENTIRELY (Step 3A) — no placeholders.
+  * A global safety-net check ensures no photo URL is used more than once.
 """
-import datetime
 import logging
 import os
 import threading
@@ -39,87 +29,99 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# Foursquare API configuration (v2 legacy API).
-FOURSQUARE_API_URL = "https://api.foursquare.com/v2/venues"
-FOURSQUARE_CLIENT_ID = os.environ.get("FOURSQUARE_CLIENT_ID", "")
-FOURSQUARE_CLIENT_SECRET = os.environ.get("FOURSQUARE_CLIENT_SECRET", "")
-FOURSQUARE_VERSION = os.environ.get("FOURSQUARE_VERSION", "20240101")
-
-# The Places API key (v3 / new developer portal). The v2 legacy oauth flow
-# uses client_id + client_secret, but the newer key is supplied as a single
-# `FOURSQUARE_API_KEY`. We support both so docker-compose's
-# `FOURSQUARE_API_KEY` (per the task's Step 1) works out of the box.
+# ---------------------------------------------------------------------------
+# Foursquare Places API (v3) configuration
+# ---------------------------------------------------------------------------
+FOURSQUARE_API_URL = os.environ.get(
+    "FOURSQUARE_API_URL", "https://api.foursquare.com/v3/places"
+)
 FOURSQUARE_API_KEY = os.environ.get("FOURSQUARE_API_KEY", "")
-
-
-def _has_credentials():
-    """Return True if any valid Foursquare credential set is configured.
-
-    Accepts either the v2 pair (client_id + client_secret) or the single
-    Places API key (FOURSQUARE_API_KEY).
-    """
-    return bool(
-        (FOURSQUARE_CLIENT_ID and FOURSQUARE_CLIENT_SECRET)
-        or FOURSQUARE_API_KEY
-    )
 
 # Yaoundé, Cameroon centre coordinates.
 YAOUNDE_LAT = 3.848
 YAOUNDE_LON = 11.502
-YAOUNDE_RADIUS_M = 15000  # ~15km radius covers the metropolitan area
+YAOUNDE_RADIUS_M = 20000  # ~20km radius covers the metropolitan area and suburbs
 
-# Foursquare category IDs (v2 taxonomy) mapped to our internal tag taxonomy.
-# See https://developer.foursquare.com/docs/resources/categories
-FOURSQUARE_CATEGORIES = [
-    # (fsq_category_id, category_label, fsq_category_name)
-    # Top-level taxonomy IDs (confirmed valid against the v2 API).
-    ("4d4b7105d754a06374d81259", "food", "Restaurant"),   # Food
-    ("4d4b7105d754a06375d81259", "culture", "Arts & Culture"),
-    ("4d4b7105d754a06377d81259", "nature", "Outdoors & Recreation"),
-    ("4d4b7105d754a06378d81259", "market", "Shops & Services"),
-    ("4d4b7105d754a06379d81259", "accommodation", "Travel & Transport"),
-    # Confirmed-valid subcategories.
-    ("4bf58dd8d48988d181941735", "culture", "Museum"),    # Museum
-    ("4bf58dd8d48988d163941735", "nature", "Park"),       # Park / Outdoors
-    ("4bf58dd8d48988d1fd941735", "market", "Market"),     # Farmers Market
-    ("4bf58dd8d48988d16a941735", "food", "Cafe"),         # Coffee Shop
+# v3 category IDs mapped to our internal tag taxonomy.
+# See https://location.foursquare.com/developer/reference/category-tree
+_FSQ_TO_TAG = {
+    # Arts & Entertainment (10000)
+    "10000": "culture",
+    "10001": "culture",       # Performing Arts Venue
+    "10016": "culture",       # Museum
+    "10024": "culture",       # Art Gallery
+    "10034": "culture",       # Museum
+    "10035": "culture",       # Art Gallery
+    "10050": "culture",       # History / Heritage
+    # Dining & Drinking (11000)
+    "11000": "food",
+    "12000": "food",
+    "12003": "food",          # Restaurant
+    "12014": "food",          # Food Truck
+    "12051": "food",          # Snack Place
+    "12064": "food",          # Cafe / Coffee Shop
+    "12067": "food",          # Bakery
+    "12070": "food",          # Bakery
+    # Nightlife (13000)
+    "13000": "attraction",
+    "13003": "attraction",    # Night club
+    "13005": "attraction",    # General Entertainment
+    "13007": "attraction",    # Entertainment
+    "13065": "accommodation", # Hotel
+    # Outdoors & Recreation (14000)
+    "14000": "nature",
+    "14001": "nature",        # Park
+    "14002": "nature",        # Sports Venue / field
+    "14003": "nature",        # Plaza
+    "14004": "nature",        # Natural Feature
+    "14011": "nature",        # Garden
+    # Residence (16000)
+    "16000": "accommodation",
+    "16032": "accommodation", # Hotel
+    "16063": "accommodation", # Guest House
+    # Shop & Service (17000)
+    "17000": "market",
+    "17001": "market",        # Market
+    "17069": "market",        # Farmers Market
+    "17114": "market",        # Shopping Mall
+    # Travel & Transport (18000)
+    "18000": "accommodation",
+    "18004": "accommodation", # Hotel
+    "18056": "accommodation", # Transit / Station
+    # Professional & Other Places (19000)
+    "19000": "services",
+    "19001": "services",
+}
+
+# Category IDs passed to the search request (travel-relevant subset).
+FSQ_CATEGORY_IDS = [
+    "10000", "10024", "10034",       # culture / museums / galleries
+    "11000", "12003", "12014",       # dining
+    "12051", "12064", "12067",       # cafes / bakeries / snacks
+    "13065",                         # hotels
+    "14000", "14001", "14002",       # nature / parks / sports
+    "14003", "14004", "14011",
+    "16032", "16063",                # hotels / guest houses
+    "17000", "17001", "17069",       # markets / malls
+    "17114",
+    "18000", "18004",
 ]
 
-# Compile the unique set of Foursquare category IDs to query.
-FSQ_CATEGORY_IDS = sorted({cid for cid, _, _ in FOURSQUARE_CATEGORIES})
-
-# Map helper: category id -> (category_label, fsq_name)
-_FSQ_CAT_MAP = {cid: (label, name) for cid, label, name in FOURSQUARE_CATEGORIES}
-
-# v3 primary category IDs mapped to our internal labels. The v2 search returns
-# v2 taxonomy IDs, but fixtures/tests and some responses use v3 primary IDs.
-_V3_CATEGORY_LABELS = {
-    "10000": "culture",          # Arts & Entertainment
-    "10016": "culture",          # Museum
-    "11000": "food",             # Dining & Drinking
-    "13000": "food",             # Nightlife Spot (mapped to food)
-    "13065": "accommodation",    # Hotel
-    "14000": "nature",           # Outdoors & Recreation
-    "16000": "accommodation",    # Residence
-    "16032": "accommodation",    # Hotel (v3)
-    "17000": "market",           # Shop & Service
-    "18000": "accommodation",    # Travel & Transport
-}
-_FSQ_CAT_MAP.update({cid: (label, label) for cid, label in _V3_CATEGORY_LABELS.items()})
-
 # Map Foursquare price tier (1-4) to a cost in XAF.
-# Foursquare price: 1 = cheap, 2 = moderate, 3 = expensive, 4 = very expensive.
 PRICE_TIER_TO_COST = {1: 5000, 2: 15000, 3: 30000, 4: 50000}
 
+# Search fields we request inline so each venue may carry its own photos.
+SEARCH_FIELDS = (
+    "fsq_id,name,geocodes,location,categories,price,contact,photos"
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _normalize_image_url(url: str) -> str:
-    """Normalize a Foursquare photo URL to a canonical form for deduplication.
-
-    Foursquare photo URLs look like:
-        https://fastly.4sqi.net/img/general/1000x1000/ABC123_hash.jpg
-    which is already unique per venue. We normalize scheme/host/trailing
-    slashes so the same photo served over http vs https is treated as equal.
-    """
+    """Normalize a Foursquare photo URL to a canonical dedup form."""
     if not url:
         return ""
     from urllib.parse import urlparse
@@ -136,27 +138,21 @@ def _normalize_image_url(url: str) -> str:
         return url.strip().lower().rstrip("/")
 
 
-def _common_params(**extra):
-    """Build the common query params for the Foursquare API.
-
-    Prefers the v2 pair (client_id + client_secret). If only the single
-    Places API key (FOURSQUARE_API_KEY) is set, send it as the API key
-    field instead.
-    """
-    if FOURSQUARE_CLIENT_ID and FOURSQUARE_CLIENT_SECRET:
-        params = {
-            "client_id": FOURSQUARE_CLIENT_ID,
-            "client_secret": FOURSQUARE_CLIENT_SECRET,
-            "v": FOURSQUARE_VERSION,
-        }
-    else:
-        params = {"api_key": FOURSQUARE_API_KEY}
-    params.update(extra)
-    return params
+def _has_credentials() -> bool:
+    """Return True if the Foursquare Places API key is configured."""
+    return bool(FOURSQUARE_API_KEY)
 
 
-def _safe_place_name(name):
-    """Reject names that don't represent a real travel destination."""
+def _common_headers() -> dict:
+    """Build the auth headers for the v3 Places API."""
+    return {
+        "Authorization": f"Bearer {FOURSQUARE_API_KEY}",
+        "Accept": "application/json",
+    }
+
+
+def _safe_place_name(name) -> bool:
+    """Reject names that aren't a real travel destination."""
     if not name:
         return False
     lower = name.lower().strip()
@@ -175,7 +171,7 @@ def _safe_place_name(name):
 
 
 def _build_description(name, category_label, fsq_name, address, price_tier):
-    """Build a human-friendly description from the Foursquare venue data."""
+    """Build a human-friendly description from Foursquare venue data."""
     parts = []
     if category_label == "food":
         parts.append(
@@ -229,7 +225,7 @@ def _build_description(name, category_label, fsq_name, address, price_tier):
 
 
 def _map_activities(category_label):
-    """Map a Foursquare category label to a list of activity strings."""
+    """Map a category label to a list of activity strings."""
     base = {
         "food": ["Dining", "Local Cuisine"],
         "accommodation": ["Accommodation", "Lodging"],
@@ -238,7 +234,7 @@ def _map_activities(category_label):
         "market": ["Shopping", "Local Culture"],
         "sports": ["Sports", "Outdoor Recreation"],
         "attraction": ["Sightseeing", "Photography"],
-        "business": ["Business", "Conferences"],
+        "services": ["Local Services"],
     }
     return base.get(category_label, ["Sightseeing"])
 
@@ -254,84 +250,67 @@ def _map_facilities(price_tier):
     return facilities
 
 
-def _venues_from_search(limit=50, cursor_offset=0):
-    """Call Foursquare v2 Place Search and return raw venue objects."""
-    params = _common_params(
-        ll=f"{YAOUNDE_LAT},{YAOUNDE_LON}",
-        radius=YAOUNDE_RADIUS_M,
-        categoryId=",".join(FSQ_CATEGORY_IDS),
-        limit=limit,
-        offset=cursor_offset,
-        intent="browse",
-    )
-
-    resp = requests.get(
-        f"{FOURSQUARE_API_URL}/search",
-        params=params,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    return data.get("response", {}).get("venues", [])
-
-
-_CREDITS_EXHAUSTED = False
-
-
-def _venue_photos(fsq_id):
-    """Call Foursquare v2 Venue Photos and return a list of photo dicts."""
-    global _CREDITS_EXHAUSTED
-    if _CREDITS_EXHAUSTED:
-        # Fail fast: once the account's credits are exhausted, every further
-        # photos call will also be rejected. Avoid hammering the API.
-        return []
-    params = _common_params(limit=6)
-    resp = requests.get(
-        f"{FOURSQUARE_API_URL}/{fsq_id}/photos",
-        params=params,
-        timeout=30,
-    )
-    if resp.status_code == 402:
-        # 402 = Payment Required / credits exhausted. Stop making photos calls.
-        _CREDITS_EXHAUSTED = True
-        logger.error(
-            "Foursquare credits exhausted (402). Photo retrieval is disabled "
-            "for this sync run; no venues with photos can be stored."
+def _should_raise_for_status(resp):
+    """Raise a clear, actionable error on bad status codes."""
+    if resp.status_code in (401, 403):
+        raise PermissionError(
+            "Foursquare v3 auth failed (401/403). Check FOURSQUARE_API_KEY."
         )
-        return []
+    if resp.status_code == 402:
+        raise PermissionError("Foursquare credits exhausted (402).")
     resp.raise_for_status()
-    data = resp.json()
-    return data.get("response", {}).get("photos", {}).get("items", [])
+
+
+def _extract_photos(venue):
+    """Return a list of photos from a venue dict (v3 shape or inline)."""
+    photos = venue.get("photos")
+    if isinstance(photos, dict):
+        return photos.get("items", []) or []
+    if isinstance(photos, list):
+        return photos
+    return []
 
 
 def _photo_url(photo):
-    """Build a full photo URL from a v2 photo dict (prefix + size + suffix)."""
+    """Build a full, high-res photo URL from a v3 photo dict."""
     prefix = photo.get("prefix", "")
     suffix = photo.get("suffix", "")
     if not prefix or not suffix:
         return ""
-    # Use the original size to keep the highest-quality image.
     return f"{prefix}original{suffix}"
 
 
 def _category_label_for_venue(categories):
-    """Map a venue's Foursquare categories to our internal tag label."""
+    """Map a venue's v3 categories to our internal tag label."""
     if not categories:
         return "attraction"
     for cat in categories:
         cat_id = str(cat.get("id", ""))
-        if cat_id in _FSQ_CAT_MAP:
-            return _FSQ_CAT_MAP[cat_id][0]
+        if cat_id in _FSQ_TO_TAG:
+            return _FSQ_TO_TAG[cat_id]
+        name = " ".join([
+            cat.get("name", ""),
+            cat.get("short_name", ""),
+        ]).lower()
+        if any(k in name for k in ("museum", "gallery", "cultural", "monument", "historic")):
+            return "culture"
+        if any(k in name for k in ("restaurant", "cafe", "coffee", "food", "bakery", "dining")):
+            return "food"
+        if any(k in name for k in ("park", "garden", "outdoor", "nature", "scenic", "plaza")):
+            return "nature"
+        if any(k in name for k in ("hotel", "resort", "hostel", "guest", "lodging")):
+            return "accommodation"
+        if any(k in name for k in ("market", "shop", "store", "mall", "marketplace")):
+            return "market"
+        if any(k in name for k in ("stadium", "sports", "gym", "field", "recreation")):
+            return "sports"
+        if any(k in name for k in ("attraction", "tourist", "landmark", "entertainment")):
+            return "attraction"
     return "attraction"
 
 
 def _venue_price(venue):
-    """Extract price tier from a venue (1-4) or None if unknown.
-
-    Handles both shapes:
-      * v2: price is a dict like {"tier": 2, ...}
-      * v3/test: price is a plain integer 1-4.
-    """
+    """Extract price tier (1-4) or None. Handles int or dict shapes."""
     price = venue.get("price")
     if isinstance(price, dict):
         tier = price.get("tier")
@@ -348,27 +327,115 @@ def _venue_price(venue):
     return None
 
 
+def _coords_from_venue(venue):
+    """Return (lat, lon) from a v3 venue, or (None, None)."""
+    geocodes = venue.get("geocodes") or {}
+    main = geocodes.get("main") or {}
+    lat = main.get("latitude")
+    lon = main.get("longitude")
+    if lat is None or lon is None:
+        loc = venue.get("location") or {}
+        lat = loc.get("lat")
+        lon = loc.get("lng")
+    if lat is None or lon is None:
+        return None, None
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except (ValueError, TypeError):
+        return None, None
+    if lat == 0 or lon == 0:
+        return None, None
+    return lat, lon
+
+
+def _address_from_venue(venue):
+    """Build a formatted address string from a v3 venue."""
+    loc = venue.get("location") or {}
+    if loc.get("formatted_address"):
+        return loc["formatted_address"]
+    parts = []
+    if loc.get("address"):
+        parts.append(loc["address"])
+    if loc.get("locality") or loc.get("city"):
+        parts.append(loc.get("locality") or loc.get("city"))
+    if loc.get("region") or loc.get("state"):
+        parts.append(loc.get("region") or loc.get("state"))
+    return ", ".join([p for p in parts if p])
+
+
+# ---------------------------------------------------------------------------
+# API calls
+# ---------------------------------------------------------------------------
+
+def _venues_from_search(limit=50, cursor_offset=0):
+    """Call the v3 Place Search endpoint and return raw venue objects."""
+    params = {
+        "ll": f"{YAOUNDE_LAT},{YAOUNDE_LON}",
+        "radius": YAOUNDE_RADIUS_M,
+        "categories": ",".join(FSQ_CATEGORY_IDS),
+        "limit": min(limit, 50),
+        "sort": "RELEVANCE",
+        "fields": SEARCH_FIELDS,
+    }
+    if cursor_offset:
+        params["cursor"] = str(cursor_offset)
+
+    resp = requests.get(
+        f"{FOURSQUARE_API_URL}/search",
+        params=params,
+        headers=_common_headers(),
+        timeout=60,
+    )
+    _should_raise_for_status(resp)
+    data = resp.json()
+    return data.get("results", [])
+
+
+_CREDITS_EXHAUSTED = False
+
+
+def _venue_photos(fsq_id):
+    """Call the v3 Place Photos endpoint and return photo dicts."""
+    global _CREDITS_EXHAUSTED
+    if _CREDITS_EXHAUSTED:
+        return []
+    resp = requests.get(
+        f"{FOURSQUARE_API_URL}/{fsq_id}/photos",
+        params={"limit": 6},
+        headers=_common_headers(),
+        timeout=30,
+    )
+    if resp.status_code == 402:
+        _CREDITS_EXHAUSTED = True
+        logger.error(
+            "Foursquare credits exhausted (402). Photo retrieval disabled "
+            "for this sync run; no venues with photos can be stored."
+        )
+        return []
+    _should_raise_for_status(resp)
+    data = resp.json()
+    return data.get("photos", [])
+
+
+# ---------------------------------------------------------------------------
+# Normalization
+# ---------------------------------------------------------------------------
+
 def _normalize_venue(venue, photos=None):
-    """Convert a Foursquare venue dict into our destination shape.
+    """Convert a v3 venue dict into our destination shape.
 
-    Supports both response shapes:
-      * v2: photos passed separately via the `photos` argument.
-      * v3/test: photos embedded in the venue dict under `photos`.
-    Accepts venue IDs from either `id` (v2) or `fsq_id` (v3).
-
-    Returns None if the venue has no real photo (Step 3A exclusion) or
-    cannot be normalized.
+    Returns None if the venue has no photo (Step 3A) or can't be normalized.
     """
-    fsq_id = venue.get("id", "") or venue.get("fsq_id", "")
-    name = venue.get("name", "").strip()
+    fsq_id = venue.get("fsq_id", "") or venue.get("id", "")
+    name = (venue.get("name", "") or "").strip()
     if not fsq_id or not name:
         return None
     if not _safe_place_name(name):
         return None
 
-    # Photos may be provided separately (v2) or embedded in the venue (v3/test).
     if photos is None:
-        photos = venue.get("photos") or []
+        photos = _extract_photos(venue)
 
     # Only keep venues that have at least one real photo (Step 3A).
     image_urls = []
@@ -381,48 +448,26 @@ def _normalize_venue(venue, photos=None):
         if len(image_urls) >= 6:
             break
 
-    # CRITICAL (Step 3A): venues with zero photos are NOT stored at all.
     if not image_urls:
         return None
 
-    # Coordinates — support both v2 (location.lat/lng) and v3 (geocodes.main).
-    loc = venue.get("location") or {}
-    lat = loc.get("lat")
-    lon = loc.get("lng")
-    if (lat is None or lon is None) and venue.get("geocodes"):
-        main = venue.get("geocodes", {}).get("main") or {}
-        lat = main.get("latitude")
-        lon = main.get("longitude")
-    if lat is None or lon is None or lat == 0 or lon == 0:
+    lat, lon = _coords_from_venue(venue)
+    if lat is None or lon is None:
         return None
 
-    # Address.
-    address_parts = []
-    if loc.get("address"):
-        address_parts.append(loc["address"])
-    city = loc.get("city") or loc.get("locality")
-    if city:
-        address_parts.append(city)
-    if loc.get("state"):
-        address_parts.append(loc["state"])
-    address = ", ".join(address_parts)
-    area = f"{city or 'Yaoundé'}, Yaoundé"
+    address = _address_from_venue(venue)
+    loc = venue.get("location") or {}
+    locality = loc.get("locality") or loc.get("city") or "Yaoundé"
+    area = f"{locality}, Yaoundé"
 
-    # Category.
     categories = venue.get("categories") or []
     category_label = _category_label_for_venue(categories)
-    fsq_name = ""
-    if categories:
-        fsq_name = categories[0].get("name", "")
+    fsq_name = categories[0].get("name", "") if categories else ""
 
-    # Tags.
     tags = [category_label, "yaounde", "cameroon"]
 
-    # Price tier -> cost (XAF).
     price_tier = _venue_price(venue)
-    cost = None
-    if price_tier:
-        cost = PRICE_TIER_TO_COST.get(price_tier)
+    cost = PRICE_TIER_TO_COST.get(price_tier) if price_tier else None
 
     description = _build_description(
         name, category_label, fsq_name, address, price_tier
@@ -431,7 +476,7 @@ def _normalize_venue(venue, photos=None):
     phone = ""
     contact = venue.get("contact") or {}
     if isinstance(contact, dict):
-        phone = contact.get("formattedPhone") or contact.get("phone") or ""
+        phone = contact.get("phone") or contact.get("formattedPhone") or ""
 
     return {
         "fsq_id": fsq_id,
@@ -461,25 +506,18 @@ def _normalize_venue(venue, photos=None):
 
 
 def fetch_destinations(max_results=200):
-    """Fetch all Foursquare venues around Yaoundé and normalize them.
+    """Fetch Foursquare venues around Yaoundé and normalize them.
 
-    Returns a tuple (kept_destinations, stats) where stats is a dict:
-        {
-          "total_venues": N,       # venues Foursquare returned
-          "kept": N,               # venues with at least one photo
-"excluded_no_photo": N,  # venues with zero photos
-          "excluded_other": N,     # venues filtered for name/coords
-        }
+    Returns (kept_destinations, stats) where stats is a dict with
+    total_venues / kept / excluded_no_photo / excluded_other.
     """
     if not _has_credentials():
         logger.error(
-            "Foursquare credentials are not set. "
-            "Set FOURSQUARE_CLIENT_ID + FOURSQUARE_CLIENT_SECRET, or "
-            "FOURSQUARE_API_KEY. Cannot sync destinations."
+            "Foursquare credentials are not set. Set FOURSQUARE_API_KEY. "
+            "Cannot sync destinations."
         )
         raise RuntimeError(
-            "Foursquare credentials are required: set FOURSQUARE_CLIENT_ID and "
-            "FOURSQUARE_CLIENT_SECRET, or FOURSQUARE_API_KEY"
+            "Foursquare credentials are required: set FOURSQUARE_API_KEY"
         )
 
     kept = []
@@ -487,14 +525,17 @@ def fetch_destinations(max_results=200):
     excluded_no_photo = 0
     excluded_other = 0
 
-    offset = 0
-    page_size = 50
-    while len(kept) < max_results and offset < max_results:
+    limit = 50
+    cursor_offset = 0
+    while len(kept) < max_results:
         try:
-            venues = _venues_from_search(limit=page_size, cursor_offset=offset)
+            venues = _venues_from_search(limit=limit, cursor_offset=cursor_offset)
         except requests.exceptions.RequestException as e:
-            logger.warning(f"Foursquare search failed (offset={offset}): {e}")
+            logger.warning(f"Foursquare search failed (cursor={cursor_offset}): {e}")
             break
+        except PermissionError as e:
+            logger.error(f"Foursquare auth/credits error: {e}")
+            raise
 
         if not venues:
             break
@@ -503,13 +544,15 @@ def fetch_destinations(max_results=200):
         for venue in venues:
             if len(kept) >= max_results:
                 break
-            fsq_id = venue.get("id", "")
+            fsq_id = venue.get("fsq_id", "") or venue.get("id", "")
 
-            try:
-                photos = _venue_photos(fsq_id)
-            except requests.exceptions.RequestException as e:
-                logger.warning(f"Foursquare photos failed for {fsq_id}: {e}")
-                photos = []
+            photos = _extract_photos(venue)
+            if not photos and fsq_id:
+                try:
+                    photos = _venue_photos(fsq_id)
+                except requests.exceptions.RequestException as e:
+                    logger.warning(f"Foursquare photos failed for {fsq_id}: {e}")
+                    photos = []
 
             if not photos:
                 excluded_no_photo += 1
@@ -521,9 +564,10 @@ def fetch_destinations(max_results=200):
             else:
                 excluded_other += 1
 
-        # Advance to next page.
-        offset += page_size
-        if len(venues) < page_size:
+        cursor_offset += limit
+        if len(venues) < limit:
+            break
+        if cursor_offset >= max_results:
             break
 
     stats = {
@@ -546,11 +590,7 @@ def fetch_destinations(max_results=200):
 # ---------------------------------------------------------------------------
 
 def _deduplicate_global_images(items):
-    """Ensure no single photo URL is used by more than one destination.
-
-    Foursquare photo URLs are unique per venue, so this is a pure safety net.
-    Returns the set of used image URLs.
-    """
+    """Ensure no single photo URL is used by more than one destination."""
     used_images = set()
     for item in items:
         images = item.get("images") or []
@@ -566,7 +606,7 @@ def _deduplicate_global_images(items):
 
 
 def deduplicate_and_sync(incoming_list, app=None):
-    """Deduplicate incoming destinations by fsq_id and write to the database.
+    """Deduplicate incoming destinations by fsq_id and write to the DB.
 
     Returns the count of inserted/updated destinations.
     """
@@ -586,7 +626,6 @@ def deduplicate_and_sync(incoming_list, app=None):
 
     # 2. Global photo URL uniqueness safety net (Step 3).
     _deduplicate_global_images(final_incoming)
-    # Drop any destination that ended up with no image after the safety net.
     final_incoming = [d for d in final_incoming if d.get("image")]
 
     # 3. Query existing fsq_ids to decide updates vs inserts.
@@ -607,9 +646,9 @@ def deduplicate_and_sync(incoming_list, app=None):
 
 
 def sync_destinations(app=None):
-    """Fetch destinations from Foursquare and store in the database.
+    """Fetch destinations from Foursquare and store them in the database.
 
-    Returns a dict with the sync stats and the upserted count.
+    Returns (stats_dict, upserted_count). On failure returns cached data.
     """
     from app.models import get_all_destinations, set_last_synced_now
 
@@ -641,24 +680,28 @@ def search_foursquare(query, app=None, limit=12):
         return []
     q = query.strip()
     try:
-        params = _common_params(
-            ll=f"{YAOUNDE_LAT},{YAOUNDE_LON}",
-            radius=YAOUNDE_RADIUS_M,
-            query=q,
-            limit=min(limit, 50),
-            intent="browse",
-        )
+        params = {
+            "ll": f"{YAOUNDE_LAT},{YAOUNDE_LON}",
+            "radius": YAOUNDE_RADIUS_M,
+            "query": q,
+            "limit": min(limit, 50),
+            "fields": SEARCH_FIELDS,
+        }
         resp = requests.get(
             f"{FOURSQUARE_API_URL}/search",
             params=params,
+            headers=_common_headers(),
             timeout=30,
         )
-        resp.raise_for_status()
-        venues = resp.json().get("response", {}).get("venues", [])
+        _should_raise_for_status(resp)
+        venues = resp.json().get("results", [])
         results = []
         for venue in venues:
             try:
-                photos = _venue_photos(venue.get("id", ""))
+                fsq_id = venue.get("fsq_id", "") or venue.get("id", "")
+                photos = _extract_photos(venue)
+                if not photos and fsq_id:
+                    photos = _venue_photos(fsq_id)
                 if not photos:
                     continue
                 normalized = _normalize_venue(venue, photos)

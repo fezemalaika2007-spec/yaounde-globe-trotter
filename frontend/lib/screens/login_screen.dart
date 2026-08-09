@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../config/google_auth_config.dart';
 import '../services/auth_provider.dart';
 import '../services/favorites_provider.dart';
 import '../utils/image_paths.dart';
@@ -58,29 +59,49 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _googleLogin() async {
+    if (!GoogleAuthConfig.isConfigured) {
+      setState(() {
+        _error =
+            'Google Sign-In requires a Google OAuth Client ID. '
+            'Please configure your Client ID in lib/config/google_auth_config.dart. '
+            'You can log in directly using your username & password!';
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final googleUser = await GoogleSignIn().signIn();
+      final googleSignIn = GoogleSignIn(
+        clientId: GoogleAuthConfig.clientId.isNotEmpty
+            ? GoogleAuthConfig.clientId
+            : null,
+        scopes: const ['email', 'profile'],
+      );
+      final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         if (mounted) setState(() => _loading = false);
         return;
       }
       final auth = await googleUser.authentication;
       final idToken = auth.idToken;
-      if (idToken == null) {
-        throw ApiException(400, 'No Google ID token received');
+      final accessToken = auth.accessToken;
+      if ((idToken == null || idToken.isEmpty) &&
+          (accessToken == null || accessToken.isEmpty)) {
+        throw ApiException(400, 'Could not retrieve authentication token from Google.');
       }
-      await AuthProvider().googleLogin(idToken);
+      await AuthProvider().googleLogin(
+        idToken: idToken,
+        accessToken: accessToken,
+      );
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = 'Google sign-in failed. Please try again.');
+      setState(() => _error = 'Google sign-in failed: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

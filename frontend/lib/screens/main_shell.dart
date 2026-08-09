@@ -514,7 +514,7 @@ class _SidebarPanel extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Logout', style: TextStyle(color: Colors.red)),
+            title: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
             onTap: onLogout,
           ),
           const SizedBox(height: 8),

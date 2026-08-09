@@ -30,18 +30,41 @@ class ApiService {
   /// Hard upper bound for any single HTTP request. Prevents the UI from
   /// hanging forever on a slow/unreachable backend — the user gets a clear
   /// timeout error instead of an infinite spinner.
-  static const Duration _requestTimeout = Duration(seconds: 6);
+  static const Duration _requestTimeout = Duration(seconds: 25);
+
+  /// Wraps a [Future] HTTP call so that connection errors (server down /
+  /// unreachable) and timeouts produce clear, actionable `ApiException`s
+  /// instead of cryptic socket errors.
+  Future<http.Response> _guard(Future<http.Response> future) async {
+    try {
+      return await future.timeout(
+        _requestTimeout,
+        onTimeout: () => throw const _TimeoutSignal(),
+      );
+    } on ApiException {
+      rethrow;
+    } on _TimeoutSignal {
+      throw ApiException(
+        408,
+        'Connection timed out. Please check that the server is running '
+        'and reachable.',
+      );
+    } on http.ClientException {
+      throw ApiException(
+        0,
+        'Could not reach the server. Is it running? Check that the backend '
+        'is started and the API URL is correct.',
+      );
+    } catch (e) {
+      throw ApiException(
+        0,
+        'Could not connect to the server. Please try again. ($e)',
+      );
+    }
+  }
 
   Future<http.Response> _get(Uri uri, {Map<String, String>? headers}) {
-    return http
-        .get(uri, headers: headers)
-        .timeout(
-          _requestTimeout,
-          onTimeout: () => throw ApiException(
-            408,
-            'Request timed out. Is the server running?',
-          ),
-        );
+    return _guard(http.get(uri, headers: headers));
   }
 
   Future<http.Response> _post(
@@ -49,15 +72,7 @@ class ApiService {
     Map<String, String>? headers,
     Object? body,
   }) {
-    return http
-        .post(uri, headers: headers, body: body)
-        .timeout(
-          _requestTimeout,
-          onTimeout: () => throw ApiException(
-            408,
-            'Request timed out. Is the server running?',
-          ),
-        );
+    return _guard(http.post(uri, headers: headers, body: body));
   }
 
   // Token management
@@ -135,8 +150,7 @@ class ApiService {
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 
-  /// Verify a freshly-registered user's email with the code returned at
-  /// registration (returned by the backend for local/dev testing).
+  /// Verify a freshly-registered user's email with the 6-digit code.
   Future<Map<String, dynamic>> verifyEmail({
     required String username,
     required String code,
@@ -152,13 +166,64 @@ class ApiService {
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 
-  /// Authenticate with a Google ID token. Returns the JWT.
-  Future<String> googleLogin({required String idToken}) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.googleAuth}');
+  /// Request a new email verification code.
+  Future<Map<String, dynamic>> resendVerificationCode(String identifier) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.resendCode}');
     final response = await _post(
       uri,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'id_token': idToken}),
+      body: jsonEncode({'username': identifier}),
+    );
+    final body = _decode(response);
+    if (response.statusCode == 200) return body;
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// Request a password reset code to be sent via email.
+  Future<Map<String, dynamic>> forgotPassword(String identifier) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.forgotPassword}');
+    final response = await _post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': identifier}),
+    );
+    final body = _decode(response);
+    if (response.statusCode == 200) return body;
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// Complete password reset using the code sent to email.
+  Future<Map<String, dynamic>> resetPassword({
+    required String identifier,
+    required String code,
+    required String newPassword,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.resetPassword}');
+    final response = await _post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'username': identifier,
+        'code': code,
+        'password': newPassword,
+      }),
+    );
+    final body = _decode(response);
+    if (response.statusCode == 200) return body;
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// Authenticate with a Google ID token or Access token. Returns the JWT.
+  Future<String> googleLogin({String? idToken, String? accessToken}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.googleAuth}');
+    final bodyData = <String, String>{};
+    if (idToken != null && idToken.isNotEmpty) bodyData['id_token'] = idToken;
+    if (accessToken != null && accessToken.isNotEmpty) bodyData['access_token'] = accessToken;
+
+    final response = await _post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(bodyData),
     );
     final body = _decode(response);
     if (response.statusCode == 200) {
@@ -522,4 +587,10 @@ class ApiException implements Exception {
   ApiException(this.statusCode, this.message);
   @override
   String toString() => message;
+}
+
+/// Internal marker used to distinguish an HTTP request timeout from other
+/// errors inside [_guard]. Not exposed outside this library.
+class _TimeoutSignal implements Exception {
+  const _TimeoutSignal();
 }

@@ -105,6 +105,23 @@ class AppLocalizations {
   );
   String get homeWhatYouCanDo => _t('What you can do');
   String get homeGlimpseYaounde => _t('A glimpse of Yaoundé');
+  String get homeFeatureDiscoverTitle => _t('Discover Destinations');
+  String get homeFeatureDiscoverDesc => _t(
+    'Browse Yaoundé\'s top attractions — from Mont Fébé to Mefou National Park — with photos, ratings, costs, and tags.',
+  );
+  String get homeFeatureRecommendTitle =>
+      _t('Get Personalized Recommendations');
+  String get homeFeatureRecommendDesc => _t(
+    'Let our smart matching engine suggest destinations based on your interests and preferences.',
+  );
+  String get homeFeaturePlanTitle => _t('Plan & Manage Itineraries');
+  String get homeFeaturePlanDesc => _t(
+    'Create custom trip itineraries, add destinations, set dates, and keep all your travel plans in one place.',
+  );
+  String get homeFeatureSaveTitle => _t('Save Favorite Locations');
+  String get homeFeatureSaveDesc => _t(
+    'Tap the heart icon on any destination to bookmark it and build your personal travel list for easy access later.',
+  );
 
   // Destinations
   String get search => _t('Search');
@@ -255,6 +272,19 @@ class AppLocalizations {
         'Yaounde.Trip est votre compagnon de voyage intelligent pour explorer la vibrante capitale du Cameroun. Découvrez les meilleures destinations, obtenez des recommandations personnalisées selon vos centres d\'intérêt, planifiez et gérez vos itinéraires, et enregistrez vos lieux préférés — tout en un seul endroit.',
     'What you can do': 'Ce que vous pouvez faire',
     'A glimpse of Yaoundé': 'Un aperçu de Yaoundé',
+    'Discover Destinations': 'Découvrir les destinations',
+    'Browse Yaoundé\'s top attractions — from Mont Fébé to Mefou National Park — with photos, ratings, costs, and tags.':
+        'Parcourez les meilleures attractions de Yaoundé — du Mont Fébé au Parc National de la Mefou — avec photos, notes, coûts et tags.',
+    'Get Personalized Recommendations':
+        'Obtenir des recommandations personnalisées',
+    'Let our smart matching engine suggest destinations based on your interests and preferences.':
+        'Laissez notre moteur de recommandation intelligent vous suggérer des destinations selon vos centres d\'intérêt et vos préférences.',
+    'Plan & Manage Itineraries': 'Planifier & gérer des itinéraires',
+    'Create custom trip itineraries, add destinations, set dates, and keep all your travel plans in one place.':
+        'Créez des itinéraires de voyage sur mesure, ajoutez des destinations, définissez des dates et conservez tous vos projets au même endroit.',
+    'Save Favorite Locations': 'Enregistrer vos lieux préférés',
+    'Tap the heart icon on any destination to bookmark it and build your personal travel list for easy access later.':
+        'Appuyez sur l\'icône cœur d\'une destination pour la mettre en favori et constituer votre liste de voyage personnelle.',
 
     // Destinations
     'Search': 'Rechercher',

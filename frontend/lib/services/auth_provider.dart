@@ -60,9 +60,9 @@ class AuthProvider extends ChangeNotifier {
     await _api.verifyEmail(username: username, code: code);
   }
 
-  /// Log in with a Google ID token.
-  Future<void> googleLogin(String idToken) async {
-    await _api.googleLogin(idToken: idToken);
+  /// Log in with a Google ID token or Access token.
+  Future<void> googleLogin({String? idToken, String? accessToken}) async {
+    await _api.googleLogin(idToken: idToken, accessToken: accessToken);
     _isLoggedIn = true;
     notifyListeners();
   }

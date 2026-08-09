@@ -35,7 +35,7 @@ def _get_database_url(app=None):
 
 def get_connection(app=None):
     """Get a PostgreSQL connection."""
-    return psycopg2.connect(_get_database_url(app))
+    return psycopg2.connect(_get_database_url(app), connect_timeout=15)
 
 
 def init_db(app=None):
@@ -73,6 +73,8 @@ def init_db(app=None):
         "is_verified": "ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE",
         "verification_code": "ALTER TABLE users ADD COLUMN verification_code TEXT DEFAULT ''",
         "auth_provider": "ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local'",
+        "reset_code": "ALTER TABLE users ADD COLUMN reset_code TEXT DEFAULT ''",
+        "reset_expires": "ALTER TABLE users ADD COLUMN reset_expires TEXT DEFAULT ''",
     }
     for col, sql in col_sql.items():
         if col not in existing_cols:
@@ -314,6 +316,67 @@ def get_preferences_for_user(username, app=None):
 
     favorites = get_favorites_for_user(username, app)
     return prefs or [], favorites or []
+
+
+def get_user_by_username_or_email(identifier, app=None):
+    """Return a user dict by username or email, or None."""
+    if not identifier:
+        return None
+    identifier = identifier.strip()
+    user = get_user_by_username(identifier, app)
+    if user:
+        return user
+    return get_user_by_email(identifier, app)
+
+
+def set_reset_code(identifier, code, expires_at_iso, app=None):
+    """Store a password reset code for a username or email."""
+    user = get_user_by_username_or_email(identifier, app)
+    if not user:
+        return False
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET reset_code = %s, reset_expires = %s WHERE id = %s",
+        (code, expires_at_iso, user["id"]),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return True
+
+
+def verify_reset_code_and_update_password(identifier, code, new_password_hash, app=None):
+    """Verify the reset code and update the user's password.
+
+    Returns True on success, False if code is invalid or expired.
+    """
+    user = get_user_by_username_or_email(identifier, app)
+    if not user:
+        return False
+    if not user.get("reset_code") or user.get("reset_code") != code:
+        return False
+
+    expires_str = user.get("reset_expires", "")
+    if expires_str:
+        try:
+            expires = datetime.datetime.fromisoformat(expires_str)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            if now > expires:
+                return False
+        except ValueError:
+            pass
+
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET password_hash = %s, reset_code = '', reset_expires = '' WHERE id = %s",
+        (new_password_hash, user["id"]),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return True
 
 
 def _row_to_dict(row, cursor):

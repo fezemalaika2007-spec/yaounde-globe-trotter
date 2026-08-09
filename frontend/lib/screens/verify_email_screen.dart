@@ -71,6 +71,30 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
+  Future<void> _resendCode() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await ApiService().resendVerificationCode(widget.username);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('A new 6-digit code has been sent to your email!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'Failed to resend code. Please try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -172,15 +196,24 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                Navigator.pushReplacementNamed(
-                  context,
-                  '/login',
-                  arguments: widget.onLocaleChanged,
-                );
-              },
-              child: const Text('Back to Login'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: _loading ? null : _resendCode,
+                  child: const Text('Resend Code'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushReplacementNamed(
+                      context,
+                      '/login',
+                      arguments: widget.onLocaleChanged,
+                    );
+                  },
+                  child: const Text('Back to Login'),
+                ),
+              ],
             ),
           ],
         ),

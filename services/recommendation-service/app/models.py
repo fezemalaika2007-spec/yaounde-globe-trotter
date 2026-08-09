@@ -36,7 +36,7 @@ def _get_database_url(app=None):
 
 def get_connection(app=None):
     """Get a PostgreSQL connection."""
-    conn = psycopg2.connect(_get_database_url(app))
+    conn = psycopg2.connect(_get_database_url(app), connect_timeout=15)
     return conn
 
 

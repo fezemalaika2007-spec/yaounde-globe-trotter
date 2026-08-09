@@ -65,22 +65,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final result = await AuthProvider().register(
+      await AuthProvider().register(
         _usernameCtrl.text.trim(),
         _emailCtrl.text.trim(),
         _passwordCtrl.text,
         List.from(_selectedTags),
       );
       if (mounted) {
-        // Navigate to the email-verification screen with the returned code
-        // (the backend returns it for local/dev testing).
-        final code = (result['verification_code'] ?? '').toString();
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => VerifyEmailScreen(
               username: _usernameCtrl.text.trim(),
-              initialCode: code,
+              initialCode: '',
               onLocaleChanged: widget.onLocaleChanged,
             ),
           ),

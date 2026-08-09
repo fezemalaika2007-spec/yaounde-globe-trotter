@@ -64,9 +64,9 @@ class AuthBackground extends StatelessWidget {
             path: backgroundPath,
             width: double.infinity,
             height: double.infinity,
+            fit: BoxFit.cover,
             fallbackIcon: Icons.travel_explore,
           ),
-          Container(color: Colors.black.withValues(alpha: 0.55)),
           SafeArea(
             child: Center(
               child: SingleChildScrollView(

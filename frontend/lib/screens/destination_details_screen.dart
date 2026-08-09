@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../services/favorites_provider.dart';
 import '../utils/destination_filters.dart';
@@ -21,18 +19,12 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   int _currentImageIndex = 0;
   final PageController _pageController = PageController();
 
-  /// Fetched Wikipedia extract (real content), if the destination has a
-  /// Wikipedia title we can resolve. Null until fetched.
-  String? _wikiExtract;
-  bool _wikiLoading = false;
-
   @override
   void initState() {
     super.initState();
     _dest = Map<String, dynamic>.from(widget.destination);
     _isFav = _favProvider.isFavorite(_dest['name'] ?? '');
     _favProvider.addListener(_onFavChange);
-    _maybeFetchWikiExtract();
   }
 
   void _onFavChange() {
@@ -45,67 +37,6 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     _favProvider.removeListener(_onFavChange);
     _pageController.dispose();
     super.dispose();
-  }
-
-  /// Fetches a real Wikipedia extract/summary for the destination when we have
-  /// a Wikipedia/Wikidata reference or a name that can resolve via Wikipedia.
-  ///
-  /// This gives genuinely long, real content about the place. If the fetch
-  /// fails or no Wikipedia article exists, we fall back to the generated
-  /// long description (derived from real OSM tags) — never an invented text.
-  Future<void> _maybeFetchWikiExtract() async {
-    // Don't try if we already have a long real description from a previous
-    // Wikipedia enrichment on the backend, unless the description is thin.
-    final existing = _dest['long_description'] ?? _dest['description'] ?? '';
-    if (existing.toString().trim().length >= 300) return;
-
-    final wikipedia = _dest['wikipedia'] ?? '';
-    final name = (_dest['name'] ?? '').toString().trim();
-    if (wikipedia.toString().isNotEmpty || name.isEmpty) {
-      if (wikipedia.toString().isNotEmpty) {
-        await _fetchWikiExtractByName(wikipedia.toString());
-      }
-      return;
-    }
-
-    // Try a Wikipedia lookup by the destination's real name.
-    await _fetchWikiExtractByName(name);
-  }
-
-  Future<void> _fetchWikiExtractByName(String query) async {
-    setState(() => _wikiLoading = true);
-    try {
-      // Wikipedia REST summary API (no key required).
-      final lang = 'en';
-      final encoded = Uri.encodeComponent(query.replaceAll(' ', '_'));
-      final uri = Uri.parse(
-        'https://$lang.wikipedia.org/api/rest_v1/page/summary/$encoded',
-      );
-      final response = await http
-          .get(uri)
-          .timeout(
-            const Duration(seconds: 6),
-            onTimeout: () => throw Exception('Wikipedia request timed out'),
-          );
-      if (response.statusCode == 200 && mounted) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final extract = data['extract'] ?? '';
-        if (extract.toString().trim().isNotEmpty) {
-          setState(() {
-            _wikiExtract = extract.toString();
-            // Keep a real content_description if provided by the API.
-            final contentDesc = data['content_urls']?['desktop_page']?['title'];
-            if (contentDesc != null) {
-              _dest['wikipedia_title'] = contentDesc.toString();
-            }
-          });
-        }
-      }
-    } catch (_) {
-      // Silently fall back to the generated long description.
-    } finally {
-      if (mounted) setState(() => _wikiLoading = false);
-    }
   }
 
   Future<void> _launchUrl(String urlString) async {
@@ -295,8 +226,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     );
   }
 
-  /// Builds a caption that leads with the destination's REAL name (from OSM
-  /// / verified Wikidata), never a generic label. The index is only an
+  /// Builds a caption that leads with the destination's REAL name (from the
+  /// Foursquare venue data), never a generic label. The index is only an
   /// auxiliary "image N of M" suffix, not the primary descriptor.
   String _buildImageCaption(int index, int total) {
     final String name = _dest['name'] ?? 'Destination';
@@ -310,16 +241,12 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   /// Returns the real, full description of the destination.
   ///
   /// Priority:
-  ///   1. Long description already enriched from Wikipedia (real content).
-  ///   2. Wikipedia extract fetched live (real content).
-  ///   3. Generated long description (built from real OSM tags).
-  ///   4. Short description (real OSM description if any).
-  ///   5. Empty — caller decides what to show.
+  ///   1. Long description generated on the backend from real Foursquare data.
+  ///   2. Short description (real Foursquare description if any).
+  ///   3. Empty — caller decides what to show.
   String _realDescription() {
     final longDesc = (_dest['long_description'] ?? '').toString().trim();
     if (longDesc.isNotEmpty) return longDesc;
-    final wiki = (_wikiExtract ?? '').toString().trim();
-    if (wiki.isNotEmpty) return wiki;
     final desc = (_dest['description'] ?? '').toString().trim();
     return desc;
   }
@@ -442,17 +369,6 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            if (_wikiLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ),
             Text(
               description.isEmpty
                   ? 'Detailed information about this place is not available yet.'
@@ -461,7 +377,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
             ),
             const SizedBox(height: 12),
 
-            // --- Practical info (real OSM data, shown only when present) ---
+            // --- Practical info (real venue data, shown only when present) ---
             if ((_dest['opening_hours'] ?? '').toString().isNotEmpty) ...[
               _infoRow(
                 Icons.schedule,

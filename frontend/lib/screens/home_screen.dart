@@ -171,14 +171,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
-                    // Gradient overlay for readability
+                    // Very light gradient overlay for readability — keeps the
+                    // hero image bright and clear while still letting the
+                    // overlaid text stand out.
                     Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Colors.black.withValues(alpha: 0.7),
-                            Colors.black.withValues(alpha: 0.3),
-                            Colors.black.withValues(alpha: 0.5),
+                            Colors.black.withValues(alpha: 0.25),
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.10),
                           ],
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
@@ -282,30 +284,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _FeatureCard(
                       icon: Icons.explore,
-                      title: 'Discover Destinations',
-                      description:
-                          'Browse Yaoundé\'s top attractions — from Mont Fébé to Mefou National Park — with photos, ratings, costs, and tags.',
+                      title: l10n.homeFeatureDiscoverTitle,
+                      description: l10n.homeFeatureDiscoverDesc,
                       onTap: () => widget.onSwitchTab?.call(1),
                     ),
                     _FeatureCard(
                       icon: Icons.star,
-                      title: 'Get Personalized Recommendations',
-                      description:
-                          'Let our smart matching engine suggest destinations based on your interests and preferences.',
+                      title: l10n.homeFeatureRecommendTitle,
+                      description: l10n.homeFeatureRecommendDesc,
                       onTap: () => widget.onSwitchTab?.call(2),
                     ),
                     _FeatureCard(
                       icon: Icons.map,
-                      title: 'Plan & Manage Itineraries',
-                      description:
-                          'Create custom trip itineraries, add destinations, set dates, and keep all your travel plans in one place.',
+                      title: l10n.homeFeaturePlanTitle,
+                      description: l10n.homeFeaturePlanDesc,
                       onTap: () => widget.onSwitchTab?.call(4),
                     ),
                     _FeatureCard(
                       icon: Icons.favorite,
-                      title: 'Save Favorite Locations',
-                      description:
-                          'Tap the heart icon on any destination to bookmark it and build your personal travel list for easy access later.',
+                      title: l10n.homeFeatureSaveTitle,
+                      description: l10n.homeFeatureSaveDesc,
                       onTap: () => widget.onSwitchTab?.call(2),
                     ),
                   ],
@@ -348,7 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
                   child: Text(
-                    'Featured Destinations',
+                    l10n.featuredDestinations,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),

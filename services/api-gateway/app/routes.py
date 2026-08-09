@@ -98,6 +98,21 @@ def verify():
     return _proxy("POST", f"{USER_SERVICE_URL}/verify")
 
 
+@gateway_bp.route("/resend-code", methods=["POST"])
+def resend_code():
+    return _proxy("POST", f"{USER_SERVICE_URL}/resend-code")
+
+
+@gateway_bp.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    return _proxy("POST", f"{USER_SERVICE_URL}/forgot-password")
+
+
+@gateway_bp.route("/reset-password", methods=["POST"])
+def reset_password():
+    return _proxy("POST", f"{USER_SERVICE_URL}/reset-password")
+
+
 @gateway_bp.route("/auth/google", methods=["POST"])
 def google_auth():
     return _proxy("POST", f"{USER_SERVICE_URL}/auth/google")

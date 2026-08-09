@@ -18,6 +18,7 @@ from flask import Blueprint, request, jsonify, current_app, g
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.auth_middleware import token_required
+from app.email_utils import send_email
 from app.models import (
     get_user_by_username,
     get_user_by_email,
@@ -29,6 +30,9 @@ from app.models import (
     get_user_by_id,
     get_favorites_for_user,
     toggle_favorite_for_user,
+    get_user_by_username_or_email,
+    set_reset_code,
+    verify_reset_code_and_update_password,
 )
 
 user_bp = Blueprint("user", __name__)
@@ -66,18 +70,7 @@ def decode_token(token: str, secret: str) -> dict:
 
 @user_bp.route("/register", methods=["POST"])
 def register():
-    """Register a new user with email verification.
-
-    Expected JSON body:
-        { "username": "alice", "email": "alice@example.com",
-          "password": "s3cr3t", "preferences": ["food", "nature"] }
-
-    Creates an unverified user and generates a 6-digit verification code that
-    is returned in the response (for local/dev) and would be emailed in
-    production. User must call POST /verify to activate their account.
-
-    Returns 201 on success, 400 on validation errors, 409 if exists.
-    """
+    """Register a new user with email verification."""
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
@@ -99,26 +92,30 @@ def register():
         username, password_hash, email, preferences,
         verification_code=verification_code,
     )
-    # In production, email the code here. For local dev we return it so the
-    # flow can be tested end-to-end.
+
+    send_email(
+        to_email=email,
+        subject="Yaounde.Trip — Verify Your Email",
+        body_text=(
+            f"Hello {username},\n\n"
+            f"Thank you for registering with Yaounde.Trip!\n\n"
+            f"Your 6-digit email verification code is: {verification_code}\n\n"
+            f"Please enter this code in the app to activate your account and start exploring.\n\n"
+            f"Happy travels,\nThe Yaounde.Trip Team"
+        ),
+    )
+
     return jsonify({
         "message": "user registered successfully. Please verify your email.",
         "username": username,
         "email": email,
-        "verification_code": verification_code,
         "is_verified": False,
     }), 201
 
 
 @user_bp.route("/verify", methods=["POST"])
 def verify():
-    """Verify a user's email address with the code sent at registration.
-
-    Expected JSON body:
-        { "username": "alice", "code": "123456" }
-
-    Returns 200 on success, 400 on bad code.
-    """
+    """Verify a user's email address with the code sent at registration."""
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     code = data.get("code", "").strip()
@@ -131,38 +128,136 @@ def verify():
     return jsonify({"error": "invalid verification code"}), 400
 
 
+@user_bp.route("/resend-code", methods=["POST"])
+def resend_code():
+    """Resend a 6-digit verification code to the user's email."""
+    data = request.get_json(silent=True) or {}
+    identifier = data.get("username", "").strip() or data.get("email", "").strip()
+    if not identifier:
+        return jsonify({"error": "username or email is required"}), 400
+
+    user = get_user_by_username_or_email(identifier)
+    if not user:
+        return jsonify({"error": "user not found"}), 404
+    if user.get("is_verified"):
+        return jsonify({"message": "user is already verified"}), 200
+
+    verification_code = "".join(random.choices(string.digits, k=6))
+    set_verification_code(user["username"], verification_code)
+
+    send_email(
+        to_email=user["email"],
+        subject="Yaounde.Trip — New Email Verification Code",
+        body_text=(
+            f"Hello {user['username']},\n\n"
+            f"Your new 6-digit email verification code is: {verification_code}\n\n"
+            f"Please enter this code in the app to activate your account."
+        ),
+    )
+    return jsonify({"message": "Verification code sent to your email.", "username": user["username"]}), 200
+
+
+@user_bp.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    """Send a password reset code to the user's registered email."""
+    data = request.get_json(silent=True) or {}
+    identifier = data.get("email", "").strip() or data.get("username", "").strip()
+    if not identifier:
+        return jsonify({"error": "username or email is required"}), 400
+
+    user = get_user_by_username_or_email(identifier)
+    if not user:
+        return jsonify({
+            "message": "If an account exists with that username or email, a reset code has been sent to your email."
+        }), 200
+
+    reset_code = "".join(random.choices(string.digits, k=6))
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+    set_reset_code(user["username"], reset_code, expires_at.isoformat())
+
+    send_email(
+        to_email=user["email"],
+        subject="Yaounde.Trip — Password Reset Code",
+        body_text=(
+            f"Hello {user['username']},\n\n"
+            f"We received a request to reset your password for Yaounde.Trip.\n\n"
+            f"Your 6-digit password reset code is: {reset_code}\n\n"
+            f"This code will expire in 1 hour. If you did not request a password reset, please ignore this email."
+        ),
+    )
+    return jsonify({
+        "message": "If an account exists with that username or email, a reset code has been sent to your email."
+    }), 200
+
+
+@user_bp.route("/reset-password", methods=["POST"])
+def reset_password():
+    """Reset user password using the verification code sent to their email."""
+    data = request.get_json(silent=True) or {}
+    identifier = data.get("username", "").strip() or data.get("email", "").strip()
+    code = data.get("code", "").strip()
+    new_password = data.get("password", "")
+
+    if not identifier or not code or not new_password:
+        return jsonify({"error": "username/email, reset code, and new password are required"}), 400
+
+    password_hash = generate_password_hash(new_password)
+    if verify_reset_code_and_update_password(identifier, code, password_hash):
+        return jsonify({"message": "Password reset successfully. You can now log in with your new password."}), 200
+
+    return jsonify({"error": "Invalid or expired password reset code"}), 400
+
+
 @user_bp.route("/auth/google", methods=["POST"])
 def google_auth():
-    """Authenticate via a Google ID token.
+    """Authenticate via a Google ID token or Access token.
 
     Expected JSON body:
-        { "id_token": "<google-issued-id-token>" }
+        { "id_token": "<google-issued-id-token>", "access_token": "<google-access-token>" }
 
-    The token is verified against Google's tokeninfo endpoint. If the user
-    doesn't exist locally, a new (auto-verified) account is created. Returns
+    The token is verified against Google's tokeninfo or userinfo endpoint. If the
+    user doesn't exist locally, a new (auto-verified) account is created. Returns
     a JWT on success.
     """
     data = request.get_json(silent=True) or {}
     id_token = data.get("id_token", "").strip()
-    if not id_token:
-        return jsonify({"error": "id_token is required"}), 400
+    access_token = data.get("access_token", "").strip()
 
-    # Verify the Google ID token against Google's public endpoint.
-    try:
-        resp = requests.get(
-            "https://oauth2.googleapis.com/tokeninfo",
-            params={"id_token": id_token},
-            timeout=10,
-        )
-        if resp.status_code != 200:
-            return jsonify({"error": "invalid Google token"}), 401
-        info = resp.json()
-    except requests.exceptions.RequestException:
-        return jsonify({"error": "could not verify Google token"}), 502
+    if not id_token and not access_token:
+        return jsonify({"error": "id_token or access_token is required"}), 400
 
-    email = info.get("email", "").strip()
+    email = None
+
+    # Option 1: Try verifying ID token via tokeninfo
+    if id_token:
+        try:
+            resp = requests.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"id_token": id_token},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                info = resp.json()
+                email = info.get("email", "").strip()
+        except requests.exceptions.RequestException:
+            pass
+
+    # Option 2: Try verifying Access token via userinfo
+    if not email and access_token:
+        try:
+            resp = requests.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                info = resp.json()
+                email = info.get("email", "").strip()
+        except requests.exceptions.RequestException:
+            pass
+
     if not email:
-        return jsonify({"error": "Google account has no email"}), 400
+        return jsonify({"error": "Could not verify Google token with Google servers"}), 401
 
     # Derive a stable username from the verified email.
     username = email.split("@")[0]
@@ -185,7 +280,7 @@ def login():
     Expected JSON body:
         { "username": "alice", "password": "s3cr3t" }
 
-    Returns 200 with token on success, 400/401 on failure.
+    Returns 200 with token on success, 400/401/403 on failure.
     """
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -194,12 +289,19 @@ def login():
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    user = get_user_by_username(username)
+    user = get_user_by_username_or_email(username)
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
 
-    token = create_token(username, current_app.config["SECRET_KEY"])
-    return jsonify({"token": token}), 200
+    if not user.get("is_verified", False):
+        return jsonify({
+            "error": "Please verify your email address before logging in.",
+            "is_verified": False,
+            "username": user["username"],
+        }), 403
+
+    token = create_token(user["username"], current_app.config["SECRET_KEY"])
+    return jsonify({"token": token, "username": user["username"]}), 200
 
 
 @user_bp.route("/favorites", methods=["GET"])
@@ -265,8 +367,3 @@ def internal_get_user_preferences(user_id):
     except (json.JSONDecodeError, TypeError):
         prefs = []
     return jsonify({"user_id": user_id, "username": user["username"], "preferences": prefs}), 200
-
-
-
-
-

@@ -77,54 +77,58 @@ class ApiService {
 
   // Token management
   //
-  // NOTE: FlutterSecureStorage on web can hang during WebCrypto / IndexedDB
-  // plugin initialization. Every secure-storage call is therefore bounded
-  // with a short timeout so a frozen storage backend can never block the
-  // UI (startup auth check, login, logout, etc.). On timeout we fall back
-  // to the SharedPreferences copy (kept in sync on web) or null, so the
-  // app always stays responsive.
+  // On web we use SharedPreferences (localStorage) DIRECTLY and skip
+  // flutter_secure_storage entirely. The secure-storage plugin's web
+  // implementation initializes WebCrypto / IndexedDB which can throw
+  // "TypeError: Failed to fetch" during app startup, blanking the whole
+  // screen before the first frame renders. localStorage is the safe,
+  // lightweight choice for web. On native (Android/iOS/desktop) we keep
+  // the secure storage plugin.
   Future<void> saveToken(String token) async {
-    try {
-      await _secureStorage
-          .write(key: _tokenKey, value: token)
-          .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
-    } catch (_) {}
     if (kIsWeb) {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_prefsTokenKey, token);
       } catch (_) {}
+      return;
     }
+    try {
+      await _secureStorage
+          .write(key: _tokenKey, value: token)
+          .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
+    } catch (_) {}
   }
 
   Future<String?> getToken() async {
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        return prefs.getString(_prefsTokenKey);
+      } catch (_) {}
+      return null;
+    }
     try {
       final token = await _secureStorage
           .read(key: _tokenKey)
           .timeout(const Duration(milliseconds: 1500), onTimeout: () => null);
       if (token != null) return token;
     } catch (_) {}
-    if (kIsWeb) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        return prefs.getString(_prefsTokenKey);
-      } catch (_) {}
-    }
     return null;
   }
 
   Future<void> deleteToken() async {
-    try {
-      await _secureStorage
-          .delete(key: _tokenKey)
-          .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
-    } catch (_) {}
     if (kIsWeb) {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(_prefsTokenKey);
       } catch (_) {}
+      return;
     }
+    try {
+      await _secureStorage
+          .delete(key: _tokenKey)
+          .timeout(const Duration(milliseconds: 1500), onTimeout: () {});
+    } catch (_) {}
   }
 
   // Auth
@@ -148,6 +152,24 @@ class ApiService {
     final body = _decode(response);
     if (response.statusCode == 201) return body;
     throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// Returns the verification code from the register response when the
+  /// backend is in dev mode (no SMTP configured). Empty string otherwise.
+  Future<String> registerAndGetCode({
+    required String username,
+    required String email,
+    required String password,
+    required List<String> preferences,
+  }) async {
+    final body = await register(
+      username: username,
+      email: email,
+      password: password,
+      preferences: preferences,
+    );
+    final code = body['verification_code'];
+    return code is String ? code : '';
   }
 
   /// Verify a freshly-registered user's email with the 6-digit code.
@@ -177,6 +199,16 @@ class ApiService {
     final body = _decode(response);
     if (response.statusCode == 200) return body;
     throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// Resend the code and return it when the backend is in dev mode
+  /// (no SMTP configured). Empty string otherwise.
+  Future<String> resendVerificationCodeAndGet({
+    required String identifier,
+  }) async {
+    final body = await resendVerificationCode(identifier);
+    final code = body['verification_code'];
+    return code is String ? code : '';
   }
 
   /// Request a password reset code to be sent via email.
@@ -218,7 +250,9 @@ class ApiService {
     final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.googleAuth}');
     final bodyData = <String, String>{};
     if (idToken != null && idToken.isNotEmpty) bodyData['id_token'] = idToken;
-    if (accessToken != null && accessToken.isNotEmpty) bodyData['access_token'] = accessToken;
+    if (accessToken != null && accessToken.isNotEmpty) {
+      bodyData['access_token'] = accessToken;
+    }
 
     final response = await _post(
       uri,

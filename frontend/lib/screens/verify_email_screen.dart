@@ -77,14 +77,26 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _error = null;
     });
     try {
-      await ApiService().resendVerificationCode(widget.username);
+      final newCode = await ApiService().resendVerificationCodeAndGet(
+        identifier: widget.username,
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('A new 6-digit code has been sent to your email!'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (newCode.isNotEmpty) {
+          _codeCtrl.text = newCode;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('A new code was generated: $newCode'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('A new 6-digit code has been sent to your email!'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);

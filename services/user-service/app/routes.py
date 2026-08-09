@@ -105,12 +105,23 @@ def register():
         ),
     )
 
-    return jsonify({
+# In dev mode (no SMTP configured) the code is only printed to the logs,
+    # so include it in the response for the app to show the user directly.
+    smtp_configured = bool(
+        os.environ.get("SMTP_SERVER", "").strip()
+        and os.environ.get("SMTP_USERNAME", "").strip()
+        and os.environ.get("SMTP_PASSWORD", "").strip()
+    )
+    response = {
         "message": "user registered successfully. Please verify your email.",
         "username": username,
         "email": email,
         "is_verified": False,
-    }), 201
+    }
+    if not smtp_configured:
+        response["verification_code"] = verification_code
+
+    return jsonify(response), 201
 
 
 @user_bp.route("/verify", methods=["POST"])
@@ -154,7 +165,19 @@ def resend_code():
             f"Please enter this code in the app to activate your account."
         ),
     )
-    return jsonify({"message": "Verification code sent to your email.", "username": user["username"]}), 200
+# In dev mode (no SMTP) the code is only in the logs; expose it to the app.
+    smtp_configured = bool(
+        os.environ.get("SMTP_SERVER", "").strip()
+        and os.environ.get("SMTP_USERNAME", "").strip()
+        and os.environ.get("SMTP_PASSWORD", "").strip()
+    )
+    response = {
+        "message": "Verification code sent to your email.",
+        "username": user["username"],
+    }
+    if not smtp_configured:
+        response["verification_code"] = verification_code
+    return jsonify(response), 200
 
 
 @user_bp.route("/forgot-password", methods=["POST"])

@@ -65,7 +65,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      await AuthProvider().register(
+      final code = await AuthProvider().registerAndGetCode(
         _usernameCtrl.text.trim(),
         _emailCtrl.text.trim(),
         _passwordCtrl.text,
@@ -77,7 +77,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           MaterialPageRoute(
             builder: (_) => VerifyEmailScreen(
               username: _usernameCtrl.text.trim(),
-              initialCode: '',
+              initialCode: code,
               onLocaleChanged: widget.onLocaleChanged,
             ),
           ),

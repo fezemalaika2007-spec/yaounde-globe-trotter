@@ -55,6 +55,22 @@ class AuthProvider extends ChangeNotifier {
     // Do NOT auto-login — user should log in manually.
   }
 
+  /// Register and return the email verification code shown to the user.
+  /// In production (SMTP configured) the code is emailed and this returns ''.
+  Future<String> registerAndGetCode(
+    String username,
+    String email,
+    String password,
+    List<String> preferences,
+  ) async {
+    return await _api.registerAndGetCode(
+      username: username,
+      email: email,
+      password: password,
+      preferences: preferences,
+    );
+  }
+
   /// Verify the user's email with the code returned at registration.
   Future<void> verifyEmail(String username, String code) async {
     await _api.verifyEmail(username: username, code: code);

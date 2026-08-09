@@ -49,3 +49,11 @@ flutter analyze
 > Part of the permanent app-wide suite. Any change to the destination detail
 > view or Recommendations screen must keep these tests green.
 </content>
+
+
+cd frontend
+flutter build web
+cd build/web
+python -m http.server 8080
+# open http://localhost:8080/
+

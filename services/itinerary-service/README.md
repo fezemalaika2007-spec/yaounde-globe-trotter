@@ -1,38 +1,30 @@
 # Itinerary Service
 
-Manages travel itineraries for the GlobeTrotter Yaoundé travel assistant:
-create, list, scoped to the authenticated user, with JWT auth.
+The **Itinerary Service** manages creation, updates, listing, and deletion of custom travel itineraries for registered users.
 
-## Database
+## Port & Base Endpoint
+- **Port**: `5002`
+- **Base URL**: `http://localhost:5002`
 
-The Itinerary Service connects to its own online PostgreSQL database,
-configured via the `DATABASE_URL` environment variable (never hardcoded,
-never committed). Tables are created automatically on first run via
-`init_db()`.
+## Key Capabilities
+- **JWT Authentication & Context**: Extracts `user_id` strictly from JWT authorization headers (`g.current_user['id']`), ensuring data isolation per user.
+- **Database Connection Pooling**: Utilizes `ThreadedConnectionPool` (1-15 connections) with explicit connection release handlers.
+- **SQL Indexes**: Optimized with `idx_itineraries_username` and `idx_itineraries_user_id`.
+- **Full CRUD Support**: Supports `GET`, `POST`, `PUT`, and `DELETE` endpoints for itinerary entities.
 
-## Running the service
+## API Routes
+- `GET /itineraries`: Retrieves all itineraries created by the authenticated user.
+- `POST /itineraries`: Creates a new itinerary for the authenticated user.
+- `PUT /itineraries/<id>`: Updates title, dates, destinations list, or notes for an existing itinerary owned by the user.
+- `DELETE /itineraries/<id>`: Deletes an itinerary owned by the user.
 
-```bash
-python -m app.main
-```
-
-## Running the tests
-
-The itinerary service has its own pytest suite (`tests/test_itinerary_service.py`)
-covering auth guards, creation validation, per-user scoping, and internal
-by-user routes.
-
-Run the full suite:
+## Running Locally & Testing
 
 ```bash
-cd services/itinerary-service
-python -m pytest tests/ -q
+# Run service
+pip install -r requirements.txt
+python run.py
+
+# Run test suite
+python -m pytest
 ```
-
-## Test command summary
-
-| What                    | Command                      |
-|-------------------------|------------------------------|
-| Full itinerary suite    | `python -m pytest tests/ -q` |
-
-> Part of the permanent app-wide suite. Keep green on any itinerary change.

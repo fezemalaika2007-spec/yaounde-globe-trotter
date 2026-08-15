@@ -4,15 +4,10 @@
 # Each service connects to its own online PostgreSQL database (Neon),
 # configured via the DATABASE_URL environment variable. No local database
 # containers are used — the databases live online.
-#
-# Set these in a .env file (never committed):
-#   DATABASE_URL=postgresql://<user>:<password>@<host>/<dbname>?sslmode=require
-#   FOURSQUARE_API_KEY=<your_foursquare_key>
 
 services:
 
   # --- User Service (port 5001) ---
-  # Owns: user registration, login, JWT generation, user preferences
   user-service:
     build: ./user-service
     container_name: user-service
@@ -21,13 +16,17 @@ services:
       - "5001:5001"
     environment:
       - PORT=5001
-      - SECRET_KEY=${SECRET_KEY:-globetrotter-secret-change-in-prod}
+      - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
       - DATABASE_URL=${USER_DATABASE_URL:-${DATABASE_URL}}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - globetrotter-net
 
   # --- Itinerary Service (port 5002) ---
-  # Owns: itinerary CRUD, user-specific itinerary lists
   itinerary-service:
     build: ./itinerary-service
     container_name: itinerary-service
@@ -36,14 +35,17 @@ services:
       - "5002:5002"
     environment:
       - PORT=5002
-      - SECRET_KEY=${SECRET_KEY:-globetrotter-secret-change-in-prod}
+      - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
       - DATABASE_URL=${ITINERARY_DATABASE_URL:-${DATABASE_URL}}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5002/').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - globetrotter-net
 
   # --- Recommendation Service (port 5003) ---
-  # Owns: destinations (Foursquare-driven), ratings, recommendations
-  # Has outbound internet access for Foursquare API calls
   recommendation-service:
     build: ./recommendation-service
     container_name: recommendation-service
@@ -52,16 +54,19 @@ services:
       - "5003:5003"
     environment:
       - PORT=5003
-      - SECRET_KEY=${SECRET_KEY:-globetrotter-secret-change-in-prod}
+      - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
       - DATABASE_URL=${RECOMMENDATION_DATABASE_URL:-${DATABASE_URL}}
       - FOURSQUARE_API_KEY=${FOURSQUARE_API_KEY}
       - USER_SERVICE_URL=http://user-service:5001
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - globetrotter-net
 
   # --- API Gateway (port 5000) ---
-  # Single public entry point. Routes requests to the correct service.
-  # Contains NO business logic.
   api-gateway:
     build: ./api-gateway
     container_name: api-gateway
@@ -73,9 +78,12 @@ services:
       - ITINERARY_SERVICE_URL=http://itinerary-service:5002
       - RECOMMENDATION_SERVICE_URL=http://recommendation-service:5003
     depends_on:
-      - user-service
-      - itinerary-service
-      - recommendation-service
+      user-service:
+        condition: service_healthy
+      itinerary-service:
+        condition: service_healthy
+      recommendation-service:
+        condition: service_healthy
     networks:
       - globetrotter-net
 

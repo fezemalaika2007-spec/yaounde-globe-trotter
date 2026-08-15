@@ -162,3 +162,10 @@ def sync_destinations():
 def itineraries():
     method = request.method
     return _proxy(method, f"{ITINERARY_SERVICE_URL}/itineraries")
+
+
+@gateway_bp.route("/itineraries/<itinerary_id>", methods=["PUT", "DELETE"])
+def itinerary_detail(itinerary_id):
+    method = request.method
+    return _proxy(method, f"{ITINERARY_SERVICE_URL}/itineraries/{itinerary_id}")
+

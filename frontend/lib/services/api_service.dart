@@ -75,6 +75,21 @@ class ApiService {
     return _guard(http.post(uri, headers: headers, body: body));
   }
 
+  Future<http.Response> _put(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    return _guard(http.put(uri, headers: headers, body: body));
+  }
+
+  Future<http.Response> _delete(
+    Uri uri, {
+    Map<String, String>? headers,
+  }) {
+    return _guard(http.delete(uri, headers: headers));
+  }
+
   // Token management
   //
   // On web we use SharedPreferences (localStorage) DIRECTLY and skip
@@ -522,6 +537,45 @@ class ApiService {
     );
     final body = _decode(response);
     if (response.statusCode == 201) return body as Map<String, dynamic>;
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// PUT /itineraries/[id] — update an existing itinerary.
+  Future<Map<String, dynamic>> updateItinerary({
+    required String id,
+    required String title,
+    required List<String> destinations,
+    required String startDate,
+    required String endDate,
+    String notes = '',
+  }) async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.itineraries}/$id');
+    final response = await _put(
+      uri,
+      headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'title': title,
+        'destinations': destinations,
+        'start_date': startDate,
+        'end_date': endDate,
+        'notes': notes,
+      }),
+    );
+    final body = _decode(response);
+    if (response.statusCode == 200) return body as Map<String, dynamic>;
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  /// DELETE /itineraries/[id] — remove an itinerary.
+  Future<void> deleteItinerary({required String id}) async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.itineraries}/$id');
+    final response = await _delete(uri, headers: _authHeaders(token));
+    if (response.statusCode == 200 || response.statusCode == 204) return;
+    final body = _decode(response);
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 

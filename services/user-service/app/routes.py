@@ -80,8 +80,16 @@ def register():
     if not username or not password or not email:
         return jsonify({"error": "username, email and password are required"}), 400
 
+    import re
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        return jsonify({"error": "please enter a valid email address"}), 400
+
+    if len(password) < 6:
+        return jsonify({"error": "password must be at least 6 characters long"}), 400
+
     if get_user_by_username(username):
         return jsonify({"error": "username already exists"}), 409
+
     if get_user_by_email(email):
         return jsonify({"error": "email already registered"}), 409
 

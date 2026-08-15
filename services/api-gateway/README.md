@@ -1,51 +1,22 @@
-# API Gateway
+# API Gateway Service
 
-Single public entry point for the GlobeTrotter Yaoundé travel assistant. It
-contains **no business logic** — it proxies requests to the User, Itinerary,
-and Recommendation services. Behind the gateway, each backend service owns its
-own online PostgreSQL database (configured via `DATABASE_URL`), but the
-gateway itself only routes requests and is database-agnostic.
+The **API Gateway** serves as the unified entry point for all frontend requests in the GlobeTrotter ecosystem. It handles request routing, authorization token pass-through, CORS headers, and reverse proxying to underlying microservices.
 
-## Running the service
+## Port & Base Endpoint
+- **Port**: `5000`
+- **Base URL**: `http://localhost:5000`
 
-```bash
-python -m app.main
-```
+## Proxy Mappings
+- `/register`, `/login`, `/verify`, `/resend-code`, `/forgot-password`, `/reset-password`, `/auth/google`, `/preferences`, `/favorites` → **User Service** (`port 5001`)
+- `/itineraries` (`GET`, `POST`, `PUT`, `DELETE`) → **Itinerary Service** (`port 5002`)
+- `/destinations`, `/search`, `/recommendations` → **Recommendation Service** (`port 5003`)
 
-## Running the tests
-
-The API Gateway has two pytest suites:
-
-1. **Proxy routing** (`tests/test_api_gateway.py`) — verifies the gateway
-   forwards each route to the correct backend service with the right method,
-   headers, query params, and JSON body; health check; and 503 on
-   unreachable services.
-2. **Consolidated integration journey** (`tests/test_integration_journey.py`)
-   — runs the **full user journey through the gateway**:
-   register → login → search/filter destinations → view a destination →
-   submit a rating → view recommendations → create an itinerary → list
-   itineraries. It mocks the backend microservices to respond as real
-   services would, and asserts the gateway orchestrates the whole flow
-   correctly.
-
-Run the full suite (both files):
+## Running Locally
 
 ```bash
-cd services/api-gateway
-python -m pytest tests/ -q
+pip install -r requirements.txt
+python run.py
 ```
 
-Run just the integration journey:
-
-```bash
-python -m pytest tests/test_integration_journey.py -q
-```
-
-## Test command summary
-
-| What                    | Command                                        |
-|-------------------------|------------------------------------------------|
-| Full gateway suite      | `python -m pytest tests/ -q`                   |
-| Integration journey     | `python -m pytest tests/test_integration_journey.py -q` |
-
-> Part of the permanent app-wide suite. Keep green on any routing change.
+## Healthcheck
+`GET http://localhost:5000/health` returns status code `200` with status `healthy`.

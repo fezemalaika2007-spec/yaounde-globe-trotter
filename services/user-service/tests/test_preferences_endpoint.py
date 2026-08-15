@@ -38,12 +38,21 @@ def client():
         yield client
 
 
-def _register_and_login(client, username="alice", password="pass"):
-    """Helper: register + login, return the JWT token."""
-    client.post(
+def _register_and_login(client, username="alice", password="mypassword"):
+    """Helper: register + verify email + login, return the JWT token."""
+    reg_res = client.post(
         "/register",
-        json={"username": username, "password": password, "preferences": ["food", "nature"]},
+        json={
+            "username": username,
+            "email": f"{username}@example.com",
+            "password": password,
+            "preferences": ["food", "nature"],
+        },
     )
+    code = reg_res.get_json().get("verification_code", "")
+    if code:
+        client.post("/verify", json={"username": username, "code": code})
+
     resp = client.post("/login", json={"username": username, "password": password})
     return resp.get_json()["token"]
 

@@ -16,7 +16,11 @@ def create_app():
     # Online PostgreSQL connection string (from env, never hardcoded).
     app.config["DATABASE"] = os.environ.get("DATABASE_URL", "")
 
+    from app.models import init_db
+    init_db(app)
+
     from app.routes import recommendation_bp
     app.register_blueprint(recommendation_bp)
 
     return app
+

@@ -1,37 +1,32 @@
 # User Service
 
-Manages user accounts, authentication (JWT), preferences and favorites for
-the GlobeTrotter Yaoundé travel assistant.
+The **User Service** manages user authentication, security, user interest profiles, and bookmarked favorite places.
 
-## Database
+## Port & Base Endpoint
+- **Port**: `5001`
+- **Base URL**: `http://localhost:5001`
 
-The User Service connects to its own online PostgreSQL database, configured
-via the `DATABASE_URL` environment variable (never hardcoded, never committed).
-Tables are created automatically on first run via `init_db()`.
+## Key Capabilities
+- **Authentication**: Salted `bcrypt` password hashing, email format regex validation, minimum password length enforcement (>= 6 characters).
+- **JWT Issuance**: Secure token generation with configurable `SECRET_KEY`.
+- **Database Connection Pooling**: Built with `ThreadedConnectionPool` (1-15 connections) and `release_connection` safety guards.
+- **SQL Indexes**: Includes B-tree indexes `idx_users_username`, `idx_users_email`, and `idx_favorites_user_id`.
 
-## Running the service
+## API Routes
+- `POST /register`: Registers new user accounts with interest tags.
+- `POST /login`: Authenticates credentials and returns a signed JWT.
+- `GET /preferences`: Fetches user interest profile tags.
+- `POST /preferences`: Updates user interest profile tags.
+- `GET /favorites`: Returns all favorited destination names for the authenticated user.
+- `POST /favorites`: Toggles favorite state for a destination.
+
+## Running Locally & Testing
 
 ```bash
-python -m app.main
+# Run service
+pip install -r requirements.txt
+python run.py
+
+# Run test suite
+python -m pytest
 ```
-
-## Running the tests
-
-The user service has its own pytest suite (`tests/test_user_service.py`)
-covering registration, login, duplicate-username handling, missing-field
-validation, internal preferences retrieval, and CORS headers.
-
-Run the full suite:
-
-```bash
-cd services/user-service
-python -m pytest tests/ -q
-```
-
-## Test command summary
-
-| What                | Command                      |
-|---------------------|------------------------------|
-| Full user suite     | `python -m pytest tests/ -q` |
-
-> Part of the permanent app-wide suite. Keep green on any auth/user change.

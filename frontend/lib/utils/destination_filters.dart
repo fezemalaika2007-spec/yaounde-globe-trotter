@@ -45,22 +45,13 @@ bool hasGoodName(String name) {
   return !kBadNamePatterns.any(normalized.contains);
 }
 
-/// Validates a candidate image URL. Requires an http(s) URL with a
-/// filename-ish path (extension) so we filter out empty/broken values.
+/// Validates a candidate image URL. Accepts any http(s) URL string.
 bool isValidImageUrl(String image) {
   final trimmed = image.trim();
   if (trimmed.isEmpty) return false;
-  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-    return false;
-  }
-  // Remove query/fragment before checking for an image-looking extension.
-  final withoutQuery = trimmed.split('?').first.split('#').first;
-  final hasImageExtension = RegExp(
-    r'\.(jpe?g|png|gif|webp|bmp|svg)(/|$)',
-    caseSensitive: false,
-  ).hasMatch(withoutQuery);
-  return hasImageExtension;
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://');
 }
+
 
 /// True when the destination references Yaoundé / Cameroon somewhere
 /// (area, city, name and/or tags).

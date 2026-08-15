@@ -7,7 +7,9 @@ import '../services/theme_provider.dart';
 import '../utils/destination_filters.dart';
 import '../widgets/destination_grid.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/shimmer_loading.dart';
 import 'home_screen.dart';
+
 import 'profile_screen.dart';
 import 'recommendations_screen.dart';
 import 'itineraries_screen.dart';
@@ -278,7 +280,7 @@ class _MainShellState extends State<MainShell> {
             ),
           );
         } else {
-          // --- Narrow layout: drawer-based navigation (unchanged) ---
+          // --- Narrow layout: bottom navigation bar + drawer ---
           return Scaffold(
             appBar: AppBar(
               title: Text('Yaounde.Trip · ${titles[_currentIndex]}'),
@@ -286,8 +288,20 @@ class _MainShellState extends State<MainShell> {
             ),
             drawer: _buildDrawer(l10n, navItems),
             body: IndexedStack(index: _currentIndex, children: _stackChildren),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (idx) => _switchTo(idx),
+              destinations: navItems.map((item) {
+                return NavigationDestination(
+                  icon: Icon(item.icon),
+                  selectedIcon: Icon(item.selectedIcon),
+                  label: item.label,
+                );
+              }).toList(),
+            ),
           );
         }
+
       },
     );
   }
@@ -550,6 +564,9 @@ class _DestinationsTabState extends State<_DestinationsTab> {
   final _costCtrl = TextEditingController();
   final _searchCtrl = TextEditingController();
 
+  String _selectedCategory = 'All';
+  String _sortBy = 'Featured';
+
   List<dynamic> _allDestinations = [];
   List<dynamic> _filteredDestinations = [];
   List<dynamic> _liveResults = [];
@@ -558,11 +575,18 @@ class _DestinationsTabState extends State<_DestinationsTab> {
   String? _error;
   Timer? _searchDebounce;
 
+  static const List<String> _categories = [
+    'All',
+    'Nature & Parks',
+    'Culture & History',
+    'Food & Dining',
+    'Shopping',
+    'Adventure',
+  ];
+
   @override
   void initState() {
     super.initState();
-    // Local filtering is immediate; live (internet) search is debounced so
-    // we don't hammer the backend on every keystroke.
     _searchCtrl.addListener(_onSearchChanged);
     _fetch();
   }
@@ -607,8 +631,6 @@ class _DestinationsTabState extends State<_DestinationsTab> {
         });
       }
     } catch (_) {
-      // Live search is a convenience — failures should never block browsing
-      // the local destination list.
       if (mounted) {
         setState(() {
           _liveResults = [];
@@ -654,16 +676,12 @@ class _DestinationsTabState extends State<_DestinationsTab> {
       setState(() {});
       return;
     }
-    // When a search query is typed, also perform a live internet search on
-    // the backend. Merge local results with live Overpass results.
     _searchLive(query);
   }
 
   Future<void> _searchLive(String query) async {
     try {
       final liveResults = await _api.searchDestinations(query, limit: 12);
-      // Merge local + live results, deduplicate by normalized key from
-      // the shared destination_filters helpers.
       final merged = List<Map<String, dynamic>>.from(
         _allDestinations.cast<Map<String, dynamic>>(),
       );
@@ -679,7 +697,6 @@ class _DestinationsTabState extends State<_DestinationsTab> {
           merged.add(live);
         }
       }
-      // Filter merged list by search query.
       _filteredDestinations = merged.where((d) {
         final name = (d['name'] ?? '').toString().toLowerCase();
         final desc = (d['description'] ?? '').toString().toLowerCase();
@@ -690,7 +707,6 @@ class _DestinationsTabState extends State<_DestinationsTab> {
       }).toList();
       setState(() {});
     } catch (_) {
-      // Fallback to local-only filtering if live search fails.
       _filteredDestinations = _allDestinations.where((d) {
         final name = (d['name'] ?? '').toString().toLowerCase();
         final desc = (d['description'] ?? '').toString().toLowerCase();
@@ -700,97 +716,148 @@ class _DestinationsTabState extends State<_DestinationsTab> {
     }
   }
 
-  /// Merged view: local filtered destinations first, then unique live
-  /// internet results appended. Live results are deduped against local ones
-  /// by [key] so the same place never appears twice.
   List<dynamic> get _visibleDestinations {
-    if (_liveResults.isEmpty) return _filteredDestinations;
-    final seenKeys = <String>{};
-    final merged = <dynamic>[];
-    for (final d in _filteredDestinations) {
-      if (d is! Map<String, dynamic>) continue;
-      final key = normalizeDestinationKey(d);
-      if (key.isNotEmpty) seenKeys.add(key);
-      merged.add(d);
+    final source = _liveResults.isEmpty ? _filteredDestinations : () {
+      final seenKeys = <String>{};
+      final merged = <dynamic>[];
+      for (final d in _filteredDestinations) {
+        if (d is! Map<String, dynamic>) continue;
+        final key = normalizeDestinationKey(d);
+        if (key.isNotEmpty) seenKeys.add(key);
+        merged.add(d);
+      }
+      for (final d in _liveResults) {
+        if (d is! Map<String, dynamic>) continue;
+        final key = normalizeDestinationKey(d);
+        if (key.isNotEmpty && seenKeys.contains(key)) continue;
+        if (key.isNotEmpty) seenKeys.add(key);
+        merged.add(d);
+      }
+      return merged;
+    }();
+
+    // 1. Filter by category
+    var result = source.where((d) {
+      if (d is! Map<String, dynamic>) return false;
+      if (_selectedCategory == 'All') return true;
+      final category = (d['category'] ?? '').toString().toLowerCase();
+      final tags = ((d['tags'] as List<dynamic>?) ?? []).map((t) => t.toString().toLowerCase()).toList();
+      final catTarget = _selectedCategory.toLowerCase();
+      return category.contains(catTarget) || tags.any((t) => catTarget.contains(t) || t.contains(catTarget));
+    }).toList();
+
+    // 2. Sort
+    if (_sortBy == 'Rating') {
+      result.sort((a, b) => ((b['average_rating'] ?? 0) as num).compareTo((a['average_rating'] ?? 0) as num));
+    } else if (_sortBy == 'Price') {
+      result.sort((a, b) => ((a['cost'] ?? 999999) as num).compareTo((b['cost'] ?? 999999) as num));
+    } else if (_sortBy == 'Name') {
+      result.sort((a, b) => (a['name'] ?? '').toString().compareTo(b['name'] ?? ''));
     }
-    for (final d in _liveResults) {
-      if (d is! Map<String, dynamic>) continue;
-      final key = normalizeDestinationKey(d);
-      if (key.isNotEmpty && seenKeys.contains(key)) continue;
-      if (key.isNotEmpty) seenKeys.add(key);
-      merged.add(d);
-    }
-    return merged;
+
+    return result;
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final query = _searchCtrl.text.trim();
+
     return Column(
       children: [
+        // Search input
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
           child: TextField(
             controller: _searchCtrl,
             decoration: InputDecoration(
               labelText: l10n.search,
-              hintText: 'Search by name or description...',
+              hintText: 'Search destinations in Yaoundé...',
               prefixIcon: const Icon(Icons.search),
+              suffixIcon: query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        _applyLocalFilters();
+                      },
+                    )
+                  : null,
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
           ),
         ),
+
+        // Category Filter Chips
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Row(
+            children: _categories.map((cat) {
+              final selected = _selectedCategory == cat;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: FilterChip(
+                  label: Text(cat),
+                  selected: selected,
+                  onSelected: (val) {
+                    setState(() => _selectedCategory = val ? cat : 'All');
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+
+        // Sorting & Filter bar
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           child: Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _tagCtrl,
-                  decoration: InputDecoration(
-                    labelText: l10n.tagFilter,
-                    hintText: 'e.g. nature',
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                  ),
+              Text(
+                'Sort by:',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _costCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: l10n.maxCost,
-                    hintText: 'e.g. 150',
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                  ),
+              DropdownButton<String>(
+                value: _sortBy,
+                isDense: true,
+                underline: const SizedBox.shrink(),
+                items: const [
+                  DropdownMenuItem(value: 'Featured', child: Text('Featured')),
+                  DropdownMenuItem(value: 'Rating', child: Text('Highest Rated')),
+                  DropdownMenuItem(value: 'Price', child: Text('Lowest Price')),
+                  DropdownMenuItem(value: 'Name', child: Text('Name A-Z')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _sortBy = val);
+                },
+              ),
+              const Spacer(),
+              if (_selectedCategory != 'All' || query.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _selectedCategory = 'All';
+                      _sortBy = 'Featured';
+                      _searchCtrl.clear();
+                      _applyLocalFilters();
+                    });
+                  },
+                  icon: const Icon(Icons.filter_alt_off, size: 16),
+                  label: const Text('Reset'),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                icon: const Icon(Icons.search),
-                onPressed: _fetch,
-                tooltip: l10n.search,
-              ),
             ],
           ),
         ),
+
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const ShimmerGrid(count: 6)
               : _error != null
               ? Center(
                   child: Column(
@@ -799,7 +866,7 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                       Icon(
                         Icons.cloud_off,
                         size: 48,
-                        color: Theme.of(context).colorScheme.error,
+                        color: theme.colorScheme.error,
                       ),
                       const SizedBox(height: 8),
                       Text(_error!, style: const TextStyle(color: Colors.red)),
@@ -835,10 +902,8 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                         icon: Icons.explore_outlined,
                         title: l10n.noDestinations,
                         message: query.isEmpty
-                            ? l10n.nothingHere
-                            : 'No places found locally. Keep typing to '
-                                  'search the internet for real Yaoundé '
-                                  'destinations.',
+                            ? 'No places found in this category.'
+                            : 'No places found locally. Keep typing to search online for real Yaoundé destinations.',
                         onAction: _fetch,
                         actionLabel: l10n.refresh,
                       ),
@@ -849,35 +914,9 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                   children: [
                     if (query.isNotEmpty && _liveSearching)
                       const LinearProgressIndicator(minHeight: 2),
-                    if (query.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 6, 12, 2),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.public, size: 16),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                _liveSearching
-                                    ? 'Searching the internet '
-                                          'for “$query”...'
-                                    : 'Showing local matches + live '
-                                          'internet results for “$query”',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     Expanded(
                       child: DestinationGrid(
-                        destinations: _visibleDestinations
-                            .cast<Map<String, dynamic>>(),
+                        destinations: _visibleDestinations.cast<Map<String, dynamic>>(),
                       ),
                     ),
                   ],
@@ -887,3 +926,4 @@ class _DestinationsTabState extends State<_DestinationsTab> {
     );
   }
 }
+

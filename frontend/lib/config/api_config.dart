@@ -1,5 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 /// API configuration for the GlobeTrotter backend.
 ///
@@ -33,10 +32,11 @@ class ApiConfig {
 
     // Android: the emulator route is localhost -> 10.0.2.2; physical
     // devices need a reachable LAN IP (override [manualBaseUrl]).
-    if (Platform.isAndroid) return _androidEmulatorHost;
+    if (defaultTargetPlatform == TargetPlatform.android) return _androidEmulatorHost;
 
     return _localHost;
   }
+
 
   /// If you run on a physical Android device (or a device that can't reach
   /// the default host), set this to your computer's LAN IP, e.g.

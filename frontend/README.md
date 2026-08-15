@@ -1,59 +1,43 @@
-# GlobeTrotter Frontend (Flutter)
+# GlobeTrotter Frontend Client
 
-Cross-platform Flutter client (web / mobile / desktop) for the GlobeTrotter
-Yaoundé travel assistant.
+The **GlobeTrotter Frontend** is a cross-platform client built with Flutter (Material 3), supporting Web, Mobile (Android/iOS), and Desktop (Windows/macOS/Linux).
 
-## Running the app
+## Key Features
 
+- 🎨 **Material 3 Travel Palette & Aesthetics**: Tailored warm terracotta & emerald palette (`#D9534F`, `#2E7D32`), customized card elevation, navigation bars, and rounded containers.
+- 📱 **Adaptive & Responsive Layout**:
+  - `<850px` (Mobile): Bottom `NavigationBar` and compact drawers.
+  - `>=850px` (Desktop/Web): Permanent left sidebar navigation (`_SidebarPanel`).
+- ⚡ **Shimmer Loading State**: Skeletal loading states (`ShimmerGrid`, `ShimmerLoading`) to prevent blank layouts.
+- 🖼️ **Full-Screen Gallery Lightbox**: Uncropped `BoxFit.contain` modal image viewer with page indicators and captions.
+- 📍 **Interactive Location Cards**: Real latitude/longitude coordinates display with quick Google Maps navigation launcher.
+- 🌍 **Multilingual Localization**: English and French in-app localization with persisted language preference.
+- 📝 **Itinerary Management**: Interactive creation, edition (PUT), and deletion (DELETE) dialogs with date pickers.
+- ⚡ **Web Safety**: Bypasses platform-specific filesystem blockers on Web and uses local storage fallback for JWT token storage.
+
+## Building and Running
+
+### Prerequisites
+- Flutter SDK `^3.19.0`
+- Chrome browser (for Web execution) or Android Emulator / Physical Device
+
+### Run Web Mode
 ```bash
-cd frontend
-flutter run -d chrome        # web
-# or
-flutter run                  # connected device / emulator
+flutter run -d chrome
 ```
 
-## Running the tests
-
-The frontend uses Flutter's built-in widget/unit test framework. The suite
-covers:
-
-- **App launch** (`test/widget_test.dart`)
-- **Destination filters & image dedup** (`test/destination_filters_test.dart`) —
-  name validation, image URL normalization, gallery dedup.
-- **Destination detail screen** (`test/destination_details_screen_test.dart`) —
-  gallery dedup, real-name captions, image detail / price display.
-- **Recommendations screen** (`test/recommendations_screen_test.dart`) —
-  categorized sections (Most Popular / Highly Rated / Recently Added /
-  Less Costly) render correctly.
-
-Run the full suite:
-
+### Run Android Mode
 ```bash
-cd frontend
-flutter test
+flutter run -d android
 ```
 
-Run the analyzer:
-
+### Static Analysis
 ```bash
 flutter analyze
 ```
 
-## Test command summary
-
-| What                 | Command            |
-|----------------------|--------------------|
-| Full frontend suite  | `flutter test`     |
-| Static analysis      | `flutter analyze`  |
-
-> Part of the permanent app-wide suite. Any change to the destination detail
-> view or Recommendations screen must keep these tests green.
-</content>
-
-
-cd frontend
-flutter build web
-cd build/web
-python -m http.server 8080
-# open http://localhost:8080/
-
+### Production Web Build
+```bash
+flutter build web --release
+```
+The production bundle will be generated under `build/web/`.

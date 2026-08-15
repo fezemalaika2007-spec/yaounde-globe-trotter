@@ -1,18 +1,21 @@
 """itinerary-service/routes.py
 
 Routes:
-  POST /itineraries — Create a new itinerary (JWT required)
-  GET  /itineraries — List all itineraries for the logged-in user (JWT required)
-  GET  /internal/users/<user_id>/itineraries — Internal: get past itineraries by user ID
+  POST   /itineraries                 — Create a new itinerary (JWT required)
+  GET    /itineraries                 — List all itineraries for the logged-in user (JWT required)
+  PUT    /itineraries/<itinerary_id>  — Update an itinerary (JWT required)
+  DELETE /itineraries/<itinerary_id>  — Delete an itinerary (JWT required)
+  GET    /internal/users/<user_id>/itineraries — Internal: get past itineraries by user ID
 """
-import uuid
-import datetime
 import json
 
 from flask import Blueprint, request, jsonify, g
 
 from app.auth_middleware import token_required
-from app.models import get_itineraries_for_user, get_itineraries_by_user_id, create_itinerary
+from app.models import (
+    get_itineraries_for_user, get_itineraries_by_user_id, create_itinerary,
+    get_itinerary_by_id, update_itinerary, delete_itinerary
+)
 
 itinerary_bp = Blueprint("itinerary", __name__)
 
@@ -26,22 +29,10 @@ def health():
 @itinerary_bp.route("/itineraries", methods=["POST"])
 @token_required
 def create_itinerary_route():
-    """Create a new itinerary for the authenticated user.
-
-    Expected JSON body:
-        {
-          "title": "Summer in Yaoundé",
-          "destinations": ["Mont Fébé", "Mefou National Park"],
-          "start_date": "2025-06-01",
-          "end_date": "2025-06-15",
-          "notes": "Optional notes"
-        }
-
-    Returns 201 with the created itinerary.
-    """
+    """Create a new itinerary for the authenticated user."""
     username = g.current_user
+    user_id = username  # Enforce user_id from JWT context
     data = request.get_json(silent=True) or {}
-    user_id = data.get("user_id", username)
     title = data.get("title", "").strip() if data.get("title") else ""
     destinations = data.get("destinations")
     start_date = data.get("start_date")
@@ -75,24 +66,48 @@ def list_itineraries():
     """List all itineraries for the authenticated user."""
     username = g.current_user
     itineraries = get_itineraries_for_user(username)
-    # Parse destinations JSON string back to list
-    for it in itineraries:
-        if isinstance(it.get("destinations"), str):
-            try:
-                it["destinations"] = json.loads(it["destinations"])
-            except (json.JSONDecodeError, TypeError):
-                it["destinations"] = []
     return jsonify(itineraries), 200
+
+
+@itinerary_bp.route("/itineraries/<itinerary_id>", methods=["PUT"])
+@token_required
+def update_itinerary_route(itinerary_id):
+    """Update an existing itinerary for the authenticated user."""
+    username = g.current_user
+    data = request.get_json(silent=True) or {}
+    title = data.get("title")
+    destinations = data.get("destinations")
+    start_date = data.get("start_date")
+    end_date = data.get("end_date")
+    notes = data.get("notes")
+
+    updated = update_itinerary(
+        itinerary_id=itinerary_id,
+        username=username,
+        title=title,
+        destinations=destinations,
+        start_date=start_date,
+        end_date=end_date,
+        notes=notes,
+    )
+    if not updated:
+        return jsonify({"error": "itinerary not found or access denied"}), 404
+    return jsonify(updated), 200
+
+
+@itinerary_bp.route("/itineraries/<itinerary_id>", methods=["DELETE"])
+@token_required
+def delete_itinerary_route(itinerary_id):
+    """Delete an itinerary for the authenticated user."""
+    username = g.current_user
+    success = delete_itinerary(itinerary_id, username)
+    if not success:
+        return jsonify({"error": "itinerary not found or access denied"}), 404
+    return jsonify({"message": "itinerary deleted successfully"}), 200
 
 
 @itinerary_bp.route("/internal/users/<user_id>/itineraries", methods=["GET"])
 def internal_get_user_itineraries(user_id):
     """Return past itineraries for a user by their UUID. Internal use only."""
     itineraries = get_itineraries_by_user_id(user_id)
-    for it in itineraries:
-        if isinstance(it.get("destinations"), str):
-            try:
-                it["destinations"] = json.loads(it["destinations"])
-            except (json.JSONDecodeError, TypeError):
-                it["destinations"] = []
     return jsonify(itineraries), 200

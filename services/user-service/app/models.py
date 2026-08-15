@@ -11,11 +11,13 @@ import os
 import uuid
 import datetime
 import json
+from contextlib import contextmanager
 
 import psycopg2
-
+from psycopg2.pool import ThreadedConnectionPool
 from flask import current_app
 
+_pool = None
 
 def _get_database_url(app=None):
     """Return the PostgreSQL connection string from env or app config."""
@@ -34,12 +36,40 @@ def _get_database_url(app=None):
 
 
 def get_connection(app=None):
-    """Get a PostgreSQL connection."""
-    return psycopg2.connect(_get_database_url(app), connect_timeout=15)
+    """Get a PostgreSQL connection from the connection pool or create a fallback."""
+    global _pool
+    db_url = _get_database_url(app)
+    if _pool is None:
+        try:
+            _pool = ThreadedConnectionPool(minconn=1, maxconn=15, dsn=db_url)
+        except Exception:
+            _pool = None
+    if _pool:
+        try:
+            return _pool.getconn()
+        except Exception:
+            pass
+    return psycopg2.connect(db_url, connect_timeout=15)
+
+
+def release_connection(conn):
+    """Release a connection back to the pool if pooling is active."""
+    global _pool
+    if _pool and conn:
+        try:
+            _pool.putconn(conn)
+            return
+        except Exception:
+            pass
+    if conn:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def init_db(app=None):
-    """Create the users and favorites tables if they don't exist."""
+    """Create the users and favorites tables and indexes if they don't exist."""
     conn = get_connection(app)
     cur = conn.cursor()
     cur.execute("""
@@ -65,6 +95,10 @@ def init_db(app=None):
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)")
+    
     # Ensure the new columns exist (safe migration for existing DBs).
     cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users'")
     existing_cols = {r[0] for r in cur.fetchall()}
@@ -81,7 +115,8 @@ def init_db(app=None):
             cur.execute(sql)
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
+
 
 
 def get_user_by_username(username, app=None):
@@ -92,7 +127,7 @@ def get_user_by_username(username, app=None):
     row = cur.fetchone()
     result = _row_to_dict(row, cur) if row else None
     cur.close()
-    conn.close()
+    release_connection(conn)
     return result
 
 
@@ -104,7 +139,7 @@ def get_user_by_id(user_id, app=None):
     row = cur.fetchone()
     result = _row_to_dict(row, cur) if row else None
     cur.close()
-    conn.close()
+    release_connection(conn)
     return result
 
 
@@ -120,7 +155,7 @@ def create_user(username, password_hash, preferences, app=None):
     )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
     return {"id": user_id, "username": username, "preferences": preferences, "created_at": created_at}
 
 
@@ -132,7 +167,7 @@ def get_user_by_email(email, app=None):
     row = cur.fetchone()
     result = _row_to_dict(row, cur) if row else None
     cur.close()
-    conn.close()
+    release_connection(conn)
     return result
 
 
@@ -160,7 +195,7 @@ def create_user_with_email(
     )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
     return {
         "id": user_id,
         "username": username,
@@ -194,7 +229,7 @@ def create_google_user(username, email, preferences, app=None):
     )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
     return {
         "id": user_id,
         "username": username,
@@ -215,7 +250,7 @@ def set_verification_code(username, code, app=None):
     )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
 
 
 def verify_user(username, code, app=None):
@@ -237,7 +272,7 @@ def verify_user(username, code, app=None):
     )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
     return True
 
 
@@ -254,7 +289,7 @@ def get_favorites_for_user(username, app=None):
     )
     rows = cur.fetchall()
     cur.close()
-    conn.close()
+    release_connection(conn)
     return [row[0] for row in rows]
 
 
@@ -291,7 +326,7 @@ def toggle_favorite_for_user(username, destination_name, app=None):
 
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
     return get_favorites_for_user(username, app)
 
 
@@ -342,7 +377,7 @@ def set_reset_code(identifier, code, expires_at_iso, app=None):
     )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
     return True
 
 

@@ -42,28 +42,43 @@ def client():
 def test_register_success(client):
     response = client.post(
         "/register",
-        json={"username": "alice", "password": "password123", "preferences": ["beach", "food"]},
+        json={
+            "username": "alice",
+            "email": "alice@example.com",
+            "password": "password123",
+            "preferences": ["beach", "food"],
+        },
     )
     assert response.status_code == 201
     data = response.get_json()
-    assert data["message"] == "user registered successfully"
+    assert "registered successfully" in data["message"].lower()
     assert data["username"] == "alice"
 
 
 def test_register_missing_fields(client):
     # Missing password
-    response = client.post("/register", json={"username": "alice"})
+    response = client.post("/register", json={"username": "alice", "email": "alice@example.com"})
     assert response.status_code == 400
     assert "required" in response.get_json()["error"]
 
     # Missing username
-    response = client.post("/register", json={"password": "password123"})
+    response = client.post("/register", json={"password": "password123", "email": "alice@example.com"})
+    assert response.status_code == 400
+
+    # Missing email
+    response = client.post("/register", json={"username": "alice", "password": "password123"})
     assert response.status_code == 400
 
 
 def test_register_duplicate_username(client):
-    client.post("/register", json={"username": "alice", "password": "password123"})
-    response = client.post("/register", json={"username": "alice", "password": "newpassword"})
+    client.post(
+        "/register",
+        json={"username": "dupuser", "email": "dup1@example.com", "password": "password123"},
+    )
+    response = client.post(
+        "/register",
+        json={"username": "dupuser", "email": "dup2@example.com", "password": "newpassword"},
+    )
     assert response.status_code == 409
     assert response.get_json()["error"] == "username already exists"
 
@@ -71,7 +86,14 @@ def test_register_duplicate_username(client):
 # ---- Login Tests ----
 
 def test_login_success(client):
-    client.post("/register", json={"username": "bob", "password": "secretpassword"})
+    reg_res = client.post(
+        "/register",
+        json={"username": "bob", "email": "bob@example.com", "password": "secretpassword"},
+    )
+    code = reg_res.get_json().get("verification_code", "")
+    if code:
+        client.post("/verify", json={"username": "bob", "code": code})
+
     response = client.post("/login", json={"username": "bob", "password": "secretpassword"})
     assert response.status_code == 200
     data = response.get_json()
@@ -79,14 +101,20 @@ def test_login_success(client):
 
 
 def test_login_failed_credentials(client):
-    client.post("/register", json={"username": "bob", "password": "secretpassword"})
+    reg_res = client.post(
+        "/register",
+        json={"username": "charlie", "email": "charlie@example.com", "password": "secretpassword"},
+    )
+    code = reg_res.get_json().get("verification_code", "")
+    if code:
+        client.post("/verify", json={"username": "charlie", "code": code})
 
     # Wrong password
-    response = client.post("/login", json={"username": "bob", "password": "wrongpassword"})
+    response = client.post("/login", json={"username": "charlie", "password": "wrongpassword"})
     assert response.status_code == 401
 
     # Non-existent user
-    response = client.post("/login", json={"username": "charlie", "password": "secretpassword"})
+    response = client.post("/login", json={"username": "nobody", "password": "secretpassword"})
     assert response.status_code == 401
 
 
@@ -98,13 +126,26 @@ def test_login_missing_fields(client):
 # ---- Internal routes ----
 
 def test_internal_get_preferences(client):
-    client.post("/register", json={"username": "diana", "password": "pass", "preferences": ["food", "nature"]})
-    login_res = client.post("/login", json={"username": "diana", "password": "pass"})
+    reg_res = client.post(
+        "/register",
+        json={
+            "username": "diana",
+            "email": "diana@example.com",
+            "password": "secretpassword",
+            "preferences": ["food", "nature"],
+        },
+    )
+    code = reg_res.get_json().get("verification_code", "")
+    if code:
+        client.post("/verify", json={"username": "diana", "code": code})
+
+    login_res = client.post("/login", json={"username": "diana", "password": "secretpassword"})
     token = login_res.get_json()["token"]
 
     # We need the user ID - extract from token's sub claim
     import jwt
-    payload = jwt.decode(token, "globetrotter-secret-change-in-prod", algorithms=["HS256"])
+    secret = os.environ.get("SECRET_KEY", "globetrotter-secret-change-in-prod")
+    payload = jwt.decode(token, secret, algorithms=["HS256"])
     username = payload["sub"]
 
     # Get user from the model to find their ID

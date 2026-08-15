@@ -44,8 +44,91 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
   void _openCreateForm() {
     showDialog(
       context: context,
-      builder: (ctx) => _CreateItineraryDialog(onCreated: _fetch),
+      builder: (ctx) => _ItineraryFormDialog(
+        onSaved: _fetch,
+        mode: _FormMode.create,
+      ),
     );
+  }
+
+  void _openEditForm(Map<String, dynamic> itinerary) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _ItineraryFormDialog(
+        onSaved: _fetch,
+        mode: _FormMode.edit,
+        existing: itinerary,
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(Map<String, dynamic> itinerary) async {
+    final theme = Theme.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded,
+            size: 48, color: theme.colorScheme.error),
+        title: const Text('Delete Itinerary'),
+        content: Text(
+          'Are you sure you want to delete "${itinerary['title']}"?\n\n'
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _api.deleteItinerary(id: itinerary['id'].toString());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('"${itinerary['title']}" deleted'),
+            ),
+          );
+          _fetch();
+        }
+      } on ApiException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Delete failed: ${e.message}')),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to delete itinerary')),
+          );
+        }
+      }
+    }
+  }
+
+  /// Computes a human-readable trip duration string.
+  String _tripDuration(String? startDate, String? endDate) {
+    if (startDate == null || endDate == null) return '';
+    try {
+      final start = DateTime.parse(startDate);
+      final end = DateTime.parse(endDate);
+      final days = end.difference(start).inDays + 1;
+      if (days <= 0) return '';
+      return days == 1 ? '1 day' : '$days days';
+    } catch (_) {
+      return '';
+    }
   }
 
   @override
@@ -57,17 +140,44 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
       children: [
         Column(
           children: [
+            // --- Header ---
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  Text(
-                    l10n.yourItineraries,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.map,
+                      size: 20,
+                      color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.yourItineraries,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (!_loading && _itineraries.isNotEmpty)
+                          Text(
+                            '${_itineraries.length} trip${_itineraries.length == 1 ? '' : 's'} planned',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   FilledButton.tonalIcon(
                     onPressed: _fetch,
                     icon: const Icon(Icons.refresh, size: 18),
@@ -92,7 +202,9 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
                           const SizedBox(height: 8),
                           Text(
                             _error!,
-                            style: const TextStyle(color: Colors.red),
+                            style: TextStyle(
+                              color: theme.colorScheme.error,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           TextButton(
@@ -110,98 +222,17 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
                       onAction: _openCreateForm,
                       actionLabel: l10n.createItinerary,
                     )
-                  : ListView.builder(
-                      itemCount: _itineraries.length,
-                      padding: const EdgeInsets.only(top: 4, bottom: 88),
-                      itemBuilder: (_, i) {
-                        final it = _itineraries[i];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.map,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        it['title'] ?? '',
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.calendar_today,
-                                      size: 16,
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        '${it['start_date']} \u2192 ${it['end_date']}',
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: theme
-                                                  .colorScheme
-                                                  .onSurfaceVariant,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 4,
-                                  children: (it['destinations'] as List)
-                                      .map(
-                                        (d) => Chip(
-                                          label: Text(
-                                            '$d',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          visualDensity: VisualDensity.compact,
-                                          materialTapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                          padding: EdgeInsets.zero,
-                                        ),
-                                      )
-                                      .toList(),
-                                ),
-                                if ((it['notes'] ?? '').isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    it['notes'],
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                  : RefreshIndicator(
+                      onRefresh: _fetch,
+                      child: ListView.builder(
+                        itemCount: _itineraries.length,
+                        padding: const EdgeInsets.only(top: 4, bottom: 88),
+                        itemBuilder: (_, i) {
+                          final it =
+                              Map<String, dynamic>.from(_itineraries[i]);
+                          return _buildItineraryCard(it, theme, l10n);
+                        },
+                      ),
                     ),
             ),
           ],
@@ -209,29 +240,219 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
         Positioned(
           right: 16,
           bottom: 16,
-          child: FloatingActionButton(
+          child: FloatingActionButton.extended(
             onPressed: _openCreateForm,
-            child: const Icon(Icons.add),
+            icon: const Icon(Icons.add),
+            label: Text(l10n.createItinerary),
           ),
         ),
       ],
     );
   }
+
+  Widget _buildItineraryCard(
+    Map<String, dynamic> it,
+    ThemeData theme,
+    AppLocalizations l10n,
+  ) {
+    final dests = (it['destinations'] as List?) ?? [];
+    final duration = _tripDuration(it['start_date'], it['end_date']);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title row with actions
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.map,
+                    size: 18,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    it['title'] ?? '',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                // Edit button
+                IconButton(
+                  onPressed: () => _openEditForm(it),
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
+                  tooltip: 'Edit',
+                  visualDensity: VisualDensity.compact,
+                ),
+                // Delete button
+                IconButton(
+                  onPressed: () => _confirmDelete(it),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 20,
+                    color: theme.colorScheme.error,
+                  ),
+                  tooltip: 'Delete',
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Date and duration row
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${it['start_date']} \u2192 ${it['end_date']}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (duration.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        duration,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Destination chips
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: dests
+                  .map(
+                    (d) => Chip(
+                      avatar: Icon(
+                        Icons.place,
+                        size: 14,
+                        color: theme.colorScheme.primary,
+                      ),
+                      label: Text(
+                        '$d',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: EdgeInsets.zero,
+                    ),
+                  )
+                  .toList(),
+            ),
+            if ((it['notes'] ?? '').isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color:
+                        theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.notes,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        it['notes'],
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Create Itinerary Dialog with Date Pickers
+// Form Mode Enum
 // ---------------------------------------------------------------------------
 
-class _CreateItineraryDialog extends StatefulWidget {
-  final VoidCallback onCreated;
-  const _CreateItineraryDialog({required this.onCreated});
+enum _FormMode { create, edit }
+
+// ---------------------------------------------------------------------------
+// Create / Edit Itinerary Dialog with Date Pickers
+// ---------------------------------------------------------------------------
+
+class _ItineraryFormDialog extends StatefulWidget {
+  final VoidCallback onSaved;
+  final _FormMode mode;
+  final Map<String, dynamic>? existing;
+
+  const _ItineraryFormDialog({
+    required this.onSaved,
+    required this.mode,
+    this.existing,
+  });
 
   @override
-  State<_CreateItineraryDialog> createState() => _CreateItineraryDialogState();
+  State<_ItineraryFormDialog> createState() => _ItineraryFormDialogState();
 }
 
-class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
+class _ItineraryFormDialogState extends State<_ItineraryFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _destinationsCtrl = TextEditingController();
@@ -240,6 +461,20 @@ class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
   final _notesCtrl = TextEditingController();
   bool _submitting = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.mode == _FormMode.edit && widget.existing != null) {
+      final e = widget.existing!;
+      _titleCtrl.text = e['title'] ?? '';
+      final dests = (e['destinations'] as List?) ?? [];
+      _destinationsCtrl.text = dests.join(', ');
+      _startCtrl.text = e['start_date'] ?? '';
+      _endCtrl.text = e['end_date'] ?? '';
+      _notesCtrl.text = e['notes'] ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -276,19 +511,33 @@ class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
           .toList();
-      await ApiService().createItinerary(
-        title: _titleCtrl.text.trim(),
-        destinations: destinations,
-        startDate: _startCtrl.text.trim(),
-        endDate: _endCtrl.text.trim(),
-        notes: _notesCtrl.text.trim(),
-      );
+
+      if (widget.mode == _FormMode.create) {
+        await ApiService().createItinerary(
+          title: _titleCtrl.text.trim(),
+          destinations: destinations,
+          startDate: _startCtrl.text.trim(),
+          endDate: _endCtrl.text.trim(),
+          notes: _notesCtrl.text.trim(),
+        );
+      } else {
+        await ApiService().updateItinerary(
+          id: widget.existing!['id'].toString(),
+          title: _titleCtrl.text.trim(),
+          destinations: destinations,
+          startDate: _startCtrl.text.trim(),
+          endDate: _endCtrl.text.trim(),
+          notes: _notesCtrl.text.trim(),
+        );
+      }
       if (mounted) Navigator.of(context).pop();
-      widget.onCreated();
+      widget.onSaved();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
-      setState(() => _error = 'Failed to create itinerary');
+      setState(() => _error = widget.mode == _FormMode.create
+          ? 'Failed to create itinerary'
+          : 'Failed to update itinerary');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -298,9 +547,19 @@ class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final isEdit = widget.mode == _FormMode.edit;
 
     return AlertDialog(
-      title: Text(l10n.newItinerary),
+      title: Row(
+        children: [
+          Icon(
+            isEdit ? Icons.edit : Icons.add_circle_outline,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Text(isEdit ? 'Edit Itinerary' : l10n.newItinerary),
+        ],
+      ),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -417,7 +676,7 @@ class _CreateItineraryDialogState extends State<_CreateItineraryDialog> {
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Text(l10n.create),
+              : Text(isEdit ? l10n.save : l10n.create),
         ),
       ],
     );

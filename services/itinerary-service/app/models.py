@@ -1,10 +1,7 @@
 """itinerary-service/models.py
 
 PostgreSQL database models for the Itinerary Service.
-Owns: itineraries table (id, user_id, title, destinations, start_date, end_date, notes, created_at)
-
-The database connection string is read from the DATABASE_URL environment
-variable and is never hardcoded.
+Owns: itineraries table (id, user_id, username, title, destinations, start_date, end_date, notes, created_at)
 """
 import os
 import uuid
@@ -12,6 +9,9 @@ import datetime
 import json
 
 import psycopg2
+from psycopg2.pool import ThreadedConnectionPool
+
+_pool = None
 
 
 def _get_database_url(app=None):
@@ -28,12 +28,40 @@ def _get_database_url(app=None):
 
 
 def get_connection(app=None):
-    """Get a PostgreSQL connection."""
-    return psycopg2.connect(_get_database_url(app), connect_timeout=15)
+    """Get a PostgreSQL connection from the connection pool or create fallback."""
+    global _pool
+    db_url = _get_database_url(app)
+    if _pool is None:
+        try:
+            _pool = ThreadedConnectionPool(minconn=1, maxconn=15, dsn=db_url)
+        except Exception:
+            _pool = None
+    if _pool:
+        try:
+            return _pool.getconn()
+        except Exception:
+            pass
+    return psycopg2.connect(db_url, connect_timeout=15)
+
+
+def release_connection(conn):
+    """Release a connection back to the pool."""
+    global _pool
+    if _pool and conn:
+        try:
+            _pool.putconn(conn)
+            return
+        except Exception:
+            pass
+    if conn:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def init_db(app=None):
-    """Create the itineraries table if it doesn't exist."""
+    """Create the itineraries table and indexes if they don't exist."""
     conn = get_connection(app)
     cur = conn.cursor()
     cur.execute("""
@@ -49,9 +77,11 @@ def init_db(app=None):
             created_at TEXT NOT NULL
         )
     """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_itineraries_username ON itineraries(username)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_itineraries_user_id ON itineraries(user_id)")
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
 
 
 def get_itineraries_for_user(username, app=None):
@@ -61,7 +91,7 @@ def get_itineraries_for_user(username, app=None):
     rows = cur.fetchall()
     results = [_row_to_dict(r, cur) for r in rows]
     cur.close()
-    conn.close()
+    release_connection(conn)
     return results
 
 
@@ -72,8 +102,19 @@ def get_itineraries_by_user_id(user_id, app=None):
     rows = cur.fetchall()
     results = [_row_to_dict(r, cur) for r in rows]
     cur.close()
-    conn.close()
+    release_connection(conn)
     return results
+
+
+def get_itinerary_by_id(itinerary_id, app=None):
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM itineraries WHERE id = %s", (itinerary_id,))
+    row = cur.fetchone()
+    result = _row_to_dict(row, cur) if row else None
+    cur.close()
+    release_connection(conn)
+    return result
 
 
 def create_itinerary(username, user_id, title, destinations, start_date, end_date, notes, app=None):
@@ -87,7 +128,7 @@ def create_itinerary(username, user_id, title, destinations, start_date, end_dat
     )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
     return {
         "id": itinerary_id,
         "username": username,
@@ -98,6 +139,44 @@ def create_itinerary(username, user_id, title, destinations, start_date, end_dat
         "notes": notes,
         "created_at": created_at,
     }
+
+
+def update_itinerary(itinerary_id, username, title=None, destinations=None, start_date=None, end_date=None, notes=None, app=None):
+    existing = get_itinerary_by_id(itinerary_id, app)
+    if not existing or existing.get("username") != username:
+        return None
+
+    new_title = title if title is not None else existing.get("title")
+    new_dest = json.dumps(destinations) if destinations is not None else json.dumps(existing.get("destinations", []))
+    new_start = start_date if start_date is not None else existing.get("start_date")
+    new_end = end_date if end_date is not None else existing.get("end_date")
+    new_notes = notes if notes is not None else existing.get("notes")
+
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE itineraries
+        SET title = %s, destinations = %s, start_date = %s, end_date = %s, notes = %s
+        WHERE id = %s AND username = %s
+    """, (new_title, new_dest, new_start, new_end, new_notes, itinerary_id, username))
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return get_itinerary_by_id(itinerary_id, app)
+
+
+def delete_itinerary(itinerary_id, username, app=None):
+    existing = get_itinerary_by_id(itinerary_id, app)
+    if not existing or existing.get("username") != username:
+        return False
+
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM itineraries WHERE id = %s AND username = %s", (itinerary_id, username))
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return True
 
 
 def _row_to_dict(row, cursor):

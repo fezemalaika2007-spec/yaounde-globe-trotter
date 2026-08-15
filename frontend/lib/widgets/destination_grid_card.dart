@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/destination_details_screen.dart';
+import '../utils/destination_filters.dart';
 
 /// A compact, image-forward card for use in a responsive grid layout.
 ///
@@ -32,7 +33,8 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
     final theme = Theme.of(context);
     final d = widget.destination;
     final name = d['name'] ?? '';
-    final imageUrl = d['image'] ?? '';
+    final rawImageUrl = d['image'] ?? '';
+    final imageUrl = formatImageUrl(rawImageUrl.toString());
     final avgRating = (d['average_rating'] ?? 0).toDouble();
     final ratingCount = d['rating_count'] ?? 0;
     final cost = d['cost'];
@@ -77,14 +79,11 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
                           borderRadius: const BorderRadius.vertical(
                             top: Radius.circular(12),
                           ),
-                          child: imageUrl.toString().startsWith('http')
+                          child: imageUrl.startsWith('http')
                               ? Image.network(
                                   imageUrl,
                                   fit: BoxFit.cover,
                                   gaplessPlayback: true,
-                                  // Decode at a bounded width so the UI loads
-                                  // images fast and avoids huge memory spikes.
-                                  cacheWidth: 600,
                                   loadingBuilder:
                                       (context, child, loadingProgress) {
                                         if (loadingProgress == null) {

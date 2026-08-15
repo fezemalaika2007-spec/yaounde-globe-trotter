@@ -2,15 +2,14 @@
 REM ============================================================
 REM  GlobeTrotter Web Launcher
 REM  Builds the Flutter web app and serves it statically.
-REM  This avoids the flaky flutter run dev-server path.
-REM  Requires: Docker backend on port 5000, Python for HTTP server.
+REM  Requires: Python for HTTP server.
 REM ============================================================
 setlocal
 cd /d "%~dp0frontend"
 
 echo.
 echo === Building web bundle ===
-call flutter build web
+call flutter build web --base-href /
 if errorlevel 1 (
     echo.
     echo Build FAILED. Check the errors above.

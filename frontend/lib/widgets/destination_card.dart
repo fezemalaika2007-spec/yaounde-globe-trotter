@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/destination_details_screen.dart';
+import '../utils/destination_filters.dart';
 
 class DestinationCard extends StatefulWidget {
   final String imagePath;
@@ -71,16 +72,15 @@ class DestinationCard extends StatefulWidget {
 
 class _DestinationCardState extends State<DestinationCard> {
   Widget _buildImage() {
-    if (widget.imagePath.startsWith('http://') ||
-        widget.imagePath.startsWith('https://')) {
+    final formattedUrl = formatImageUrl(widget.imagePath);
+    if (formattedUrl.startsWith('http://') ||
+        formattedUrl.startsWith('https://')) {
       return Image.network(
-        widget.imagePath,
+        formattedUrl,
         fit: BoxFit.cover,
         width: double.infinity,
         height: 160,
         gaplessPlayback: true,
-        // Decode at a bounded width so images load fast and memory stays low.
-        cacheWidth: 900,
         errorBuilder: (context, error, stackTrace) {
           return Container(
             color: Theme.of(context).colorScheme.primaryContainer,

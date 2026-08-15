@@ -52,6 +52,16 @@ bool isValidImageUrl(String image) {
   return trimmed.startsWith('http://') || trimmed.startsWith('https://');
 }
 
+/// Normalizes and formats an image URL for reliable rendering across Web and mobile.
+String formatImageUrl(String image) {
+  final trimmed = image.trim();
+  if (trimmed.isEmpty) return '';
+  if (trimmed.contains('unsplash.com') && !trimmed.contains('?')) {
+    return '$trimmed?auto=format&fit=crop&w=800&q=80';
+  }
+  return trimmed;
+}
+
 
 /// True when the destination references Yaoundé / Cameroon somewhere
 /// (area, city, name and/or tags).

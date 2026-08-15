@@ -165,7 +165,10 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<void> _resolveAuthStatus() async {
     try {
-      await AuthProvider().checkAuthStatus();
+      await AuthProvider().checkAuthStatus().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {},
+      );
       if (AuthProvider().isLoggedIn) {
         await FavoritesProvider().loadFavorites().catchError((e) {
           debugPrint('Error loading favorites after auth check: $e');
@@ -173,12 +176,13 @@ class _AuthGateState extends State<AuthGate> {
       }
     } catch (e) {
       debugPrint('Error during auth check: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _checkingAuth = false;
+        });
+      }
     }
-
-    if (!mounted) return;
-    setState(() {
-      _checkingAuth = false;
-    });
   }
 
   void _onAuthChange() {

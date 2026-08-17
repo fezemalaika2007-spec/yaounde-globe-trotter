@@ -71,8 +71,30 @@ class DestinationCard extends StatefulWidget {
 }
 
 class _DestinationCardState extends State<DestinationCard> {
+  IconData _getCategoryIcon() {
+    final cat = (widget.category ?? '').toLowerCase();
+    final tagsStr = (widget.tags ?? []).join(' ').toLowerCase();
+    if (cat.contains('nature') || tagsStr.contains('nature') || tagsStr.contains('park')) {
+      return Icons.forest_outlined;
+    }
+    if (cat.contains('culture') || cat.contains('history') || tagsStr.contains('museum') || tagsStr.contains('culture')) {
+      return Icons.account_balance_outlined;
+    }
+    if (cat.contains('shop') || tagsStr.contains('market') || tagsStr.contains('shopping')) {
+      return Icons.storefront_outlined;
+    }
+    if (cat.contains('food') || tagsStr.contains('food') || tagsStr.contains('dining')) {
+      return Icons.restaurant_outlined;
+    }
+    if (cat.contains('hotel') || tagsStr.contains('accommodation') || tagsStr.contains('hotel')) {
+      return Icons.hotel_outlined;
+    }
+    return Icons.location_on_outlined;
+  }
+
   Widget _buildImage() {
     final formattedUrl = formatImageUrl(widget.imagePath);
+    final fallbackIcon = _getCategoryIcon();
     if (formattedUrl.startsWith('http://') ||
         formattedUrl.startsWith('https://')) {
       return Image.network(
@@ -84,7 +106,7 @@ class _DestinationCardState extends State<DestinationCard> {
         errorBuilder: (context, error, stackTrace) {
           return Container(
             color: Theme.of(context).colorScheme.primaryContainer,
-            child: const Icon(Icons.place_outlined, size: 48),
+            child: Icon(fallbackIcon, size: 48),
           );
         },
       );
@@ -97,7 +119,7 @@ class _DestinationCardState extends State<DestinationCard> {
       errorBuilder: (context, error, stackTrace) {
         return Container(
           color: Theme.of(context).colorScheme.primaryContainer,
-          child: const Icon(Icons.place_outlined, size: 48),
+          child: Icon(fallbackIcon, size: 48),
         );
       },
     );

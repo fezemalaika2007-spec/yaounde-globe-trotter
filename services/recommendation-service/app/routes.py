@@ -206,6 +206,17 @@ def live_search_destinations():
     return jsonify(results), 200
 
 
+@recommendation_bp.route("/reseed", methods=["POST", "GET"])
+def reseed_destinations():
+    """Reseed/upsert authentic Yaoundé landmark destinations."""
+    try:
+        from app.models import seed_initial_destinations
+        seed_initial_destinations(app=current_app._get_current_object())
+        return jsonify({"message": "Successfully reseeded authentic Yaoundé destinations"}), 200
+    except Exception as e:
+        return jsonify({"error": f"Reseed failed: {str(e)}"}), 500
+
+
 @recommendation_bp.route("/sync-destinations", methods=["POST"])
 def trigger_sync():
     """Manually trigger a Foursquare sync to refresh destination data."""

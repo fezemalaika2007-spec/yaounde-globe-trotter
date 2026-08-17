@@ -49,7 +49,15 @@ bool hasGoodName(String name) {
 bool isValidImageUrl(String image) {
   final trimmed = image.trim();
   if (trimmed.isEmpty) return false;
-  return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return false;
+  }
+  final lower = trimmed.toLowerCase();
+  final pathOnly = lower.split('?').first.split('#').first;
+  if (pathOnly.endsWith('.html') || pathOnly.endsWith('.htm') || pathOnly.endsWith('.php')) {
+    return false;
+  }
+  return true;
 }
 
 /// Normalizes and formats an image URL for reliable rendering across Web and mobile.

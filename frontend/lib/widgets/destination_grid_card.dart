@@ -28,6 +28,27 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
     );
   }
 
+  IconData _getCategoryIcon(String category, List<dynamic> tags) {
+    final cat = category.toLowerCase();
+    final tagsStr = tags.join(' ').toLowerCase();
+    if (cat.contains('nature') || tagsStr.contains('nature') || tagsStr.contains('park')) {
+      return Icons.forest_outlined;
+    }
+    if (cat.contains('culture') || cat.contains('history') || tagsStr.contains('museum') || tagsStr.contains('culture')) {
+      return Icons.account_balance_outlined;
+    }
+    if (cat.contains('shop') || tagsStr.contains('market') || tagsStr.contains('shopping')) {
+      return Icons.storefront_outlined;
+    }
+    if (cat.contains('food') || tagsStr.contains('food') || tagsStr.contains('dining')) {
+      return Icons.restaurant_outlined;
+    }
+    if (cat.contains('hotel') || tagsStr.contains('accommodation') || tagsStr.contains('hotel')) {
+      return Icons.hotel_outlined;
+    }
+    return Icons.location_on_outlined;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -39,6 +60,7 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
     final ratingCount = d['rating_count'] ?? 0;
     final cost = d['cost'];
     final tags = (d['tags'] as List<dynamic>?) ?? [];
+    final category = (d['category'] ?? '').toString();
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -71,7 +93,7 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
                 children: [
                   // --- Image section ---
                   AspectRatio(
-                    aspectRatio: 1.2,
+                    aspectRatio: 1.6,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -107,8 +129,8 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
                                   errorBuilder: (context, error, stackTrace) {
                                     return Container(
                                       color: theme.colorScheme.primaryContainer,
-                                      child: const Icon(
-                                        Icons.place_outlined,
+                                      child: Icon(
+                                        _getCategoryIcon(category, tags),
                                         size: 32,
                                       ),
                                     );
@@ -116,8 +138,8 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
                                 )
                               : Container(
                                   color: theme.colorScheme.primaryContainer,
-                                  child: const Icon(
-                                    Icons.place_outlined,
+                                  child: Icon(
+                                    _getCategoryIcon(category, tags),
                                     size: 32,
                                   ),
                                 ),

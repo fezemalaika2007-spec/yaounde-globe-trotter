@@ -1,0 +1,77 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-test:
+    name: Backend Tests & Image Deduplication Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Recommendation Service Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r services/recommendation-service/requirements.txt pytest
+
+      - name: Run Global Image Deduplication & Seed Tests
+        run: |
+          cd services/recommendation-service
+          python -m pytest tests/test_no_duplicate_real_images.py -v
+          python -m pytest tests/test_recommendations.py -v
+
+      - name: Run User Service Tests
+        run: |
+          cd services/user-service
+          python -m pip install -r requirements.txt pytest
+          python -m pytest tests/ -v
+
+      - name: Run Itinerary Service Tests
+        run: |
+          cd services/itinerary-service
+          python -m pip install -r requirements.txt pytest
+          python -m pytest tests/ -v
+
+      - name: Run API Gateway Tests
+        run: |
+          cd services/api-gateway
+          python -m pip install -r requirements.txt pytest
+          python -m pytest tests/ -v
+
+  frontend-test:
+    name: Frontend Build & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          flutter pub get
+
+      - name: Analyze Frontend Code
+        run: |
+          cd frontend
+          flutter analyze
+
+      - name: Run Frontend Tests
+        run: |
+          cd frontend
+          flutter test

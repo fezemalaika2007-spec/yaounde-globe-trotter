@@ -103,3 +103,22 @@ def test_no_duplicate_images_within_any_gallery(all_destinations):
         assert len(normalized) == len(set(normalized)), (
             f"Destination '{dest.get('name')}' has a duplicate image in its gallery: {gallery}"
         )
+
+
+def test_initial_seed_destinations_have_unique_real_images():
+    """Assert all INITIAL_SEED_DESTINATIONS have unique, valid image URLs."""
+    from app.models import INITIAL_SEED_DESTINATIONS
+
+    seen_urls = {}
+    for dest in INITIAL_SEED_DESTINATIONS:
+        name = dest.get("name")
+        raw_url = dest.get("image")
+        assert raw_url and raw_url.startswith("https://"), (
+            f"Seed destination '{name}' must have a valid HTTPS image URL"
+        )
+        norm = _normalize_image_url(raw_url)
+        assert norm not in seen_urls, (
+            f"Duplicate seed image URL found for '{name}': {raw_url} (already used by '{seen_urls[norm]}')"
+        )
+        seen_urls[norm] = name
+

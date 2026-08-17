@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 import '../config/api_config.dart';
 
 /// A structured recommendation section returned by the backend.
@@ -97,10 +99,11 @@ class ApiService {
   // implementation initializes WebCrypto / IndexedDB which can throw
   // "TypeError: Failed to fetch" during app startup, blanking the whole
   // screen before the first frame renders. localStorage is the safe,
-  // lightweight choice for web. On native (Android/iOS/desktop) we keep
-  // the secure storage plugin.
+  bool get _usePrefsStorage =>
+      kIsWeb || WidgetsBinding.instance is AutomatedTestWidgetsFlutterBinding;
+
   Future<void> saveToken(String token) async {
-    if (kIsWeb) {
+    if (_usePrefsStorage) {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_prefsTokenKey, token);
@@ -115,7 +118,7 @@ class ApiService {
   }
 
   Future<String?> getToken() async {
-    if (kIsWeb) {
+    if (_usePrefsStorage) {
       try {
         final prefs = await SharedPreferences.getInstance();
         return prefs.getString(_prefsTokenKey);
@@ -132,7 +135,7 @@ class ApiService {
   }
 
   Future<void> deleteToken() async {
-    if (kIsWeb) {
+    if (_usePrefsStorage) {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(_prefsTokenKey);

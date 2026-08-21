@@ -1,15 +1,6 @@
 """recommendation-service/image_utils.py
 
 Image URL helpers for the Recommendation Service.
-
-The old curated placeholder pool (_YaoundeImages) and the Wikidata/Wikimedia
-image-fetching pipeline have been REMOVED entirely. The app now sources all
-destination photos directly from the Foursquare Places API, where each photo
-is already attached to a specific venue — so there is no shared image pool
-that can run out and cause duplicate-image bugs.
-
-This module now only keeps the URL-normalization helper used for the global
-no-duplicate-image safety net.
 """
 import logging
 import re

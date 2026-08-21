@@ -56,7 +56,6 @@ services:
       - PORT=5003
       - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
       - DATABASE_URL=${RECOMMENDATION_DATABASE_URL:-${DATABASE_URL}}
-      - FOURSQUARE_API_KEY=${FOURSQUARE_API_KEY}
       - USER_SERVICE_URL=http://user-service:5001
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/').read()"]

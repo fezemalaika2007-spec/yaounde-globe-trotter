@@ -300,7 +300,7 @@ def get_sectioned_recommendations(destinations, token="", limit=5):
     less_costly, ...) is also exposed as a top-level key mapping to the item
     list, so the frontend can render each as its own horizontal section.
     """
-    # Only ever show destinations that have a real image (Foursquare photos).
+    # Only ever show destinations that have a real image.
     with_images = [
         d for d in destinations
         if (d.get("image_source") not in ("placeholder", "") and (d.get("image") or ""))

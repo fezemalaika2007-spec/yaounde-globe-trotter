@@ -21,18 +21,19 @@ _pool = None
 
 def _get_database_url(app=None):
     """Return the PostgreSQL connection string from env or app config."""
+    url = ""
     if app and app.config.get("DATABASE"):
-        return app.config["DATABASE"]
-    try:
-        return current_app.config["DATABASE"]
-    except RuntimeError:
+        url = app.config["DATABASE"]
+    if not url:
         url = os.environ.get("DATABASE_URL", "")
-        if not url:
-            raise RuntimeError(
-                "DATABASE_URL environment variable is required to connect to "
-                "the online PostgreSQL database."
-            )
-        return url
+    if "-pooler" in url:
+        url = url.replace("-pooler", "")
+    if not url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable is required to connect to "
+            "the online PostgreSQL database."
+        )
+    return url
 
 
 def get_connection(app=None):

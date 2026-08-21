@@ -4,8 +4,7 @@ Routes:
   GET  /destinations                  — List/search destinations (public)
   POST /destinations/<id>/rating      — Submit/update a rating (JWT required)
   GET  /recommendations               — Categorized recommendations (JWT required)
-  GET  /search                        — Live Foursquare search (public)
-  POST /sync-destinations             — Trigger Foursquare sync (admin)
+  POST /reseed                        — Reseed authentic Yaoundé destinations
 """
 import json
 import logging
@@ -17,8 +16,6 @@ from app.models import (
     get_all_destinations, get_destination_by_id,
     upsert_rating, get_user_rating
 )
-from app.foursquare_sync import sync_destinations as _sync_destinations
-from app.foursquare_sync import search_foursquare as _live_search
 from app.recommendations import get_sectioned_recommendations as _section_recommendations
 
 recommendation_bp = Blueprint("recommendation", __name__)
@@ -181,50 +178,15 @@ def get_recommendations():
     return jsonify(payload), 200
 
 
-@recommendation_bp.route("/search", methods=["GET"])
-def live_search_destinations():
-    """Live search for destinations in Yaoundé via Foursquare.
-
-    Query parameter:
-        q – the place name to search for (e.g. "museum", "Mfoundi")
-
-    Searches Foursquare for matching places inside the Yaoundé radius and
-    returns normalized destination objects that have real photos.
-
-    Returns a JSON list (possibly empty).
-    """
-    q = request.args.get("q", "").strip()
-    if not q:
-        return jsonify([]), 200
-    try:
-        limit = int(request.args.get("limit", 12))
-    except (ValueError, TypeError):
-        limit = 12
-    limit = max(1, min(limit, 24))
-
-    results = _live_search(q, app=current_app._get_current_object(), limit=limit)
-    return jsonify(results), 200
-
-
+@recommendation_bp.route("/clear", methods=["POST", "DELETE", "GET"])
 @recommendation_bp.route("/reseed", methods=["POST", "GET"])
-def reseed_destinations():
-    """Reseed/upsert authentic Yaoundé landmark destinations."""
+def clear_destinations():
+    """Clear all destinations to keep a virgin state."""
     try:
-        from app.models import seed_initial_destinations
-        seed_initial_destinations(app=current_app._get_current_object())
-        return jsonify({"message": "Successfully reseeded authentic Yaoundé destinations"}), 200
+        from app.models import clear_all_destinations
+        clear_all_destinations(app=current_app._get_current_object())
+        return jsonify({"message": "Successfully cleared all destinations and recommendations"}), 200
     except Exception as e:
-        return jsonify({"error": f"Reseed failed: {str(e)}"}), 500
+        return jsonify({"error": f"Clear failed: {str(e)}"}), 500
 
 
-@recommendation_bp.route("/sync-destinations", methods=["POST"])
-def trigger_sync():
-    """Manually trigger a Foursquare sync to refresh destination data."""
-    try:
-        stats, count = _sync_destinations(app=current_app._get_current_object())
-        return jsonify({
-            "message": f"Synchronized {count} destinations from Foursquare",
-            "stats": stats,
-        }), 200
-    except Exception as e:
-        return jsonify({"error": f"Sync failed: {str(e)}"}), 500

@@ -143,6 +143,12 @@ def favorites():
     return _proxy(method, f"{USER_SERVICE_URL}/favorites")
 
 
+@gateway_bp.route("/import-urls", methods=["POST"])
+def import_urls():
+    return _proxy("POST", f"{RECOMMENDATION_SERVICE_URL}/import-urls")
+
+
+
 # ---------------------------------------------------------------------------
 # Itinerary routes → Itinerary Service
 # ---------------------------------------------------------------------------

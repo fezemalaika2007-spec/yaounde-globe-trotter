@@ -41,13 +41,58 @@ def _get_database_url(app=None):
     return url
 
 
+import sqlite3
+
+class SQLiteCursorWrapper:
+    def __init__(self, cur):
+        self.cur = cur
+        self.description = None
+
+    def execute(self, sql, params=()):
+        sql = sql.replace("%s", "?")
+        sql = sql.replace("TRUNCATE destinations, ratings CASCADE", "DELETE FROM destinations; DELETE FROM ratings;")
+        self.cur.execute(sql, params)
+        self.description = self.cur.description
+
+    def fetchall(self):
+        rows = self.cur.fetchall()
+        return [tuple(r) for r in rows]
+
+    def fetchone(self):
+        row = self.cur.fetchone()
+        return tuple(row) if row else None
+
+    def close(self):
+        try:
+            self.cur.close()
+        except Exception:
+            pass
+
+
+class SQLiteWrapper:
+    def __init__(self, db_path="destinations.db"):
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+
+    def cursor(self):
+        return SQLiteCursorWrapper(self.conn.cursor())
+
+    def commit(self):
+        self.conn.commit()
+
+    def close(self):
+        try:
+            self.conn.close()
+        except Exception:
+            pass
+
+
 def get_connection(app=None):
-    """Get a PostgreSQL connection from connection pool or create fallback."""
+    """Get a PostgreSQL connection or fallback to local SQLite."""
     global _pool
     db_url = _get_database_url(app)
     if _pool is None:
         try:
-            _pool = ThreadedConnectionPool(minconn=1, maxconn=5, dsn=db_url, connect_timeout=3)
+            _pool = ThreadedConnectionPool(minconn=1, maxconn=5, dsn=db_url, connect_timeout=2)
         except Exception:
             _pool = None
     if _pool:
@@ -55,12 +100,19 @@ def get_connection(app=None):
             return _pool.getconn()
         except Exception:
             pass
-    return psycopg2.connect(db_url, connect_timeout=3)
+    try:
+        return psycopg2.connect(db_url, connect_timeout=2)
+    except Exception as e:
+        print(f"PostgreSQL connection offline ({e}); falling back to local SQLite DB")
+        return SQLiteWrapper()
 
 
 def release_connection(conn):
     """Release a connection back to the pool."""
     global _pool
+    if isinstance(conn, SQLiteWrapper):
+        conn.close()
+        return
     if _pool and conn:
         try:
             _pool.putconn(conn)
@@ -72,6 +124,7 @@ def release_connection(conn):
             conn.close()
         except Exception:
             pass
+
 
 
 def init_db(app=None):

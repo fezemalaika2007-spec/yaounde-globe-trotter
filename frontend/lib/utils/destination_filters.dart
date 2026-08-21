@@ -21,7 +21,6 @@ const List<String> kBadNamePatterns = [
   'null',
   'drainage',
   'track',
-  'roundabout',
   'bridge',
   'interchange',
   'poi',

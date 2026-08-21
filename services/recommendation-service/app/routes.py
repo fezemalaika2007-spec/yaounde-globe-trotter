@@ -178,15 +178,31 @@ def get_recommendations():
     return jsonify(payload), 200
 
 
-@recommendation_bp.route("/clear", methods=["POST", "DELETE", "GET"])
-@recommendation_bp.route("/reseed", methods=["POST", "GET"])
-def clear_destinations():
-    """Clear all destinations to keep a virgin state."""
-    try:
-        from app.models import clear_all_destinations
-        clear_all_destinations(app=current_app._get_current_object())
-        return jsonify({"message": "Successfully cleared all destinations and recommendations"}), 200
-    except Exception as e:
-        return jsonify({"error": f"Clear failed: {str(e)}"}), 500
+@recommendation_bp.route("/import-urls", methods=["POST"])
+def import_urls():
+    """Accept a JSON payload with a list of URLs and import destination metadata for each."""
+    data = request.get_json(silent=True) or {}
+    urls = data.get("urls", [])
+    if isinstance(urls, str):
+        urls = [urls]
+
+    imported_ids = []
+    from app.import_utils import extract_metadata_from_url, save_destination_from_dict
+
+    for url in urls:
+        if not url or not isinstance(url, str):
+            continue
+        try:
+            meta = extract_metadata_from_url(url)
+            dest_id = save_destination_from_dict(meta, app=current_app._get_current_object())
+            imported_ids.append(dest_id)
+        except Exception as e:
+            logger.warning(f"Failed to import URL '{url}': {e}")
+
+    return jsonify({
+        "message": f"Successfully imported {len(imported_ids)} destination(s)",
+        "imported_ids": imported_ids
+    }), 200
+
 
 

@@ -288,68 +288,85 @@ def _tag_based_section(destinations, tag, limit):
 def get_sectioned_recommendations(destinations, token="", limit=5):
     """Return categorized recommendations as named sections.
 
-    Returns a dict with named keys:
-        {
-          "sections": [
-             {"title": ..., "type": ..., "items": [destination, ...]},
-             ...
-          ]
-        }
-
-    Each named category (most_popular, highly_rated, recently_added,
-    less_costly, ...) is also exposed as a top-level key mapping to the item
-    list, so the frontend can render each as its own horizontal section.
+    Strictly enforces that each destination appears in ONLY ONE section
+    across the entire Recommendations page (no destination duplicates across categories).
     """
     # Only ever show destinations that have a real image.
     with_images = [
         d for d in destinations
         if (d.get("image_source") not in ("placeholder", "") and (d.get("image") or ""))
     ]
-    pool = with_images if len(with_images) >= 4 else destinations
+    pool = with_images if len(with_images) >= 2 else destinations
 
     sections = []
     payload = {}
+    seen_ids = set()
+
+    def get_dest_key(d):
+        return d.get("id") or d.get("name") or ""
 
     # 1. Most Popular (highest rating_count).
-    most_popular = _most_popular(pool, limit)
+    candidates = [d for d in pool if get_dest_key(d) not in seen_ids]
+    most_popular = _most_popular(candidates, limit)
     if most_popular:
+        for d in most_popular:
+            seen_ids.add(get_dest_key(d))
         sections.append({"title": "Most Popular", "type": "most_popular", "items": most_popular})
         payload["most_popular"] = most_popular
 
-    # 2. Highly Rated (highest average_rating with min count).
-    highly_rated = _highly_rated(pool, limit)
+    # 2. Highly Rated (highest average_rating).
+    candidates = [d for d in pool if get_dest_key(d) not in seen_ids]
+    highly_rated = _highly_rated(candidates, limit)
     if highly_rated:
+        for d in highly_rated:
+            seen_ids.add(get_dest_key(d))
         sections.append({"title": "Highly Rated", "type": "highly_rated", "items": highly_rated})
         payload["highly_rated"] = highly_rated
 
     # 3. Recently Added (most recently synced).
-    recently_added = _recently_added(pool, limit)
+    candidates = [d for d in pool if get_dest_key(d) not in seen_ids]
+    recently_added = _recently_added(candidates, limit)
     if recently_added:
+        for d in recently_added:
+            seen_ids.add(get_dest_key(d))
         sections.append({"title": "Recently Added", "type": "recently_added", "items": recently_added})
         payload["recently_added"] = recently_added
 
-    # 4. Less Costly (lowest known cost, excluding null/unknown).
-    less_costly = _less_costly(pool, limit)
+    # 4. Less Costly (lowest known cost).
+    candidates = [d for d in pool if get_dest_key(d) not in seen_ids]
+    less_costly = _less_costly(candidates, limit)
     if less_costly:
+        for d in less_costly:
+            seen_ids.add(get_dest_key(d))
         sections.append({"title": "Less Costly", "type": "less_costly", "items": less_costly})
         payload["less_costly"] = less_costly
 
-    # 5. Extra tag-based sections (if data supports them).
-    food_markets = _tag_based_section(pool, "food", limit)
-    if len(food_markets) >= 2:
+    # 5. Extra tag-based sections.
+    candidates = [d for d in pool if get_dest_key(d) not in seen_ids]
+    food_markets = _tag_based_section(candidates, "food", limit)
+    if food_markets:
+        for d in food_markets:
+            seen_ids.add(get_dest_key(d))
         sections.append({"title": "Food & Markets", "type": "food_markets", "items": food_markets})
         payload["food_markets"] = food_markets
 
-    nature_parks = _tag_based_section(pool, "nature", limit)
-    if len(nature_parks) >= 2:
+    candidates = [d for d in pool if get_dest_key(d) not in seen_ids]
+    nature_parks = _tag_based_section(candidates, "nature", limit)
+    if nature_parks:
+        for d in nature_parks:
+            seen_ids.add(get_dest_key(d))
         sections.append({"title": "Nature & Parks", "type": "nature_parks", "items": nature_parks})
         payload["nature_parks"] = nature_parks
 
-    # 6. Category sections (only those with real image-bearing destinations).
+    # 6. Category sections.
     for cat, title in CATEGORY_SECTION_TITLES.items():
-        items = _category_section(pool, cat, limit)
+        candidates = [d for d in pool if get_dest_key(d) not in seen_ids]
+        items = _category_section(candidates, cat, limit)
         if items:
+            for d in items:
+                seen_ids.add(get_dest_key(d))
             sections.append({"title": title, "type": f"category_{cat}", "items": items})
 
     payload["sections"] = sections
     return payload
+

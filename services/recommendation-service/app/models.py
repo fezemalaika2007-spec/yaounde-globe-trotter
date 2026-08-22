@@ -50,8 +50,14 @@ class SQLiteCursorWrapper:
 
     def execute(self, sql, params=()):
         sql = sql.replace("%s", "?")
-        sql = sql.replace("TRUNCATE destinations, ratings CASCADE", "DELETE FROM destinations; DELETE FROM ratings;")
-        self.cur.execute(sql, params)
+        if "TRUNCATE destinations" in sql:
+            self.cur.execute("DELETE FROM destinations;")
+            try:
+                self.cur.execute("DELETE FROM ratings;")
+            except Exception:
+                pass
+        else:
+            self.cur.execute(sql, params)
         self.description = self.cur.description
 
     def fetchall(self):
@@ -79,6 +85,24 @@ class SQLiteWrapper:
     def commit(self):
         self.conn.commit()
 
+    def rollback(self):
+        try:
+            self.conn.rollback()
+        except Exception:
+            pass
+
+    def close(self):
+        try:
+            self.conn.close()
+        except Exception:
+            pass
+
+    def cursor(self):
+        return SQLiteCursorWrapper(self.conn.cursor())
+
+    def commit(self):
+        self.conn.commit()
+
     def close(self):
         try:
             self.conn.close()
@@ -87,24 +111,8 @@ class SQLiteWrapper:
 
 
 def get_connection(app=None):
-    """Get a PostgreSQL connection or fallback to local SQLite."""
-    global _pool
-    db_url = _get_database_url(app)
-    if _pool is None:
-        try:
-            _pool = ThreadedConnectionPool(minconn=1, maxconn=5, dsn=db_url, connect_timeout=2)
-        except Exception:
-            _pool = None
-    if _pool:
-        try:
-            return _pool.getconn()
-        except Exception:
-            pass
-    try:
-        return psycopg2.connect(db_url, connect_timeout=2)
-    except Exception as e:
-        print(f"PostgreSQL connection offline ({e}); falling back to local SQLite DB")
-        return SQLiteWrapper()
+    """Return local SQLite database wrapper as single source of truth."""
+    return SQLiteWrapper()
 
 
 def release_connection(conn):

@@ -63,8 +63,9 @@ bool isValidImageUrl(String image) {
 String formatImageUrl(String image) {
   final trimmed = image.trim();
   if (trimmed.isEmpty) return '';
-  if (trimmed.contains('unsplash.com') && !trimmed.contains('?')) {
-    return '$trimmed?auto=format&fit=crop&w=800&q=80';
+  if (trimmed.contains('lh3.googleusercontent.com')) {
+    final cleanUrl = trimmed.replaceAll('https://', '').replaceAll('http://', '');
+    return 'https://images.weserv.nl/?url=$cleanUrl';
   }
   return trimmed;
 }
@@ -101,12 +102,9 @@ bool hasGoodDescription(Map<String, dynamic> destination) {
   return !kBadDescriptionPatterns.any(desc.toLowerCase().contains);
 }
 
-/// Overall validity gate — used before adding a destination to any list.
 bool isDestinationValid(Map<String, dynamic> destination) {
   final name = (destination['name'] ?? '').toString().trim();
-  if (name.isEmpty || !hasGoodName(name)) return false;
-  if (!hasGoodLocation(destination)) return false;
-  return true;
+  return name.isNotEmpty;
 }
 
 /// Normalizes a string for stable key comparisons.
@@ -131,16 +129,13 @@ String normalizeImageUrl(String url) {
 /// Builds a stable dedup key for a destination.
 String normalizeDestinationKey(Map<String, dynamic> destination) {
   final id = destination['id']?.toString().trim();
-  if (id?.isNotEmpty == true) return id!;
-  final osmId = destination['osm_id']?.toString().trim();
-  if (osmId?.isNotEmpty == true) return 'osm:$osmId';
+  if (id != null && id.isNotEmpty) return id;
+  final fsqId = destination['fsq_id']?.toString().trim();
+  if (fsqId != null && fsqId.isNotEmpty) return fsqId;
+  final image = destination['image']?.toString().trim();
+  if (image != null && image.isNotEmpty) return normalizeImageUrl(image);
   final name = (destination['name'] ?? '').toString().trim();
-  final image = (destination['image'] ?? '').toString().trim();
-  if (name.isNotEmpty && image.isNotEmpty) {
-    return '${normalizeString(name)}|${normalizeImageUrl(image)}';
-  }
-  if (name.isNotEmpty) return normalizeString(name);
-  return image;
+  return normalizeString(name);
 }
 
 /// Deduplicates a list of destination maps, dropping invalid entries.

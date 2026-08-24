@@ -6,6 +6,8 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql)](https://neon.tech)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://www.docker.com/)
 
+.\sync_destinations.bat
+
 **GlobeTrotter Travel Assistant** is a modern, distributed microservices platform designed for exploring Cameroon's vibrant capital, Yaoundé. The application provides intelligent search, personalized recommendations, itinerary planning, rating/reviews, and multi-language support across Web, Mobile, and Desktop clients.
 
 ---

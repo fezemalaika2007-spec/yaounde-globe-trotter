@@ -1,15 +1,31 @@
-https://lh3.googleusercontent.com/gps-cs-s/AHRPTWn8hS7T1ZNlGLbk3XbjnKbd3zjVRiVPTyN8-YcxbKdXTLgN8rMUN-CoytwYCurjM4MGStnee4TJ6NMcrcn3UY1iu-D6nc5eJVRtGZW-icvKeH_i5Abd-IHp_j8ExqMItsnApx8hdQ=w450-h160-p-k-no",
-https://www.google.com/maps/place/National+Museum/@3.8616357,11.5167199,17z/data=!3m1!4b1!4m6!3m5!1s0x108bcf84f791d633:0x56164fae3b22eac4!8m2!3d3.8616357!4d11.5167199!16s%2Fg%2F12z65blr2?entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
-https://lh3.googleusercontent.com/gps-cs-s/AHRPTWkPmYz2xUVhH7eg6q2DfEPfRMY4sgj_mGjD2J_RqIUWoARNeKRtREC2C-sO6H6eomwvWNgvzZTtTM3z6QLH2bzyY9zThkHge8Byvu7YIWKVpVs-bpcap499G2-uLib66me8W1g4=w450-h160-p-k-no",
-https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmCXmjPzY6I1QMAAKAgdIeZ-A-0N1_fgVFEPvHWsBmG4LkYMsu-oPSKJoRUDhx3Nhh8Deje3AcJ4g425BpB93oF-cNFR5mxtIq0aunGWKR-56rlDHL-PPZHIn1f3bNfQJ3vI58=w450-h160-p-k-no",
-https://lh3.googleusercontent.com/gps-cs-s/AHRPTWn6Qeed6FjSjrzbW7Td0Wk8DoNd2t3D2ZASCk-4li7bw0JDmTWO_YD0TiF3zXh-nGzIZq1Y7mHLCGLwBNGRorx_OuQMR5Z46_7A2X6wVDfss2JzyKpXm7CRNK_e-S6qBS8QGj9jUkyFC9Q=w450-h160-p-k-no",
-https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlpJLBOeJzAMyH9dtloUXVoZc4g6HJECmwt_a4tNvc_nm-46s1ifvU4zsthzjbY-a7qIQn2gs0VKIyAmfQhecL-9PRnmbmYN0cfGp42jQQAJhsDHAOLtjVK9VU1OprJdBUdeB8iJQ=w450-h160-p-k-no",
-https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmamKA5awf7wzdMy-qZa4hBhj9imJq74RCy9_XNcLBpDzl5BFVn2ASImvo3K-5u-YXKCrTu8ckgr6jC29bNwhGYh_0kNJWJKOLmRCiARjAnZ-mzzkJtdEEZh9N-5yWfPcw7AEpN=w450-h160-p-k-no",
-https://lh3.googleusercontent.com/gps-cs-s/AHRPTWna7wgCb5vGfvfIcv2M0lVRjIrtSp1UrCI9yewaBs8hsk01jY8uSrwds10pEydAtMPrUbmS5yDZbgUURu4A9eDvIpzfzCip7Asa5AnF0TKZSs1QSpAKk0E2Mn9MQ2Nk4VzLVOga2A=w450-h160-p-k-no",
-https://lh3.googleusercontent.com/gps-cs-s/AHRPTWkUqP9bXDHXHiqRApw2FD-LnOsDURe6srqVkf2yEzxnzSaxKL5Hr1Z7SVyIGSvDRrVym76EQgHRz52xVz9hDn4kju2veFGp9kKKwc_XGB73CpNRkZw709IM9oMtLimTUfhOJQ0=w450-h160-p-k-no",
-https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlqPnS9_D3RnsIcUWHCqaG_AJjHWErHmlRfc1ty5tmsrqWfx-iHflMkQGzZu2fslDq5COM4_K1D0AhE6BZIQXFPkGB8GzxSpVn7wvV4gIXfCUTLbi3t1OHk2tGHYmgNpnqHm-m2yg=w450-h160-p-k-no",
-https://www.google.com/maps/search/Ebogo+Ecotourism+Yaounde/@3.5823257,11.471691,11z/data=!3m1!4b1?entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
+# Destination 1: General Express Voyages Mvan
 https://www.google.com/maps/place/General+Express+Voyages+Mvan/data=!4m7!3m6!1s0x108bd00378d23b0f:0x14482f2c563fdbfd!8m2!3d3.8184324!4d11.5135562!16s%2Fg%2F11c594dm46!19sChIJDzvSeAPQixAR_ds_ViwvSBQ?authuser=0&hl=fr&g_ep=EgoyMDI2MDgxOS4wIJJjKgBIAVAD&rclk=1
 
+#Destination 2: plaYce Yaounde
+https://www.google.com/maps/place/PlaYce+Yaound%C3%A9/@3.8743774,11.4423054,13z/data=!4m10!1m2!2m1!1s100+yaounde+places!3m6!1s0x108bcf2c86c30e8f:0x2c8a15dc160bbabb!8m2!3d3.8743774!4d11.5123432!15sChIxMDAgeWFvdW5kZSBwbGFjZXNaFCISMTAwIHlhb3VuZGUgcGxhY2VzkgEPc2hvcHBpbmdfY2VudGVymgEkQ2hkRFNVaE5NRzluUzBWSlEwRm5TVVF0ZDNWNlpUTkJSUkFC4AEA-gEECC0QQQ!16s%2Fg%2F11qh6c1pzw?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
+
+#Destination 3: fresh Lunch
+https://www.google.com/maps/place/Fresh+lunch/@3.8835616,11.516386,14z/data=!4m16!1m8!2m7!1sRestaurants!3m5!2sGeneral+Express+Voyages+Mvan!3s0x108bd00378d23b0f:0x14482f2c563fdbfd!4m2!1d11.5135562!2d3.8184324!3m6!1s0x108bcf588292faff:0x6cab8ab2013830c4!8m2!3d3.8492516!4d11.5010643!15sCgtSZXN0YXVyYW50c1oNIgtyZXN0YXVyYW50c5IBCnJlc3RhdXJhbnSaASNDaFpEU1VoTk1HOW5TMFZKUTBGblNVUm9MVXcyY1V4UkVBReABAPoBBAhqEEs!16s%2Fg%2F11kbtsqrrg?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
+
+#Destination 4:
 
 
+
+#Destination 5:
+
+
+#Destination 6:
+
+
+#Destination 7:
+
+
+
+#Destination 8:
+
+
+
+#Destination 9:
+
+
+#Destination 10:

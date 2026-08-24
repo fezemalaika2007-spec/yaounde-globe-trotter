@@ -76,7 +76,10 @@ class SQLiteCursorWrapper:
 
 
 class SQLiteWrapper:
-    def __init__(self, db_path="destinations.db"):
+    def __init__(self, db_path=None):
+        if db_path is None:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            db_path = os.path.join(base_dir, "destinations.db")
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
 
     def cursor(self):
@@ -90,18 +93,6 @@ class SQLiteWrapper:
             self.conn.rollback()
         except Exception:
             pass
-
-    def close(self):
-        try:
-            self.conn.close()
-        except Exception:
-            pass
-
-    def cursor(self):
-        return SQLiteCursorWrapper(self.conn.cursor())
-
-    def commit(self):
-        self.conn.commit()
 
     def close(self):
         try:

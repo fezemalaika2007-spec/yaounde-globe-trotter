@@ -63,10 +63,7 @@ bool isValidImageUrl(String image) {
 String formatImageUrl(String image) {
   final trimmed = image.trim();
   if (trimmed.isEmpty) return '';
-  if (trimmed.contains('lh3.googleusercontent.com')) {
-    final cleanUrl = trimmed.replaceAll('https://', '').replaceAll('http://', '');
-    return 'https://images.weserv.nl/?url=$cleanUrl';
-  }
+  // lh3.googleusercontent.com URLs load directly in browsers — no proxy needed.
   return trimmed;
 }
 

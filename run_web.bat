@@ -9,7 +9,8 @@ cd /d "%~dp0frontend"
 
 echo.
 echo === Building web bundle ===
-call flutter build web --base-href /
+call flutter build web --base-href / --no-tree-shake-icons
+
 if errorlevel 1 (
     echo.
     echo Build FAILED. Check the errors above.

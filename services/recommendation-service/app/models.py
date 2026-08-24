@@ -177,10 +177,13 @@ def init_db(app=None):
         cur.execute("CREATE INDEX IF NOT EXISTS idx_ratings_dest_user ON ratings(destination_id, user_id)")
 
         # Ensure the fsq_id column exists (safe migration for existing DBs).
-        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='destinations'")
-        existing_cols = {r[0] for r in cur.fetchall()}
-        if "fsq_id" not in existing_cols:
-            cur.execute("ALTER TABLE destinations ADD COLUMN fsq_id TEXT")
+        try:
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='destinations'")
+            existing_cols = {r[0] for r in cur.fetchall()}
+            if "fsq_id" not in existing_cols:
+                cur.execute("ALTER TABLE destinations ADD COLUMN fsq_id TEXT")
+        except Exception:
+            pass
 
         conn.commit()
         cur.close()

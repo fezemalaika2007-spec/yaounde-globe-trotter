@@ -1,3 +1,40 @@
+ #To add new destinations manually without missing any images, follow these simple steps:
+
+#1. How to format new entries in destinations.txt (Recommended)
+#When adding a new destination, include its exact image address right on the header line using the pipe (|) symbol:
+
+#text
+# Destination 7: Place Name | Image_Address_URL
+#Google_Maps_Place_URL
+#How to get the Image Address:
+#Open the place on Google Maps in your browser.
+#Right-click on the main photo of the place.
+#Click "Copy image address" (the URL will start with https://lh3.googleusercontent.com/...).
+#Paste that URL after the | symbol.
+#Example:
+#text
+# Destination 7: Bois Sainte Anastasie | https://lh3.googleusercontent.com/gps-cs-s/AHRPTW...
+#https://www.google.com/maps/place/Bois+Sainte+Anastasie/...
+#2. Alternative Method (Inside Python Code)
+#If you don't put the image URL in destinations.txt, you can add the name (in lowercase) and image address inside services/recommendation-service/parse_and_sync_destinations.py under KNOWN_PLACE_PHOTOS:
+
+#python
+#KNOWN_PLACE_PHOTOS = {
+ #   "bois sainte anastasie": "https://lh3.googleusercontent.com/...",
+#}
+#3. Synchronize Your Changes
+#Every time you finish adding destinations to destinations.txt:
+
+#Run the sync script in your terminal:
+#cmd
+#python services\recommendation-service\parse_and_sync_destinations.py
+#Refresh your browser at http://localhost:8080 (or launch with .\run_web.bat).
+
+
+python services\recommendation-service\parse_and_sync_destinations.py
+.\run_web.bat
+
+
 # Destination 1: General Express Voyages Mvan
 https://www.google.com/maps/place/General+Express+Voyages+Mvan/data=!4m7!3m6!1s0x108bd00378d23b0f:0x14482f2c563fdbfd!8m2!3d3.8184324!4d11.5135562!16s%2Fg%2F11c594dm46!19sChIJDzvSeAPQixAR_ds_ViwvSBQ?authuser=0&hl=fr&g_ep=EgoyMDI2MDgxOS4wIJJjKgBIAVAD&rclk=1
 
@@ -7,15 +44,14 @@ https://www.google.com/maps/place/PlaYce+Yaound%C3%A9/@3.8743774,11.4423054,13z/
 #Destination 3: fresh Lunch
 https://www.google.com/maps/place/Fresh+lunch/@3.8835616,11.516386,14z/data=!4m16!1m8!2m7!1sRestaurants!3m5!2sGeneral+Express+Voyages+Mvan!3s0x108bd00378d23b0f:0x14482f2c563fdbfd!4m2!1d11.5135562!2d3.8184324!3m6!1s0x108bcf588292faff:0x6cab8ab2013830c4!8m2!3d3.8492516!4d11.5010643!15sCgtSZXN0YXVyYW50c1oNIgtyZXN0YXVyYW50c5IBCnJlc3RhdXJhbnSaASNDaFpEU1VoTk1HOW5TMFZKUTBGblNVUm9MVXcyY1V4UkVBReABAPoBBAhqEEs!16s%2Fg%2F11kbtsqrrg?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
-#Destination 4:
+#Destination 4: Hilton Hotel
+https://www.google.com/maps/place/Hilton+Yaound%C3%A9/@3.8302894,11.3456394,11z/data=!4m12!1m2!2m1!1zSMO0dGVscw!3m8!1s0x108bcf830bfffff5:0x66957260425d213c!5m2!4m1!1i2!8m2!3d3.8649635!4d11.516126!16s%2Fg%2F1hm1v49xj?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
+#Destination 5:le continent restaurant
+https://www.google.com/maps/place/Le+continent+Restaurant/@3.8302578,11.3456384,11z/data=!4m11!1m3!2m2!1sRestaurants!6e5!3m6!1s0x108bc9004790a0d9:0xdf2c925e0c0dc863!8m2!3d3.9245687!4d11.5145238!15sCgtSZXN0YXVyYW50c1oNIgtyZXN0YXVyYW50c5IBCnJlc3RhdXJhbnSaASNDaFpEU1VoTk1HOW5TMFZNWW5CNlRsQmphMGxsT0ZGUkVBReABAPoBBAgAEDs!16s%2Fg%2F11vz56yp7s?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
-
-#Destination 5:
-
-
-#Destination 6:
-
+#Destination 6:cosy pool yaounde | https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmDBuprrKdvGAlDOmncVbZ1MJXeLLqfVT7Phoe72yl8h10aixRoPKNe2G0jvyu4VXIEMljiz0hdWCqAkoL7qIUqItFi97kz5Eur_ARXROBnPuqqBYz5Tgp0MTwTkjs88j7lPqkX=w426-h240-k-no
+https://www.google.com/maps/place/Cosy+Pool,+Yaound%C3%A9/@3.8302578,11.3456384,11z/data=!4m11!1m3!2m2!1sRestaurants!6e5!3m6!1s0x108bcf68403c2337:0xb44dfa3c48e92e6!8m2!3d3.8866235!4d11.5119583!15sCgtSZXN0YXVyYW50c1oNIgtyZXN0YXVyYW50c5IBEWZyZW5jaF9yZXN0YXVyYW50mgEkQ2hkRFNVaE5NRzluUzBWSlEwRm5UVU5SYVV0TVp6QlJSUkFC4AEA-gEECAAQNg!16s%2Fg%2F11bzv2qlk0?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
 #Destination 7:
 

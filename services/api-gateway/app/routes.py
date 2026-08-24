@@ -148,6 +148,11 @@ def import_urls():
     return _proxy("POST", f"{RECOMMENDATION_SERVICE_URL}/import-urls")
 
 
+@gateway_bp.route("/api/image-proxy", methods=["GET"])
+def image_proxy():
+    return _proxy("GET", f"{RECOMMENDATION_SERVICE_URL}/api/image-proxy")
+
+
 
 # ---------------------------------------------------------------------------
 # Itinerary routes → Itinerary Service

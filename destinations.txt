@@ -1,67 +1,619 @@
- #To add new destinations manually without missing any images, follow these simple steps:
-
-#1. How to format new entries in destinations.txt (Recommended)
-#When adding a new destination, include its exact image address right on the header line using the pipe (|) symbol:
-
-#text
-# Destination 7: Place Name | Image_Address_URL
-#Google_Maps_Place_URL
-#How to get the Image Address:
-#Open the place on Google Maps in your browser.
-#Right-click on the main photo of the place.
-#Click "Copy image address" (the URL will start with https://lh3.googleusercontent.com/...).
-#Paste that URL after the | symbol.
-#Example:
-#text
-# Destination 7: Bois Sainte Anastasie | https://lh3.googleusercontent.com/gps-cs-s/AHRPTW...
-#https://www.google.com/maps/place/Bois+Sainte+Anastasie/...
-#2. Alternative Method (Inside Python Code)
-#If you don't put the image URL in destinations.txt, you can add the name (in lowercase) and image address inside services/recommendation-service/parse_and_sync_destinations.py under KNOWN_PLACE_PHOTOS:
-
-#python
-#KNOWN_PLACE_PHOTOS = {
- #   "bois sainte anastasie": "https://lh3.googleusercontent.com/...",
-#}
-#3. Synchronize Your Changes
-#Every time you finish adding destinations to destinations.txt:
-
-#Run the sync script in your terminal:
-#cmd
-#python services\recommendation-service\parse_and_sync_destinations.py
-#Refresh your browser at http://localhost:8080 (or launch with .\run_web.bat).
+# === INSTRUCTIONS FOR ADDING DESTINATIONS ===
+# To add a new destination, use the format below:
+#
+# Format:
+#   # Place Name | Image_Address_URL
+#   Google_Maps_Place_URL
+#
+# Sync Command:
+#./run_web.bat
+# python services\recommendation-service\arse_and_sync_destinations.py
+# ============================================
 
 
-python services\recommendation-service\parse_and_sync_destinations.py
-.\run_web.bat
-
-
-# Destination 1: General Express Voyages Mvan
+# Destination 1: General Express Voyages Mvan | assets/images/general_express.jpg
 https://www.google.com/maps/place/General+Express+Voyages+Mvan/data=!4m7!3m6!1s0x108bd00378d23b0f:0x14482f2c563fdbfd!8m2!3d3.8184324!4d11.5135562!16s%2Fg%2F11c594dm46!19sChIJDzvSeAPQixAR_ds_ViwvSBQ?authuser=0&hl=fr&g_ep=EgoyMDI2MDgxOS4wIJJjKgBIAVAD&rclk=1
 
-#Destination 2: plaYce Yaounde
+# Destination 2: plaYce Yaounde | assets/images/playce_yaounde.jpg
 https://www.google.com/maps/place/PlaYce+Yaound%C3%A9/@3.8743774,11.4423054,13z/data=!4m10!1m2!2m1!1s100+yaounde+places!3m6!1s0x108bcf2c86c30e8f:0x2c8a15dc160bbabb!8m2!3d3.8743774!4d11.5123432!15sChIxMDAgeWFvdW5kZSBwbGFjZXNaFCISMTAwIHlhb3VuZGUgcGxhY2VzkgEPc2hvcHBpbmdfY2VudGVymgEkQ2hkRFNVaE5NRzluUzBWSlEwRm5TVVF0ZDNWNlpUTkJSUkFC4AEA-gEECC0QQQ!16s%2Fg%2F11qh6c1pzw?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
-#Destination 3: fresh Lunch
+# Destination 3: fresh Lunch | assets/images/fresh_lunch.jpg
 https://www.google.com/maps/place/Fresh+lunch/@3.8835616,11.516386,14z/data=!4m16!1m8!2m7!1sRestaurants!3m5!2sGeneral+Express+Voyages+Mvan!3s0x108bd00378d23b0f:0x14482f2c563fdbfd!4m2!1d11.5135562!2d3.8184324!3m6!1s0x108bcf588292faff:0x6cab8ab2013830c4!8m2!3d3.8492516!4d11.5010643!15sCgtSZXN0YXVyYW50c1oNIgtyZXN0YXVyYW50c5IBCnJlc3RhdXJhbnSaASNDaFpEU1VoTk1HOW5TMFZKUTBGblNVUm9MVXcyY1V4UkVBReABAPoBBAhqEEs!16s%2Fg%2F11kbtsqrrg?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
-#Destination 4: Hilton Hotel
+# Destination 4: Hilton Hotel | assets/images/hilton.jpg
 https://www.google.com/maps/place/Hilton+Yaound%C3%A9/@3.8302894,11.3456394,11z/data=!4m12!1m2!2m1!1zSMO0dGVscw!3m8!1s0x108bcf830bfffff5:0x66957260425d213c!5m2!4m1!1i2!8m2!3d3.8649635!4d11.516126!16s%2Fg%2F1hm1v49xj?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
-#Destination 5:le continent restaurant
+# Destination 5: le continent restaurant | assets/images/le_continent_restaurant.jpg
 https://www.google.com/maps/place/Le+continent+Restaurant/@3.8302578,11.3456384,11z/data=!4m11!1m3!2m2!1sRestaurants!6e5!3m6!1s0x108bc9004790a0d9:0xdf2c925e0c0dc863!8m2!3d3.9245687!4d11.5145238!15sCgtSZXN0YXVyYW50c1oNIgtyZXN0YXVyYW50c5IBCnJlc3RhdXJhbnSaASNDaFpEU1VoTk1HOW5TMFZNWW5CNlRsQmphMGxsT0ZGUkVBReABAPoBBAgAEDs!16s%2Fg%2F11vz56yp7s?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
-#Destination 6:cosy pool yaounde | https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmDBuprrKdvGAlDOmncVbZ1MJXeLLqfVT7Phoe72yl8h10aixRoPKNe2G0jvyu4VXIEMljiz0hdWCqAkoL7qIUqItFi97kz5Eur_ARXROBnPuqqBYz5Tgp0MTwTkjs88j7lPqkX=w426-h240-k-no
+# Destination 6: cosy pool yaounde | assets/images/cosy_pool_yaounde.jpg
 https://www.google.com/maps/place/Cosy+Pool,+Yaound%C3%A9/@3.8302578,11.3456384,11z/data=!4m11!1m3!2m2!1sRestaurants!6e5!3m6!1s0x108bcf68403c2337:0xb44dfa3c48e92e6!8m2!3d3.8866235!4d11.5119583!15sCgtSZXN0YXVyYW50c1oNIgtyZXN0YXVyYW50c5IBEWZyZW5jaF9yZXN0YXVyYW50mgEkQ2hkRFNVaE5NRzluUzBWSlEwRm5UVU5SYVV0TVp6QlJSUkFC4AEA-gEECAAQNg!16s%2Fg%2F11bzv2qlk0?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
-#Destination 7:
+# Destination 7: blackitude museum | assets/images/blackitude_meseum.jpg
+https://www.google.com/maps/place/Blackitude+Museum/@3.8641926,11.4483054,13z/data=!4m10!1m2!2m1!1zTXVzw6llcw!3m6!1s0x108bcf83c2df2841:0x8fa057ac47e1b9ed!8m2!3d3.8641926!4d11.5183432!15sCgdNdXPDqWVzWgkiB211c8OpZXOSAQZtdXNldW2aASRDaGREU1VoTk1HOW5TMFZKUTBGblNVTnNNMHhoZVY5UlJSQULgAQD6AQQIABAi!16s%2Fm%2F0_97dt5?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
+
+#Destination 8:pharmacie nkozoa | assets/images/pharmacie_nkozoa.jpg
+https://www.google.com/maps/place/Pharmacie+nkozoa/@3.9132617,11.4847399,13z/data=!4m10!1m2!2m1!1sPharmacies!3m6!1s0x108bc7197767af97:0xfd7d5bea550b45dc!8m2!3d3.9657658!4d11.5409087!15sCgpQaGFybWFjaWVzWgwiCnBoYXJtYWNpZXOSAQhwaGFybWFjeeABAA!16s%2Fg%2F11fmq0_dhx?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
+
+#Destination 9:place charles atangana | assets/images/place_charles_atangana.jpg
+https://www.google.com/maps/place/Place+Charles+Atangana/@3.9132597,11.4847398,13z/data=!4m10!1m2!2m1!1syaounde+places+low+rated!3m6!1s0x108bcf866b0e9b47:0x4ccc75f22bbf3d7c!8m2!3d3.8584601!4d11.520254!15sChh5YW91bmRlIHBsYWNlcyBsb3cgcmF0ZWQiAjgBkgETaGlzdG9yaWNhbF9sYW5kbWFya-ABAA!16s%2Fg%2F1w44h734?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
+
+#Destination 10:monument jaime mon pays | assets/images/monument_jaime_mon_pays.jpg
+https://www.google.com/maps/place/Monument+j'aime+mon+pays/@3.8480325,11.4320374,13z/data=!4m10!1m2!2m1!1syaounde+places+low+rated!3m6!1s0x108bcf5dd30e40a7:0xb3fd960a2ba2261e!8m2!3d3.8480325!4d11.5020752!15sChh5YW91bmRlIHBsYWNlcyBsb3cgcmF0ZWQiAjgBkgETaGlzdG9yaWNhbF9sYW5kbWFya-ABAA!16s%2Fg%2F11s599z8zj?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
+
+#Destination 11:
 
 
-
-#Destination 8:
-
+#Destination 12:
 
 
-#Destination 9:
+#Destination 13:
 
 
-#Destination 10:
+Destination 14:
+
+
+Destination 15:
+
+
+Destination 16:
+
+
+Destination 17:
+
+
+Destination 18:
+
+
+Destination 19:
+
+
+Destination 20:
+
+
+Destination 21:
+
+
+Destination 22:
+
+
+Destination 23:
+
+
+Destination 24:
+
+
+Destination 25:
+
+
+Destination 26:
+
+
+Destination 27:
+
+
+Destination 28:
+
+
+Destination 29:
+
+
+Destination 30:
+
+
+Destination 31:
+
+
+Destination 32:
+
+
+Destination 33:
+
+
+Destination 34:
+
+
+Destination 35:
+
+
+Destination 36:
+
+
+Destination 37:
+
+
+Destination 38:
+
+
+Destination 39:
+
+
+Destination 40:
+
+
+Destination 41:
+
+
+Destination 42:
+
+
+Destination 43:
+
+
+Destination 44:
+
+
+Destination 45:
+
+
+Destination 46:
+
+
+Destination 47:
+
+
+Destination 48:
+
+
+Destination 49:
+
+
+Destination 50:
+
+
+Destination 51:
+
+
+Destination 52:
+
+
+Destination 53:
+
+
+Destination 54:
+
+
+Destination 55:
+
+
+Destination 56:
+
+
+Destination 57:
+
+
+Destination 58:
+
+
+Destination 59:
+
+
+Destination 60:
+
+
+Destination 61:
+
+
+Destination 62:
+
+
+Destination 63:
+
+
+Destination 64:
+
+
+Destination 65:
+
+
+Destination 66:
+
+
+Destination 67:
+
+
+Destination 68:
+
+
+Destination 69:
+
+
+Destination 70:
+
+
+Destination 71:
+
+
+Destination 72:
+
+
+Destination 73:
+
+
+Destination 74:
+
+
+Destination 75:
+
+
+Destination 76:
+
+
+Destination 77:
+
+
+Destination 78:
+
+
+Destination 79:
+
+
+Destination 80:
+
+
+Destination 81:
+
+
+Destination 82:
+
+
+Destination 83:
+
+
+Destination 84:
+
+
+Destination 85:
+
+
+Destination 86:
+
+
+Destination 87:
+
+
+Destination 88:
+
+
+Destination 89:
+
+
+Destination 90:
+
+
+Destination 91:
+
+
+Destination 92:
+
+
+Destination 93:
+
+
+Destination 94:
+
+
+Destination 95:
+
+
+Destination 96:
+
+
+Destination 97:
+
+
+Destination 98:
+
+
+Destination 99:
+
+
+Destination 100:
+
+
+Destination 101:
+
+
+Destination 102:
+
+
+Destination 103:
+
+
+Destination 104:
+
+
+Destination 105:
+
+
+Destination 106:
+
+
+Destination 107:
+
+
+Destination 108:
+
+
+Destination 109:
+
+
+Destination 110:
+
+
+Destination 111:
+
+
+Destination 112:
+
+
+Destination 113:
+
+
+Destination 114:
+
+
+Destination 115:
+
+
+Destination 116:
+
+
+Destination 117:
+
+
+Destination 118:
+
+
+Destination 119:
+
+
+Destination 120:
+
+
+Destination 121:
+
+
+Destination 122:
+
+
+Destination 123:
+
+
+Destination 124:
+
+
+Destination 125:
+
+
+Destination 126:
+
+
+Destination 127:
+
+
+Destination 128:
+
+
+Destination 129:
+
+
+Destination 130:
+
+
+Destination 131:
+
+
+Destination 132:
+
+
+Destination 133:
+
+
+Destination 134:
+
+
+Destination 135:
+
+
+Destination 136:
+
+
+Destination 137:
+
+
+Destination 138:
+
+
+Destination 139:
+
+
+Destination 140:
+
+
+Destination 141:
+
+
+Destination 142:
+
+
+Destination 143:
+
+
+Destination 144:
+
+
+Destination 145:
+
+
+Destination 146:
+
+
+Destination 147:
+
+
+Destination 148:
+
+
+Destination 149:
+
+
+Destination 150:
+
+
+Destination 151:
+
+
+Destination 152:
+
+
+Destination 153:
+
+
+Destination 154:
+
+
+Destination 155:
+
+
+Destination 156:
+
+
+Destination 157:
+
+
+Destination 158:
+
+
+Destination 159:
+
+
+Destination 160:
+
+
+Destination 161:
+
+
+Destination 162:
+
+
+Destination 163:
+
+
+Destination 164:
+
+
+Destination 165:
+
+
+Destination 166:
+
+
+Destination 167:
+
+
+Destination 168:
+
+
+Destination 169:
+
+
+Destination 170:
+
+
+Destination 171:
+
+
+Destination 172:
+
+
+Destination 173:
+
+
+Destination 174:
+
+
+Destination 175:
+
+
+Destination 176:
+
+
+Destination 177:
+
+
+Destination 178:
+
+
+Destination 179:
+
+
+Destination 180:
+
+
+Destination 181:
+
+
+Destination 182:
+
+
+Destination 183:
+
+
+Destination 184:
+
+
+Destination 185:
+
+
+Destination 186:
+
+
+Destination 187:
+
+
+Destination 188:
+
+
+Destination 189:
+
+
+Destination 190:
+
+
+Destination 191:
+
+
+Destination 192:
+
+
+Destination 193:
+
+
+Destination 194:
+
+
+Destination 195:
+
+
+Destination 196:
+
+
+Destination 197:
+
+
+Destination 198:
+
+
+Destination 199:
+
+
+Destination 200:
+
+
+Destination 201:
+
+
+Destination 202:
+
+

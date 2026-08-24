@@ -21,6 +21,7 @@ const List<String> kBadNamePatterns = [
   'null',
   'drainage',
   'track',
+  'roundabout',
   'bridge',
   'interchange',
   'poi',
@@ -59,12 +60,66 @@ bool isValidImageUrl(String image) {
   return true;
 }
 
+/// Local asset fallback mapping for Yaoundé destinations.
+String getLocalAssetFallback(String name) {
+  final norm = name.toLowerCase();
+  if (norm.contains('hilton')) return 'assets/images/hilton.jpg';
+  if (norm.contains('fresh lunch') || (norm.contains('fresh') && norm.contains('lunch'))) {
+    return 'assets/images/fresh_lunch.jpg';
+  }
+  if (norm.contains('playce') || norm.contains('pla yce')) {
+    return 'assets/images/playce_yaounde.jpg';
+  }
+  if (norm.contains('general express') || norm.contains('express voyages')) {
+    return 'assets/images/general_express.jpg';
+  }
+  if (norm.contains('continent')) {
+    return 'assets/images/le_continent_restaurant.jpg';
+  }
+  if (norm.contains('cosy pool') || norm.contains('cosypool')) {
+    return 'assets/images/cosy_pool_yaounde.jpg';
+  }
+  if (norm.contains('blackitude')) {
+    return 'assets/images/blackitude_meseum.jpg';
+  }
+  if (norm.contains('pharmacie nkozoa') || norm.contains('nkozoa')) {
+    return 'assets/images/pharmacie_nkozoa.jpg';
+  }
+  if (norm.contains('atangana') || norm.contains('charles atangana')) {
+    return 'assets/images/place_charles_atangana.jpg';
+  }
+  if (norm.contains('jaime mon pays') || norm.contains("j'aime mon pays") || norm.contains('mon pays')) {
+    return 'assets/images/monument_jaime_mon_pays.jpg';
+  }
+  return '';
+}
+
+/// Resolves the candidate image (URL or asset path) for a destination map.
+String resolveDestinationImageUrl(Map<String, dynamic> destination) {
+  // 1. Direct 'image' field
+  final direct = (destination['image'] ?? '').toString().trim();
+  if (direct.isNotEmpty && direct != 'null' && direct != 'None') {
+    return direct;
+  }
+  // 2. First non-empty element in 'images' array
+  final images = destination['images'];
+  if (images is List && images.isNotEmpty) {
+    for (final img in images) {
+      final s = img.toString().trim();
+      if (s.isNotEmpty && s != 'null' && s != 'None') return s;
+    }
+  }
+  // 3. Fall back to local asset by destination name
+  final name = (destination['name'] ?? '').toString();
+  final local = getLocalAssetFallback(name);
+  if (local.isNotEmpty) return local;
+
+  return '';
+}
+
 /// Normalizes and formats an image URL for reliable rendering across Web and mobile.
 String formatImageUrl(String image) {
-  final trimmed = image.trim();
-  if (trimmed.isEmpty) return '';
-  // lh3.googleusercontent.com URLs load directly in browsers — no proxy needed.
-  return trimmed;
+  return image.trim();
 }
 
 
@@ -127,12 +182,20 @@ String normalizeImageUrl(String url) {
 String normalizeDestinationKey(Map<String, dynamic> destination) {
   final id = destination['id']?.toString().trim();
   if (id != null && id.isNotEmpty) return id;
+  final osmId = destination['osm_id']?.toString().trim();
+  if (osmId != null && osmId.isNotEmpty) {
+    return osmId.startsWith('osm:') ? osmId : 'osm:$osmId';
+  }
   final fsqId = destination['fsq_id']?.toString().trim();
   if (fsqId != null && fsqId.isNotEmpty) return fsqId;
-  final image = destination['image']?.toString().trim();
-  if (image != null && image.isNotEmpty) return normalizeImageUrl(image);
   final name = (destination['name'] ?? '').toString().trim();
-  return normalizeString(name);
+  final image = destination['image']?.toString().trim();
+  if (name.isNotEmpty && image != null && image.isNotEmpty) {
+    return '${normalizeString(name)}|${normalizeImageUrl(image)}';
+  }
+  if (name.isNotEmpty) return normalizeString(name);
+  if (image != null && image.isNotEmpty) return normalizeImageUrl(image);
+  return '';
 }
 
 /// Deduplicates a list of destination maps, dropping invalid entries.
@@ -153,21 +216,32 @@ List<dynamic> deduplicateDestinations(List<dynamic> destinations) {
 }
 
 /// Returns a list of unique gallery image URLs from [images], using the
-/// [fallback] image when nothing usable is present.
+/// [fallback] image and optional destination [name] when nothing usable is present.
 ///
 /// Deduplication is *normalized* (query strings/fragments stripped,
 /// scheme/netloc lowercased) so the same photo served with different URL
 /// parameters never appears twice.
-List<String> uniqueImages(List<dynamic> images, {String fallback = ''}) {
+List<String> uniqueImages(
+  List<dynamic> images, {
+  String fallback = '',
+  String name = '',
+}) {
   final seen = <String>{};
   final unique = <String>[];
   void addIfUnique(String raw) {
     final url = raw.trim();
-    if (url.isEmpty) return;
-    final key = normalizeImageUrl(url);
-    if (key.isEmpty || seen.contains(key)) return;
-    seen.add(key);
-    unique.add(url);
+    if (url.isEmpty || url == 'null' || url == 'None') return;
+    final lower = url.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      final key = normalizeImageUrl(url);
+      if (key.isEmpty || seen.contains(key)) return;
+      seen.add(key);
+      unique.add(url);
+    } else {
+      if (seen.contains(url)) return;
+      seen.add(url);
+      unique.add(url);
+    }
   }
 
   for (final image in images) {
@@ -175,6 +249,12 @@ List<String> uniqueImages(List<dynamic> images, {String fallback = ''}) {
   }
   if (unique.isEmpty && fallback.isNotEmpty) {
     addIfUnique(fallback);
+  }
+  if (unique.isEmpty && name.isNotEmpty) {
+    final local = getLocalAssetFallback(name);
+    if (local.isNotEmpty) {
+      addIfUnique(local);
+    }
   }
   return unique;
 }

@@ -62,6 +62,10 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
   /// Opens the full-screen, uncropped view of the image at [index].
   void _openFullImage(List<String> images, int index) {
+    final imagePath = images[index];
+    final isNetwork = imagePath.startsWith('http://') || imagePath.startsWith('https://');
+    final localFallback = getLocalAssetFallback(_dest['name'] ?? '');
+
     showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.92),
@@ -71,19 +75,43 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           child: Stack(
             children: [
               Center(
-                // BoxFit.contain ensures the WHOLE image is visible, unlike
-                // the BoxFit.cover used in card/gallery thumbnails.
-                child: Image.network(
-                  images[index],
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  height: double.infinity,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Icon(Icons.broken_image, size: 64),
-                    );
-                  },
-                ),
+                // BoxFit.contain ensures the WHOLE image is visible
+                child: isNetwork
+                    ? Image.network(
+                        imagePath,
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) {
+                          if (localFallback.isNotEmpty) {
+                            return Image.asset(
+                              localFallback,
+                              fit: BoxFit.contain,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (c, e, s) => const Center(
+                                child: Icon(Icons.broken_image, size: 64, color: Colors.white70),
+                              ),
+                            );
+                          }
+                          return const Center(
+                            child: Icon(Icons.broken_image, size: 64, color: Colors.white70),
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        imagePath.startsWith('assets/')
+                            ? imagePath
+                            : 'assets/images/$imagePath',
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Icon(Icons.broken_image, size: 64, color: Colors.white70),
+                          );
+                        },
+                      ),
               ),
               Positioned(
                 top: 32,
@@ -122,11 +150,16 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   Widget _buildGallery() {
     final List<dynamic> images = _dest['images'] ?? [];
     final String fallbackImage = _dest['image'] ?? '';
+    final String destName = (_dest['name'] ?? '').toString();
 
     // Normalized dedup: strips query strings/fragments and lowercases
     // scheme/netloc so the same photo served with different URL params
     // never appears more than once.
-    final uniqueGalleryImages = uniqueImages(images, fallback: fallbackImage);
+    final uniqueGalleryImages = uniqueImages(
+      images,
+      fallback: fallbackImage,
+      name: destName,
+    );
 
     if (uniqueGalleryImages.isEmpty) {
       return Container(
@@ -185,20 +218,48 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                 index,
                 uniqueGalleryImages.length,
               );
+              final isNet = url.startsWith('http://') || url.startsWith('https://');
+              final localFallback = getLocalAssetFallback(destName);
+
               return GestureDetector(
                 onTap: () => _openFullImage(uniqueGalleryImages, index),
-                child: Image.network(
-                  url,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  semanticLabel: caption,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Theme.of(context).colorScheme.secondaryContainer,
-                      child: const Icon(Icons.broken_image, size: 48),
-                    );
-                  },
-                ),
+                child: isNet
+                    ? Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        semanticLabel: caption,
+                        errorBuilder: (context, error, stackTrace) {
+                          if (localFallback.isNotEmpty) {
+                            return Image.asset(
+                              localFallback,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              semanticLabel: caption,
+                              errorBuilder: (c, e, s) => Container(
+                                color: Theme.of(context).colorScheme.secondaryContainer,
+                                child: const Icon(Icons.broken_image, size: 48),
+                              ),
+                            );
+                          }
+                          return Container(
+                            color: Theme.of(context).colorScheme.secondaryContainer,
+                            child: const Icon(Icons.broken_image, size: 48),
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        url.startsWith('assets/') ? url : 'assets/images/$url',
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        semanticLabel: caption,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Theme.of(context).colorScheme.secondaryContainer,
+                            child: const Icon(Icons.broken_image, size: 48),
+                          );
+                        },
+                      ),
               );
             },
           ),

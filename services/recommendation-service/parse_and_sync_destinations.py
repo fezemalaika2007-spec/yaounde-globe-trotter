@@ -25,7 +25,11 @@ KNOWN_PLACE_PHOTOS = {
     "hilton": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlB9aMzHeHos3IFh4wtTmQq8v8vd6f06kCRkuXxsnlq-E_FO84UUpSZvz21eMLb2HJba1FdFp1jW-z1MZ9zw_F3JHRTLWfCMWc6BQj6fcuO6JuVZMdS0blMxTuKuKXuRE7FRGgyLQBeDhA=w408-h273-k-no",
     "le continent restaurant": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmdRYaFw8-feoCxdg3AXQissR5eqLm6OXeBv1_nvAwZswwLUDDDNzIpOJzl__UvpaxChqCYlbz0CSnjQfjyWl8IZ-AWVTAae1a3qNk4zlVkX33BjCnb7N69DWe5LmsWeGygRPqy=w408-h306-k-no",
     "cosy pool": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmDBuprrKdvGAlDOmncVbZ1MJXeLLqfVT7Phoe72yl8h10aixRoPKNe2G0jvyu4VXIEMljiz0hdWCqAkoL7qIUqItFi97kz5Eur_ARXROBnPuqqBYz5Tgp0MTwTkjs88j7lPqkX=w426-h240-k-no",
-    "cosy pool yaounde": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmDBuprrKdvGAlDOmncVbZ1MJXeLLqfVT7Phoe72yl8h10aixRoPKNe2G0jvyu4VXIEMljiz0hdWCqAkoL7qIUqItFi97kz5Eur_ARXROBnPuqqBYz5Tgp0MTwTkjs88j7lPqkX=w426-h240-k-no"
+    "cosy pool yaounde": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmDBuprrKdvGAlDOmncVbZ1MJXeLLqfVT7Phoe72yl8h10aixRoPKNe2G0jvyu4VXIEMljiz0hdWCqAkoL7qIUqItFi97kz5Eur_ARXROBnPuqqBYz5Tgp0MTwTkjs88j7lPqkX=w426-h240-k-no",
+    "blackitude museum": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmUjQUiJXbecmKC533fikxUjOFLaTvUnl7xXGrGWFAk76vqwAOzZZCBbPzJW1HIsVtOi40vWQmqFtsIfcJd82jniLoYpUhtKAB2zsM8QzUazFPOVwXbdZ8AYNfZgmgXPUpSPq8=w408-h272-k-no",
+    "pharmacie nkozoa": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnJ0nB1d-XkLiTRDWvUUYklzAqkAe559Zkalovc9QQrQA46fvoJfRQ8ZsDRmyAXtkqCI3i9uost1D-EwCooTFcSLiNuYioacByzbSo2HGZFfYHCOCi7JW3JdCbIoWFpFCJA1d_U=w408-h877-k-no",
+    "place charles atangana": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWm5x81unNsApCwCxH8mJPr2QAV2je1SkPWrnaiKUZlsTOan_TzBXeLeMCmpcOkVxkjl7MnIFwFsMix8rD028wDwNqjDwz8WxzGxfUX_2TAF4Vbbhgy_TVlA0vVoQ1DsY8a0Euvz=w408-h272-k-no",
+    "monument jaime mon pays": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlSzhjDxJyNUYv2f8cdfr23F5PJ_DF-sCv_N84t7kfEQsmshSLcpUKjls78lBtXwxWXcFJMUSepwXKES58Nw6PQLLvZvqChD8-7_WFsL6NUvPItN4fD0SiOhpOnV15cKCNXQtbs=w408-h306-k-no",
 }
 
 # Default placeholder when no image is provided
@@ -95,10 +99,15 @@ def extract_coordinates_from_url(url):
     return 3.8743774, 11.5123432  # Default Yaoundé center
 
 def is_direct_image_url(url):
-    """Check if URL points directly to an image or image CDN."""
-    if not url or not url.startswith("http"):
+    """Check if URL points directly to an image or image CDN, or local asset."""
+    if not url:
         return False
-    lower = url.lower()
+    clean = url.strip()
+    if clean.startswith("assets/") or clean.startswith("assets\\") or "/assets/" in clean:
+        return True
+    if not clean.startswith("http"):
+        return False
+    lower = clean.lower()
     if "googleusercontent.com" in lower or "ggpht.com" in lower or "wikimedia.org" in lower:
         return True
     if any(lower.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".avif"]):
@@ -216,7 +225,7 @@ def parse_destinations_file(dest_txt_path):
                 parts = clean_head.split("|", 1)
                 clean_head = parts[0].strip()
                 extra = parts[1].strip()
-                if is_direct_image_url(extra) or extra.startswith("http"):
+                if is_direct_image_url(extra) or extra.startswith("http") or extra.startswith("assets"):
                     dest_image = extra
 
             if ":" in clean_head:

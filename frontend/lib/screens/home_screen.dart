@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../utils/destination_filters.dart';
 import '../widgets/app_footer.dart';
 import '../widgets/destination_grid.dart';
 
@@ -111,7 +112,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _hasValidImage(Map<String, dynamic> destination) {
     final image = (destination['image'] ?? '').toString().trim();
-    return image.startsWith('http://') || image.startsWith('https://');
+    if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('assets/')) {
+      return true;
+    }
+    final name = (destination['name'] ?? '').toString();
+    return getLocalAssetFallback(name).isNotEmpty;
   }
 
   bool _hasGoodLocation(Map<String, dynamic> destination) {

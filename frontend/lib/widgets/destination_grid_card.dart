@@ -49,13 +49,97 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
     return Icons.location_on_outlined;
   }
 
+  Widget _buildIconContainer(
+    String category,
+    List<dynamic> tags,
+    ThemeData theme,
+  ) {
+    return Container(
+      color: theme.colorScheme.primaryContainer,
+      child: Center(
+        child: Icon(
+          _getCategoryIcon(category, tags),
+          size: 36,
+          color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardImage({
+    required String imageUrl,
+    required String name,
+    required String category,
+    required List<dynamic> tags,
+    required ThemeData theme,
+  }) {
+    final localFallback = getLocalAssetFallback(name);
+
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            color: theme.colorScheme.primaryContainer,
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          if (localFallback.isNotEmpty) {
+            return Image.asset(
+              localFallback,
+              fit: BoxFit.cover,
+              errorBuilder: (c, e, s) =>
+                  _buildIconContainer(category, tags, theme),
+            );
+          }
+          return _buildIconContainer(category, tags, theme);
+        },
+      );
+    }
+
+    final effectiveAsset = imageUrl.isNotEmpty
+        ? (imageUrl.startsWith('assets/')
+            ? imageUrl
+            : 'assets/images/$imageUrl')
+        : localFallback;
+
+    if (effectiveAsset.isNotEmpty) {
+      return Image.asset(
+        effectiveAsset,
+        fit: BoxFit.cover,
+        errorBuilder: (context, err, stack) {
+          if (localFallback.isNotEmpty && localFallback != effectiveAsset) {
+            return Image.asset(
+              localFallback,
+              fit: BoxFit.cover,
+              errorBuilder: (c, e, s) =>
+                  _buildIconContainer(category, tags, theme),
+            );
+          }
+          return _buildIconContainer(category, tags, theme);
+        },
+      );
+    }
+
+    return _buildIconContainer(category, tags, theme);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final d = widget.destination;
     final name = d['name'] ?? '';
-    final rawImageUrl = d['image'] ?? '';
-    final imageUrl = formatImageUrl(rawImageUrl.toString());
+    final imageUrl = resolveDestinationImageUrl(d);
     final avgRating = (d['average_rating'] ?? 0).toDouble();
     final ratingCount = d['rating_count'] ?? 0;
     final cost = d['cost'];
@@ -101,48 +185,13 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
                           borderRadius: const BorderRadius.vertical(
                             top: Radius.circular(12),
                           ),
-                          child: imageUrl.startsWith('http')
-                              ? Image.network(
-                                  imageUrl,
-                                  fit: BoxFit.cover,
-                                  gaplessPlayback: true,
-                                  loadingBuilder:
-                                      (context, child, loadingProgress) {
-                                        if (loadingProgress == null) {
-                                          return child;
-                                        }
-                                        return Container(
-                                          color: theme
-                                              .colorScheme
-                                              .primaryContainer,
-                                          child: const Center(
-                                            child: SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: theme.colorScheme.primaryContainer,
-                                      child: Icon(
-                                        _getCategoryIcon(category, tags),
-                                        size: 32,
-                                      ),
-                                    );
-                                  },
-                                )
-                              : Container(
-                                  color: theme.colorScheme.primaryContainer,
-                                  child: Icon(
-                                    _getCategoryIcon(category, tags),
-                                    size: 32,
-                                  ),
-                                ),
+                          child: _buildCardImage(
+                            imageUrl: imageUrl,
+                            name: name,
+                            category: category,
+                            tags: tags,
+                            theme: theme,
+                          ),
                         ),
                         // Gradient overlay at bottom for readability
                         Positioned(

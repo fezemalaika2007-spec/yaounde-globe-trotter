@@ -8,8 +8,10 @@ Routes:
 """
 import json
 import logging
+import urllib.parse
+import urllib.request
 
-from flask import Blueprint, request, jsonify, g, current_app
+from flask import Blueprint, request, jsonify, g, current_app, Response
 
 from app.auth_middleware import token_required
 from app.models import (
@@ -199,10 +201,36 @@ def import_urls():
         except Exception as e:
             logger.warning(f"Failed to import URL '{url}': {e}")
 
-    return jsonify({
-        "message": f"Successfully imported {len(imported_ids)} destination(s)",
-        "imported_ids": imported_ids
-    }), 200
+
+@recommendation_bp.route("/api/image-proxy", methods=["GET"])
+def proxy_image():
+    """Proxy external image requests (like Google CDN) to resolve CORS issues on web."""
+    image_url = request.args.get("url", "").strip()
+    if not image_url or not image_url.startswith("http"):
+        return jsonify({"error": "Invalid URL"}), 400
+
+    try:
+        req = urllib.request.Request(
+            image_url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            }
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            content_type = resp.headers.get("Content-Type", "image/jpeg")
+            image_data = resp.read()
+            return Response(
+                image_data,
+                mimetype=content_type,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=86400"
+                }
+            )
+    except Exception as e:
+        logger.warning(f"Image proxy failed for {image_url}: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 

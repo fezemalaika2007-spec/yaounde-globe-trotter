@@ -73,7 +73,7 @@ class DestinationCard extends StatefulWidget {
 class _DestinationCardState extends State<DestinationCard> {
   IconData _getCategoryIcon() {
     final cat = (widget.category ?? '').toLowerCase();
-    final tagsStr = (widget.tags ?? []).join(' ').toLowerCase();
+    final tagsStr = widget.tags.join(' ').toLowerCase();
     if (cat.contains('nature') || tagsStr.contains('nature') || tagsStr.contains('park')) {
       return Icons.forest_outlined;
     }
@@ -93,36 +93,73 @@ class _DestinationCardState extends State<DestinationCard> {
   }
 
   Widget _buildImage() {
-    final formattedUrl = formatImageUrl(widget.imagePath);
+    final imageCandidate = widget.imagePath.trim();
+    final localFallback = getLocalAssetFallback(widget.name);
     final fallbackIcon = _getCategoryIcon();
-    if (formattedUrl.startsWith('http://') ||
-        formattedUrl.startsWith('https://')) {
+
+    Widget buildFallbackContainer() {
+      return Container(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        child: Center(
+          child: Icon(
+            fallbackIcon,
+            size: 48,
+            color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+          ),
+        ),
+      );
+    }
+
+    if (imageCandidate.startsWith('http://') || imageCandidate.startsWith('https://')) {
       return Image.network(
-        formattedUrl,
+        imageCandidate,
         fit: BoxFit.cover,
         width: double.infinity,
         height: 160,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) {
-          return Container(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            child: Icon(fallbackIcon, size: 48),
-          );
+          if (localFallback.isNotEmpty) {
+            return Image.asset(
+              localFallback,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 160,
+              errorBuilder: (c, e, s) => buildFallbackContainer(),
+            );
+          }
+          return buildFallbackContainer();
         },
       );
     }
-    return Image.asset(
-      widget.imagePath,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: 160,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          child: Icon(fallbackIcon, size: 48),
-        );
-      },
-    );
+
+    final effectiveAsset = imageCandidate.isNotEmpty
+        ? (imageCandidate.startsWith('assets/')
+            ? imageCandidate
+            : 'assets/images/$imageCandidate')
+        : localFallback;
+
+    if (effectiveAsset.isNotEmpty) {
+      return Image.asset(
+        effectiveAsset,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: 160,
+        errorBuilder: (context, error, stackTrace) {
+          if (localFallback.isNotEmpty && localFallback != effectiveAsset) {
+            return Image.asset(
+              localFallback,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 160,
+              errorBuilder: (c, e, s) => buildFallbackContainer(),
+            );
+          }
+          return buildFallbackContainer();
+        },
+      );
+    }
+
+    return buildFallbackContainer();
   }
 
   @override

@@ -4,7 +4,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
-import 'package:flutter_test/flutter_test.dart';
 import '../config/api_config.dart';
 
 /// A structured recommendation section returned by the backend.
@@ -100,7 +99,7 @@ class ApiService {
   // "TypeError: Failed to fetch" during app startup, blanking the whole
   // screen before the first frame renders. localStorage is the safe,
   bool get _usePrefsStorage =>
-      kIsWeb || WidgetsBinding.instance is AutomatedTestWidgetsFlutterBinding;
+      kIsWeb || WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   Future<void> saveToken(String token) async {
     if (_usePrefsStorage) {

@@ -6,8 +6,11 @@
 #   Google_Maps_Place_URL
 #
 # Sync Command:
+#cd "C:\Users\jbc\OneDrive\Desktop\yaounde travel assistance\yaounde-globe-trotter\frontend\build\web"
+#python -m http.server 8080
+
 #./run_web.bat
-# python services\recommendation-service\arse_and_sync_destinations.py
+# python services\recommendation-service\parse_and_sync_destinations.py
 # ============================================
 
 
@@ -41,10 +44,12 @@ https://www.google.com/maps/place/Place+Charles+Atangana/@3.9132597,11.4847398,1
 #Destination 10:monument jaime mon pays | assets/images/monument_jaime_mon_pays.jpg
 https://www.google.com/maps/place/Monument+j'aime+mon+pays/@3.8480325,11.4320374,13z/data=!4m10!1m2!2m1!1syaounde+places+low+rated!3m6!1s0x108bcf5dd30e40a7:0xb3fd960a2ba2261e!8m2!3d3.8480325!4d11.5020752!15sChh5YW91bmRlIHBsYWNlcyBsb3cgcmF0ZWQiAjgBkgETaGlzdG9yaWNhbF9sYW5kbWFya-ABAA!16s%2Fg%2F11s599z8zj?authuser=0&hl=fr&entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
-#Destination 11:
+#Destination 11:parc de la mefou | assets/images/parc_de_la_mefou.jpg
+https://www.google.com/maps/place/Parc+de+la+M%C3%A9fou+(Ape+Action+Africa)/@3.8302578,11.3456384,11z/data=!4m10!1m2!2m1!1sThings+to+do!3m6!1s0x108963ad6f43a59f:0xdbb63a9e11bc9896!8m2!3d3.6253619!4d11.5812826!15sCgxUaGluZ3MgdG8gZG9aDiIMdGhpbmdzIHRvIGRvkgEPd2lsZGxpZmVfcmVmdWdlmgFEQ2k5RFFVbFJRVU52WkVOb2RIbGpSamx2VDI1Wk5WRlVSbmhpTVd4RFZqRmFUR016VG1GWmF6VktZbTFLTUZvell4QULgAQD6AQQIABAo!16s%2Fg%2F11f662d1_b?entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
 
-#Destination 12:
+#Destination 12:presidential place grounds | assets/images/presidential_place_grounds.jpg
+https://www.google.com/maps/place/Presidential+Palace's+Grounds/@3.8302578,11.3456384,11z/data=!4m10!1m2!2m1!1sThings+to+do!3m6!1s0x108bc8ade60d2615:0xf578b71d11f1359b!8m2!3d3.9115811!4d11.5148604!15sCgxUaGluZ3MgdG8gZG9aDiIMdGhpbmdzIHRvIGRvkgEPaGVyaXRhZ2VfbXVzZXVtmgFEQ2k5RFFVbFJRVU52WkVOb2RIbGpSamx2VDIxd1JrNVZVa3BsUmtaQ1RXNXNObU50Y0hCYVdIQk1VMFpvVEZZd1JSQULgAQD6AQQIABAX!16s%2Fg%2F1vpghw9y?entry=ttu&g_ep=EgoyMDI2MDgxOS4wIKXMDSoASAFQAw%3D%3D
 
 
 #Destination 13:

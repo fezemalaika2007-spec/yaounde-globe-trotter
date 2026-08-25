@@ -30,6 +30,8 @@ KNOWN_PLACE_PHOTOS = {
     "pharmacie nkozoa": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnJ0nB1d-XkLiTRDWvUUYklzAqkAe559Zkalovc9QQrQA46fvoJfRQ8ZsDRmyAXtkqCI3i9uost1D-EwCooTFcSLiNuYioacByzbSo2HGZFfYHCOCi7JW3JdCbIoWFpFCJA1d_U=w408-h877-k-no",
     "place charles atangana": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWm5x81unNsApCwCxH8mJPr2QAV2je1SkPWrnaiKUZlsTOan_TzBXeLeMCmpcOkVxkjl7MnIFwFsMix8rD028wDwNqjDwz8WxzGxfUX_2TAF4Vbbhgy_TVlA0vVoQ1DsY8a0Euvz=w408-h272-k-no",
     "monument jaime mon pays": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlSzhjDxJyNUYv2f8cdfr23F5PJ_DF-sCv_N84t7kfEQsmshSLcpUKjls78lBtXwxWXcFJMUSepwXKES58Nw6PQLLvZvqChD8-7_WFsL6NUvPItN4fD0SiOhpOnV15cKCNXQtbs=w408-h306-k-no",
+    "parc de la mefou": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWkw_sv6Ia990VekqXZjbHrLGrizXjGL7SURBY95Lmoph42CJV_Z5tFVsNyYiu_rRr2uNiRH76D7493yJ3ML-rQ_SYfg5ePS6VvRe2iYjV-1A9rx8cQX_0-y8q2sMvxgDkORLW9o=w408-h271-k-no",
+    "presidential place grounds": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnF_lP42zglnAtBolkorn2BBY68LNRLvs-UZvidD823fdKacER8OFF8V43k_6rhZZlHd_ZYH5II1Kw7aUL2-s5VZbU1m_oOomxtbk_-5uR-XyzRWyyvkByAaUJC2iS4kWtZHaiVVw=w408-h306-k-no",
 }
 
 # Default placeholder when no image is provided

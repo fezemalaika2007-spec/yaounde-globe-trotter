@@ -3,6 +3,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/favorites_provider.dart';
 import '../services/api_service.dart';
 import '../utils/destination_filters.dart';
+import '../widgets/star_rating_widget.dart';
+import '../widgets/comment_section.dart';
+
 
 class DestinationDetailScreen extends StatefulWidget {
   final Map<String, dynamic> destination;
@@ -18,6 +21,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   final _favProvider = FavoritesProvider();
   bool _isFav = false;
   int _currentImageIndex = 0;
+  int _userRating = 0;
+  bool _isSubmittingRating = false;
   final PageController _pageController = PageController();
 
   @override
@@ -26,7 +31,47 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     _dest = Map<String, dynamic>.from(widget.destination);
     _isFav = _favProvider.isFavorite(_dest['name'] ?? '');
     _favProvider.addListener(_onFavChange);
+    _loadUserRating();
   }
+
+  Future<void> _loadUserRating() async {
+    final destId = _dest['id']?.toString();
+    if (destId == null || destId.isEmpty) return;
+    try {
+      final rating = await ApiService().getUserRating(destId);
+      if (mounted && rating != null) {
+        setState(() => _userRating = rating);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _onRatingSubmit(int newRating) async {
+    final destId = _dest['id']?.toString();
+    if (destId == null || destId.isEmpty) return;
+    try {
+      setState(() => _isSubmittingRating = true);
+      final result = await ApiService().submitRating(destId, newRating);
+      if (mounted) {
+        setState(() {
+          _userRating = newRating;
+          _dest['average_rating'] = result['average_rating'];
+          _dest['rating_count'] = result['rating_count'];
+          _isSubmittingRating = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Rating saved! ($newRating ★)')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmittingRating = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit rating: $e')),
+        );
+      }
+    }
+  }
+
 
   void _onFavChange() {
     if (!mounted) return;
@@ -500,6 +545,38 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                   _buildQuickStats(theme, hasCost),
                   const SizedBox(height: 16),
 
+                  // --- Interactive User Rating Card ---
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: theme.dividerColor.withValues(alpha: 0.5)),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          _userRating > 0 ? 'Your Rating: $_userRating / 5 ★' : 'Tap a star to rate this place',
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        _isSubmittingRating
+                            ? const SizedBox(
+                                height: 28,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : StarRatingWidget(
+                                initialRating: _userRating,
+                                starSize: 32,
+                                isInteractive: true,
+                                onRatingChanged: _onRatingSubmit,
+                              ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
                   // --- About / real description ---
                   _buildSectionHeader(theme, Icons.info_outline, 'About'),
                   const SizedBox(height: 8),
@@ -511,26 +588,82 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // --- Practical info (real venue data, shown only when present) ---
-                  if (_hasPracticalInfo()) ...[
-                    _buildSectionHeader(
-                      theme,
-                      Icons.article_outlined,
-                      'Practical Info',
-                    ),
+                  // --- Opening Hours & Contact Info ---
+                  if ((_dest['opening_hours'] ?? '').isNotEmpty ||
+                      (_dest['phone'] ?? '').isNotEmpty ||
+                      (_dest['website'] ?? '').isNotEmpty) ...[
+                    _buildSectionHeader(theme, Icons.access_time_rounded, 'Opening Hours & Contact'),
                     const SizedBox(height: 8),
-                    _buildPracticalInfoCard(theme),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: theme.cardColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        children: [
+                          if ((_dest['opening_hours'] ?? '').isNotEmpty)
+                            ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.schedule_rounded, color: Colors.blueAccent),
+                              title: const Text('Opening Hours', style: TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(_dest['opening_hours']),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          if ((_dest['phone'] ?? '').isNotEmpty)
+                            ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.phone_rounded, color: Colors.green),
+                              title: const Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(_dest['phone']),
+                              contentPadding: EdgeInsets.zero,
+                              trailing: IconButton(
+                                icon: const Icon(Icons.call_rounded, color: Colors.green),
+                                onPressed: () => _launchUrl('tel:${_dest['phone']}'),
+                                tooltip: 'Call',
+                              ),
+                            ),
+                          if ((_dest['website'] ?? '').isNotEmpty)
+                            ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.language_rounded, color: Colors.purpleAccent),
+                              title: const Text('Website / Map Link', style: TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(_dest['website'], maxLines: 1, overflow: TextOverflow.ellipsis),
+                              contentPadding: EdgeInsets.zero,
+                              trailing: IconButton(
+                                icon: const Icon(Icons.open_in_new_rounded, color: Colors.purpleAccent),
+                                onPressed: () => _launchUrl(_dest['website']),
+                                tooltip: 'Open Link',
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // --- Facilities ---
+                  if ((_dest['facilities'] as List<dynamic>? ?? []).isNotEmpty) ...[
+                    _buildSectionHeader(theme, Icons.local_offer_rounded, 'Facilities & Amenities'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: (_dest['facilities'] as List<dynamic>?)!
+                          .map((f) => Chip(
+                                avatar: const Icon(Icons.check_rounded, size: 14, color: Colors.green),
+                                label: Text(f.toString(), style: const TextStyle(fontSize: 12)),
+                                backgroundColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
+                              ))
+                          .toList(),
+                    ),
                     const SizedBox(height: 16),
                   ],
 
                   // --- Activities ---
-                  if ((_dest['activities'] as List<dynamic>? ?? [])
-                      .isNotEmpty) ...[
-                    _buildSectionHeader(
-                      theme,
-                      Icons.local_activity,
-                      'Things to Do',
-                    ),
+                  if ((_dest['activities'] as List<dynamic>? ?? []).isNotEmpty) ...[
+                    _buildSectionHeader(theme, Icons.local_activity, 'Things to Do'),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
@@ -553,15 +686,18 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
                   // --- Map preview card ---
                   if (lat != null && lon != null) ...[
-                    _buildSectionHeader(
-                      theme,
-                      Icons.map,
-                      'Location',
-                    ),
+                    _buildSectionHeader(theme, Icons.map, 'Location'),
                     const SizedBox(height: 8),
                     _buildMapPreviewCard(theme, lat, lon, name),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                   ],
+
+                  const Divider(),
+                  const SizedBox(height: 16),
+
+                  // --- Real Comment System ---
+                  CommentSection(destinationId: _dest['id']?.toString() ?? ''),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -570,6 +706,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
       ),
     );
   }
+
 
   Widget _buildQuickStats(ThemeData theme, bool hasCost) {
     return Container(

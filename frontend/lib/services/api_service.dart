@@ -584,14 +584,11 @@ class ApiService {
   // Ratings
   /// POST /destinations/[id]/rating – submit or update a rating.
   /// [rating] must be 1-5.
-  Future<Map<String, dynamic>> submitRating({
-    required String destinationId,
-    required int rating,
-  }) async {
+  Future<Map<String, dynamic>> submitRating(String destId, int rating) async {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
     final uri = Uri.parse(
-      '${ApiConfig.baseUrl}/destinations/$destinationId/rating',
+      '${ApiConfig.baseUrl}/destinations/$destId/rating',
     );
     final response = await _post(
       uri,
@@ -602,6 +599,7 @@ class ApiService {
     if (response.statusCode == 200) return body as Map<String, dynamic>;
     throw ApiException(response.statusCode, _errorMessage(body));
   }
+
 
   // Favorites
   Future<List<String>> getFavorites() async {
@@ -650,10 +648,135 @@ class ApiService {
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 
+
+  Future<int?> getUserRating(String destId) async {
+    final token = await getToken();
+    if (token == null) return null;
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/user-rating');
+    final response = await _get(uri, headers: _authHeaders(token));
+    if (response.statusCode == 200) {
+      final body = _decode(response);
+      if (body is Map && body.containsKey('rating')) {
+        return body['rating'] as int?;
+      }
+    }
+    return null;
+  }
+
+  // Comments
+  Future<List<Map<String, dynamic>>> getComments(String destId) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments');
+    final response = await _get(uri);
+    final body = _decode(response);
+    if (response.statusCode == 200 && body is List) {
+      return List<Map<String, dynamic>>.from(body);
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> postComment(String destId, String text) async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments');
+    final response = await _post(
+      uri,
+      headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
+      body: jsonEncode({'text': text}),
+    );
+    final body = _decode(response);
+    if (response.statusCode == 201) return Map<String, dynamic>.from(body);
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  Future<void> deleteComment(String destId, String commentId) async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments/$commentId');
+    final response = await _delete(uri, headers: _authHeaders(token));
+    if (response.statusCode != 200) {
+      final body = _decode(response);
+      throw ApiException(response.statusCode, _errorMessage(body));
+    }
+  }
+
+  // Notifications
+  Future<Map<String, dynamic>> getNotifications() async {
+    final token = await getToken();
+    if (token == null) return {'notifications': [], 'unread_count': 0};
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.notifications}');
+    final response = await _get(uri, headers: _authHeaders(token));
+    if (response.statusCode == 200) {
+      final body = _decode(response);
+      if (body is Map<String, dynamic>) return body;
+    }
+    return {'notifications': [], 'unread_count': 0};
+  }
+
+  Future<void> markNotificationRead(String notifId) async {
+    final token = await getToken();
+    if (token == null) return;
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.notifications}/$notifId/read');
+    await _post(uri, headers: _authHeaders(token));
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final token = await getToken();
+    if (token == null) return;
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.notifications}/read-all');
+    await _post(uri, headers: _authHeaders(token));
+  }
+
+  // Feedback
+  Future<Map<String, dynamic>> submitFeedback({
+    required String category,
+    required String subject,
+    required String message,
+  }) async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.feedback}');
+    final response = await _post(
+      uri,
+      headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'category': category,
+        'subject': subject,
+        'message': message,
+      }),
+    );
+    final body = _decode(response);
+    if (response.statusCode == 201) return Map<String, dynamic>.from(body);
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  Future<List<Map<String, dynamic>>> getAllFeedback() async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.feedback}');
+    final response = await _get(uri, headers: _authHeaders(token));
+    final body = _decode(response);
+    if (response.statusCode == 200 && body is List) {
+      return List<Map<String, dynamic>>.from(body);
+    }
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  Future<void> resolveFeedback(String feedbackId) async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.feedback}/$feedbackId/resolve');
+    final response = await _post(uri, headers: _authHeaders(token));
+    if (response.statusCode != 200) {
+      final body = _decode(response);
+      throw ApiException(response.statusCode, _errorMessage(body));
+    }
+  }
+
   // Helpers
   Map<String, String> _authHeaders(String token) => {
     'Authorization': 'Bearer $token',
   };
+
 
   dynamic _decode(http.Response response) {
     try {

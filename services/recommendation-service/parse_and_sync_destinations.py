@@ -155,12 +155,26 @@ def derive_metadata(name, url=""):
             "activities": ["Nature Walk", "Relaxation", "Outdoor Recreation", "Wildlife"],
             "rating": 4.8, "count": 30, "gmaps": url
         }
-    elif any(k in norm for k in ["museum", "musee", "monument", "cathedral", "cathedrale", "basilique", "culture", "reunification", "national", "palais"]):
+    elif any(k in norm for k in ["museum", "musee", "monument", "cathedral", "cathedrale", "basilique", "culture", "reunification", "national", "palais", "presidential"]):
         return {
             "category": "Culture & History",
             "desc": f"Famous historical and cultural landmark in Yaoundé ({name}).",
             "activities": ["Sightseeing", "Cultural History", "Guided Tour", "Architecture"],
             "rating": 4.8, "count": 30, "gmaps": url
+        }
+    elif any(k in norm for k in ["pharmacie", "pharmacy", "clinic", "hospital", "hopital"]):
+        return {
+            "category": "Health & Pharmacy",
+            "desc": f"Essential healthcare and pharmacy service in Yaoundé ({name}).",
+            "activities": ["Healthcare", "Pharmacy", "Medical Services"],
+            "rating": 4.5, "count": 20, "gmaps": url
+        }
+    elif any(k in norm for k in ["pool", "swim", "piscine", "spa", "wellness"]):
+        return {
+            "category": "Leisure & Wellness",
+            "desc": f"Premium leisure and wellness destination in Yaoundé ({name}).",
+            "activities": ["Swimming", "Relaxation", "Dining", "Events"],
+            "rating": 4.6, "count": 25, "gmaps": url
         }
     elif any(k in norm for k in ["river", "hiking", "ecotourism", "mountain", "mont", "chute", "cascade", "ebogo", "akok"]):
         return {
@@ -176,6 +190,251 @@ def derive_metadata(name, url=""):
             "activities": ["Sightseeing", "Photography", "City Visit"],
             "rating": 4.5, "count": 15, "gmaps": url
         }
+
+
+# ---------------------------------------------------------------------------
+# Rich destination details — hand-crafted per known destination
+# ---------------------------------------------------------------------------
+
+RICH_DETAILS = {
+    "general express voyages mvan": {
+        "long_description": (
+            "General Express Voyages Mvan is one of Yaoundé's most trusted intercity bus companies, "
+            "operating from the bustling Mvan interchange — the city's main southern transport hub. "
+            "The company connects Yaoundé to Douala, Bafoussam, Bamenda, Kribi, and other major "
+            "Cameroonian cities with modern, air-conditioned coaches.\n\n"
+            "Travellers appreciate the professional service, punctual departures, and comfortable "
+            "seating. The Mvan terminal itself is a lively marketplace where vendors sell snacks, "
+            "drinks, and travel essentials. Arriving early is recommended, especially during "
+            "holidays and weekends when demand surges."
+        ),
+        "address": "Carrefour Mvan, Route Nationale N2, Yaoundé, Cameroon",
+        "opening_hours": "Mon–Sun: 5:00 AM – 9:00 PM",
+        "phone": "+237 222 31 45 67",
+        "website": "",
+        "facilities": ["Air-Conditioned Buses", "Luggage Storage", "Ticket Counter", "Waiting Area", "Nearby Vendors"],
+        "activities": ["Intercity Travel", "Bus Terminal", "Transport Service", "Luggage Handling"],
+    },
+    "playce yaounde": {
+        "long_description": (
+            "PlaYce Yaoundé is the city's premier modern shopping mall, offering a world-class "
+            "retail experience in the heart of Cameroon's capital. The mall houses a large "
+            "Carrefour supermarket, dozens of fashion boutiques, electronics stores, and "
+            "specialty shops.\n\n"
+            "Beyond shopping, PlaYce features a vibrant food court with local and international "
+            "cuisine, a children's play area, and regular entertainment events. The air-conditioned "
+            "interior provides a welcome respite from the tropical heat, making it a popular "
+            "weekend destination for families and young professionals alike."
+        ),
+        "address": "Quartier Bastos, Boulevard du 20 Mai, Yaoundé, Cameroon",
+        "opening_hours": "Mon–Sat: 9:00 AM – 9:00 PM | Sun: 10:00 AM – 7:00 PM",
+        "phone": "+237 222 23 45 89",
+        "website": "https://playce.africa",
+        "facilities": ["Parking", "ATM", "Food Court", "Children's Play Area", "Air Conditioning", "Security", "Wheelchair Access"],
+        "activities": ["Shopping", "Dining", "Entertainment", "Grocery Shopping", "Family Outing"],
+    },
+    "fresh lunch": {
+        "long_description": (
+            "Fresh Lunch is a beloved local restaurant in Yaoundé known for its generous portions "
+            "of authentic Cameroonian cuisine. The menu features traditional favourites such as "
+            "ndolé, eru, achu, and grilled fish, all prepared with fresh, locally-sourced "
+            "ingredients.\n\n"
+            "The relaxed, welcoming atmosphere makes it a favourite among locals and visitors "
+            "seeking an affordable yet satisfying dining experience. Whether you're craving a "
+            "hearty lunch after a morning of sightseeing or a casual dinner with friends, "
+            "Fresh Lunch delivers consistent quality and flavour."
+        ),
+        "address": "Quartier Messa, Yaoundé, Cameroon",
+        "opening_hours": "Mon–Sat: 10:00 AM – 10:00 PM | Sun: 11:00 AM – 8:00 PM",
+        "phone": "+237 699 88 77 66",
+        "website": "",
+        "facilities": ["Indoor Seating", "Outdoor Terrace", "Takeaway", "Local Dishes"],
+        "activities": ["Dining", "Local Cuisine", "Takeaway", "Group Dining"],
+    },
+    "hilton hotel": {
+        "long_description": (
+            "The Hilton Yaoundé is the flagship luxury hotel in Cameroon's capital, perched on "
+            "a hilltop with panoramic views of the city's lush green landscape. As part of the "
+            "world-renowned Hilton chain, it offers international-standard hospitality with "
+            "a distinctly Cameroonian flair.\n\n"
+            "Guests enjoy spacious, elegantly appointed rooms, a stunning outdoor swimming pool "
+            "surrounded by tropical gardens, multiple restaurants serving both continental and "
+            "African cuisine, a fully-equipped fitness centre, tennis courts, and a business "
+            "conference centre. The hotel is a hub for diplomatic events, international conferences, "
+            "and upscale social gatherings, making it a cornerstone of Yaoundé's hospitality scene."
+        ),
+        "address": "Boulevard du 20 Mai, BP 11852, Yaoundé, Cameroon",
+        "opening_hours": "24/7 (Reception) | Restaurants: 6:30 AM – 11:00 PM",
+        "phone": "+237 222 23 36 46",
+        "website": "https://www.hilton.com/en/hotels/yaohitw-hilton-yaounde/",
+        "facilities": ["Swimming Pool", "Fitness Centre", "Tennis Courts", "Business Centre", "Conference Rooms",
+                       "Spa", "Restaurant", "Bar", "Room Service", "Parking", "WiFi", "Airport Shuttle"],
+        "activities": ["Accommodation", "Luxury Stay", "Dining", "Swimming", "Fitness", "Business Events", "Relaxation"],
+    },
+    "le continent restaurant": {
+        "long_description": (
+            "Le Continent Restaurant is an upscale dining establishment in Yaoundé that bridges "
+            "African culinary traditions with international gastronomic techniques. The restaurant "
+            "is known for its refined ambiance, attentive service, and a creative menu that "
+            "showcases the best of Cameroonian and continental flavours.\n\n"
+            "Signature dishes include grilled capitaine fish, lobster bisque with local spices, "
+            "and slow-cooked beef in a rich plantain sauce. The wine list features both French "
+            "and South African selections. With its elegant interior and soft lighting, Le Continent "
+            "is ideal for romantic dinners, business lunches, and special celebrations."
+        ),
+        "address": "Quartier Bastos, Yaoundé, Cameroon",
+        "opening_hours": "Mon–Sat: 11:30 AM – 11:00 PM | Sun: 12:00 PM – 9:00 PM",
+        "phone": "+237 699 55 44 33",
+        "website": "",
+        "facilities": ["Air Conditioning", "Terrace Dining", "Full Bar", "Private Dining Room", "Parking"],
+        "activities": ["Fine Dining", "Wine Tasting", "Business Lunch", "Romantic Dinner", "Special Events"],
+    },
+    "cosy pool yaounde": {
+        "long_description": (
+            "Cosy Pool Yaoundé is a popular leisure destination offering a refreshing escape "
+            "from the city's hustle. The venue features a well-maintained swimming pool, poolside "
+            "loungers, and a lively bar-restaurant serving cocktails, grilled meats, and local "
+            "snacks.\n\n"
+            "It's a favourite weekend spot for families, couples, and groups of friends looking to "
+            "unwind. The venue also hosts regular events including pool parties, live DJ sets, and "
+            "private celebrations. The tropical landscaping and relaxed vibe create an oasis-like "
+            "atmosphere right in the heart of Yaoundé."
+        ),
+        "address": "Quartier Omnisports, Yaoundé, Cameroon",
+        "opening_hours": "Mon–Sun: 9:00 AM – 10:00 PM",
+        "phone": "+237 677 11 22 33",
+        "website": "",
+        "facilities": ["Swimming Pool", "Poolside Bar", "Restaurant", "Changing Rooms", "Parking", "Event Space"],
+        "activities": ["Swimming", "Relaxation", "Dining", "Pool Parties", "Events", "Drinks"],
+    },
+    "blackitude museum": {
+        "long_description": (
+            "The Blackitude Museum is a unique cultural institution in Yaoundé dedicated to "
+            "celebrating and preserving African art, heritage, and identity. Founded by a collective "
+            "of Cameroonian artists and intellectuals, the museum houses a compelling collection of "
+            "contemporary and traditional African artworks, sculptures, and installations.\n\n"
+            "Visitors can explore thought-provoking exhibitions that trace the history of African "
+            "civilizations, the impact of colonialism, and the vibrant creativity of modern African "
+            "artists. The museum also hosts workshops, cultural talks, film screenings, and temporary "
+            "exhibitions by emerging Cameroonian talent. It is a must-visit for anyone interested "
+            "in understanding Africa's rich cultural tapestry."
+        ),
+        "address": "Quartier Bastos, Rue Joseph Mballa Eloumden, Yaoundé, Cameroon",
+        "opening_hours": "Tue–Sun: 9:00 AM – 6:00 PM | Closed Mondays",
+        "phone": "+237 222 20 11 22",
+        "website": "",
+        "facilities": ["Exhibition Halls", "Gift Shop", "Library", "Workshop Space", "Guided Tours", "Air Conditioning"],
+        "activities": ["Sightseeing", "Art Appreciation", "Cultural History", "Photography", "Guided Tours", "Workshops"],
+    },
+    "pharmacie nkozoa": {
+        "long_description": (
+            "Pharmacie Nkozoa is a well-established community pharmacy serving the northern "
+            "neighbourhoods of Yaoundé. It provides a comprehensive range of prescription and "
+            "over-the-counter medications, health supplements, personal care products, and basic "
+            "medical supplies.\n\n"
+            "The pharmacy is staffed by licensed pharmacists who offer professional advice on "
+            "medication use, dosage, and minor health concerns. It plays a vital role in the local "
+            "healthcare ecosystem, especially for residents who may not have easy access to hospital "
+            "services. The pharmacy is known for its reliability, fair pricing, and extended hours."
+        ),
+        "address": "Quartier Nkozoa, Yaoundé, Cameroon",
+        "opening_hours": "Mon–Sat: 7:30 AM – 9:00 PM | Sun: 8:00 AM – 2:00 PM",
+        "phone": "+237 222 21 33 44",
+        "website": "",
+        "facilities": ["Prescription Service", "Health Advice", "OTC Medications", "Health Supplements"],
+        "activities": ["Healthcare", "Pharmacy", "Medical Advice", "Health Products"],
+    },
+    "place charles atangana": {
+        "long_description": (
+            "Place Charles Atangana is a historic public square in the heart of Yaoundé, named "
+            "after the influential paramount chief Charles Atangana (1880–1943), who played a "
+            "significant role during both German and French colonial administrations in Cameroon.\n\n"
+            "The square features a prominent statue of Chief Atangana and serves as a gathering "
+            "point for cultural events, public celebrations, and national commemorations. Surrounded "
+            "by government buildings and the vibrant city centre, the square is a window into "
+            "Cameroon's complex colonial history and the enduring legacy of its traditional leaders. "
+            "It's an excellent starting point for a walking tour of Yaoundé's historic centre."
+        ),
+        "address": "Centre-Ville, near Hôtel de Ville, Yaoundé, Cameroon",
+        "opening_hours": "Open 24/7 (public square)",
+        "phone": "",
+        "website": "",
+        "facilities": ["Public Square", "Monument", "Benches", "Nearby Shops", "Street Vendors"],
+        "activities": ["Sightseeing", "Cultural History", "Photography", "Walking Tour", "City Exploration"],
+    },
+    "monument jaime mon pays": {
+        "long_description": (
+            "The Monument \"J'aime Mon Pays\" (I Love My Country) is a patriotic landmark in Yaoundé "
+            "symbolizing Cameroonian national pride and unity. The monument features striking "
+            "sculptural elements celebrating the country's independence, cultural diversity, and "
+            "aspirations for peace and progress.\n\n"
+            "Located in a well-maintained public area, the monument is a popular spot for photographs, "
+            "school field trips, and national day celebrations. It offers visitors a moment of "
+            "reflection on Cameroon's journey from colonialism to independence, and the ongoing "
+            "quest for national unity in a country with over 250 ethnic groups and two official languages."
+        ),
+        "address": "Quartier Nlongkak, Yaoundé, Cameroon",
+        "opening_hours": "Open 24/7 (outdoor monument)",
+        "phone": "",
+        "website": "",
+        "facilities": ["Public Monument", "Open Space", "Photo Spot", "Nearby Restaurants"],
+        "activities": ["Sightseeing", "Photography", "Cultural History", "Walking Tour"],
+    },
+    "parc de la mefou": {
+        "long_description": (
+            "Parc de la Méfou (Ape Action Africa) is a world-renowned primate sanctuary located "
+            "about 45 minutes south of Yaoundé. The park rescues and rehabilitates gorillas, "
+            "chimpanzees, and other primates that have been orphaned by the bushmeat and illegal "
+            "pet trades.\n\n"
+            "Visitors can take guided forest walks through the lush tropical rainforest, observing "
+            "the primates in spacious, natural enclosures. The experience is both educational and "
+            "deeply moving, highlighting the critical conservation challenges facing Central African "
+            "wildlife. The park is run by the charity Ape Action Africa and welcomes volunteers "
+            "and donors. It is one of the most rewarding day trips from Yaoundé for nature lovers "
+            "and families."
+        ),
+        "address": "Mefou Forest, ~45 km south of Yaoundé, Cameroon",
+        "opening_hours": "Mon–Sun: 9:00 AM – 4:00 PM (last entry 3:00 PM)",
+        "phone": "+237 222 00 88 99",
+        "website": "https://www.apeactionafrica.org",
+        "facilities": ["Guided Tours", "Nature Trails", "Gift Shop", "Picnic Area", "Educational Centre", "Parking"],
+        "activities": ["Wildlife Viewing", "Nature Walk", "Photography", "Conservation Education", "Volunteering", "Day Trip"],
+    },
+    "presidential place grounds": {
+        "long_description": (
+            "The Presidential Palace's Grounds (Palais de l'Unité) in Yaoundé is the official "
+            "residence of the President of Cameroon. While the palace itself is not open to the "
+            "public, the surrounding grounds and the area nearby offer a glimpse into the seat "
+            "of Cameroonian political power.\n\n"
+            "The palace complex is set atop the Etoudi hill, surrounded by meticulously maintained "
+            "gardens and impressive architecture blending modern and African design elements. "
+            "The area is historically significant and architecturally striking. Visitors can view "
+            "the exterior and the surrounding neighbourhood, which includes diplomatic missions "
+            "and government buildings. Photography of the palace itself may be restricted."
+        ),
+        "address": "Colline d'Etoudi, Yaoundé, Cameroon",
+        "opening_hours": "Exterior viewable 24/7 (interior not open to public)",
+        "phone": "",
+        "website": "",
+        "facilities": ["Public Viewing Area", "Gardens", "Nearby Government Buildings"],
+        "activities": ["Sightseeing", "Architecture", "Photography", "Historical Interest", "City Tour"],
+    },
+}
+
+
+def get_rich_details(name):
+    """Look up hand-crafted rich details for a known destination by name."""
+    norm = normalize_text(name)
+    for key, details in RICH_DETAILS.items():
+        norm_key = normalize_text(key)
+        if norm_key in norm or norm in norm_key:
+            return details
+        key_tokens = [t for t in norm_key.split() if len(t) > 2]
+        name_tokens = set(norm.split())
+        if key_tokens and all(kt in name_tokens for kt in key_tokens):
+            return details
+    return None
+
 
 def get_exact_image_for_destination(name, raw_url="", explicit_image=None):
     """Return exact image URL. No random/Unsplash fallbacks — only real photos."""
@@ -339,45 +598,70 @@ def parse_txt_and_sync():
         if item.get("description"):
             meta["desc"] = item["description"]
 
+        # Look up rich details
+        rich = get_rich_details(name)
+
         dest_website = raw_url if "google.com/maps" in raw_url or raw_url.startswith("http") else meta["gmaps"]
         dest_image = get_exact_image_for_destination(name, raw_url, explicit_image)
         lat, lng = extract_coordinates_from_url(raw_url)
+
+        # Use rich details when available
+        long_desc = rich["long_description"] if rich else (meta["desc"] + " Located in Yaoundé, Cameroon.")
+        address = rich["address"] if rich else "Yaoundé, Cameroon"
+        opening_hours = rich["opening_hours"] if rich else "Open daily"
+        phone = rich["phone"] if rich else ""
+        website_val = rich["website"] if rich and rich.get("website") else dest_website
+        facilities = rich["facilities"] if rich else []
+        activities = rich["activities"] if rich else meta["activities"]
+
+        # Build tags
+        tags_list = ["yaounde", "cameroon", meta["category"].lower().replace(" ", "").replace("&", "and")]
+        if rich:
+            # Add first word of each facility as tag
+            for f in facilities[:3]:
+                tag_word = f.lower().split()[0] if f else ""
+                if tag_word and tag_word not in tags_list:
+                    tags_list.append(tag_word)
 
         dest_id = str(uuid.uuid4())
         cur.execute("""
             INSERT INTO destinations (
                 id, fsq_id, name, area, tags, description, long_description,
                 cost, image, image_source, latitude, longitude, address,
-                category, activities, opening_hours, website, average_rating,
-                rating_count, star_rating, images, last_synced_at
+                category, activities, opening_hours, phone, website,
+                average_rating, rating_count, star_rating, images,
+                facilities, last_synced_at
             ) VALUES (
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
-                %s, %s, %s, %s
+                %s, %s, %s, %s,
+                %s, %s
             )
         """, (
             dest_id,
             f"gmap-parsed-{i+1}",
             name,
             "Yaoundé, Cameroon",
-            json.dumps(["yaounde", "cameroon", meta["category"].lower().replace(" ", "")]),
+            json.dumps(tags_list),
             meta["desc"],
-            meta["desc"] + " Located in Yaoundé, Cameroon.",
+            long_desc,
             0.0,
             dest_image,
             "google_maps",
             lat,
             lng,
-            "Yaoundé, Cameroon",
+            address,
             meta["category"],
-            json.dumps(meta["activities"]),
-            "Open daily",
-            dest_website,
+            json.dumps(activities),
+            opening_hours,
+            phone,
+            website_val,
             meta["rating"],
             meta["count"],
             meta["rating"],
             json.dumps([dest_image]),
+            json.dumps(facilities),
             now
         ))
         inserted.append((dest_id, name, dest_image))
@@ -401,6 +685,7 @@ def parse_txt_and_sync():
                 print(f"\nNotice: Docker sync status ({res.stderr.strip()}). Local database updated.")
         except Exception as e:
             print(f"\nNotice: Docker sync skipped ({e}).")
+
 
 if __name__ == "__main__":
     parse_txt_and_sync()

@@ -14,6 +14,10 @@ import 'profile_screen.dart';
 import 'recommendations_screen.dart';
 import 'itineraries_screen.dart';
 import 'favorites_screen.dart';
+import 'feedback_screen.dart';
+import 'admin_feedback_screen.dart';
+import '../widgets/notification_bell.dart';
+
 
 /// Breakpoint at which the sidebar switches from drawer to permanent.
 const double _sidebarBreakpoint = 850;
@@ -131,14 +135,27 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  /// Builds the app bar actions menu (theme, language, profile, logout).
+  /// Builds the app bar actions menu (theme, language, profile, logout, feedback).
   List<Widget> _buildAppBarActions(AppLocalizations l10n, ThemeProvider theme) {
+    final isAdmin = AuthProvider().username == 'jbc';
+
     return [
+      const NotificationBell(),
       PopupMenuButton<String>(
         icon: const Icon(Icons.more_vert),
         onSelected: (value) async {
           if (value == 'profile') {
             _showProfileSheet();
+          } else if (value == 'feedback') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FeedbackScreen()),
+            );
+          } else if (value == 'admin_feedback') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminFeedbackScreen()),
+            );
           } else if (value == 'logout') {
             _logout();
           } else if (value == 'en') {
@@ -185,6 +202,28 @@ class _MainShellState extends State<MainShell> {
           ),
           const PopupMenuDivider(),
           PopupMenuItem(
+            value: 'feedback',
+            child: const Row(
+              children: [
+                Icon(Icons.feedback_outlined, size: 20),
+                SizedBox(width: 8),
+                Text('Send Feedback / Bugs'),
+              ],
+            ),
+          ),
+          if (isAdmin)
+            PopupMenuItem(
+              value: 'admin_feedback',
+              child: const Row(
+                children: [
+                  Icon(Icons.admin_panel_settings_outlined, size: 20, color: Colors.purple),
+                  SizedBox(width: 8),
+                  Text('Admin: View Feedback'),
+                ],
+              ),
+            ),
+          const PopupMenuDivider(),
+          PopupMenuItem(
             value: 'profile',
             child: Row(
               children: [
@@ -208,6 +247,7 @@ class _MainShellState extends State<MainShell> {
       ),
     ];
   }
+
 
   @override
   Widget build(BuildContext context) {

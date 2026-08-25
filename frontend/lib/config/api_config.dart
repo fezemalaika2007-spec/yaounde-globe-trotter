@@ -72,4 +72,8 @@ class ApiConfig {
 
   /// Live internet search for destinations in Yaoundé (Foursquare-backed).
   static const String search = '/search';
+
+  static const String notifications = '/notifications';
+  static const String feedback = '/feedback';
 }
+

@@ -3,6 +3,16 @@
 Routes:
   GET  /destinations                  — List/search destinations (public)
   POST /destinations/<id>/rating      — Submit/update a rating (JWT required)
+  GET  /destinations/<id>/user-rating — Get user's own rating (JWT required)
+  GET  /destinations/<id>/comments    — List comments for a destination
+  POST /destinations/<id>/comments    — Add a comment (JWT required)
+  DELETE /destinations/<id>/comments/<cid> — Delete own comment (JWT required)
+  GET  /notifications                 — List notifications (JWT required)
+  POST /notifications/<id>/read       — Mark notification read (JWT required)
+  POST /notifications/read-all        — Mark all read (JWT required)
+  POST /feedback                      — Submit feedback (JWT required)
+  GET  /feedback                      — List all feedback (admin only)
+  POST /feedback/<id>/resolve         — Resolve feedback (admin only)
   GET  /recommendations               — Categorized recommendations (JWT required)
   POST /reseed                        — Reseed authentic Yaoundé destinations
 """
@@ -16,7 +26,13 @@ from flask import Blueprint, request, jsonify, g, current_app, Response
 from app.auth_middleware import token_required
 from app.models import (
     get_all_destinations, get_destination_by_id,
-    upsert_rating, get_user_rating
+    upsert_rating, get_user_rating,
+    create_notification, get_notifications_for_user,
+    get_unread_notification_count, mark_notification_read,
+    mark_all_notifications_read,
+    create_comment, get_comments_for_destination, delete_comment,
+    create_feedback, get_all_feedback, mark_feedback_resolved,
+    ADMIN_USERNAME,
 )
 from app.recommendations import get_sectioned_recommendations as _section_recommendations
 
@@ -30,6 +46,10 @@ def health():
     """Health check for the recommendation service."""
     return jsonify({"status": "ok", "service": "recommendation-service"}), 200
 
+
+# ---------------------------------------------------------------------------
+# Destinations
+# ---------------------------------------------------------------------------
 
 @recommendation_bp.route("/destinations", methods=["GET"])
 def search_destinations():
@@ -84,6 +104,10 @@ def search_destinations():
     return jsonify(results), 200
 
 
+# ---------------------------------------------------------------------------
+# Ratings
+# ---------------------------------------------------------------------------
+
 @recommendation_bp.route("/destinations/<dest_id>/rating", methods=["POST"])
 @token_required
 def submit_rating(dest_id):
@@ -120,12 +144,197 @@ def submit_rating(dest_id):
     user_id = username
 
     result = upsert_rating(dest_id, user_id, rating_value)
+
+    # Auto-create notification
+    stars = "★" * rating_value + "☆" * (5 - rating_value)
+    dest_name = destination.get("name", "a destination")
+    try:
+        create_notification(
+            user_id=user_id,
+            title="Rating Submitted",
+            message=f"You rated {dest_name} {stars} ({rating_value}/5)",
+            notif_type="rating",
+            related_id=dest_id,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to create rating notification: {e}")
+
     return jsonify({
         "message": "rating submitted successfully",
         "average_rating": result["average_rating"],
         "rating_count": result["rating_count"],
     }), 200
 
+
+@recommendation_bp.route("/destinations/<dest_id>/user-rating", methods=["GET"])
+@token_required
+def get_user_rating_route(dest_id):
+    """Get the current user's rating for a destination."""
+    username = g.current_user
+    destination = get_destination_by_id(dest_id)
+    if not destination:
+        return jsonify({"error": "destination not found"}), 404
+
+    rating = get_user_rating(dest_id, username)
+    return jsonify({"rating": rating}), 200
+
+
+# ---------------------------------------------------------------------------
+# Comments
+# ---------------------------------------------------------------------------
+
+@recommendation_bp.route("/destinations/<dest_id>/comments", methods=["GET"])
+def get_comments(dest_id):
+    """List all comments for a destination (public)."""
+    destination = get_destination_by_id(dest_id)
+    if not destination:
+        return jsonify({"error": "destination not found"}), 404
+
+    comments = get_comments_for_destination(dest_id)
+    return jsonify(comments), 200
+
+
+@recommendation_bp.route("/destinations/<dest_id>/comments", methods=["POST"])
+@token_required
+def post_comment(dest_id):
+    """Add a comment to a destination (JWT required)."""
+    username = g.current_user
+    destination = get_destination_by_id(dest_id)
+    if not destination:
+        import urllib.parse
+        clean_id = urllib.parse.unquote(dest_id)
+        destination = get_destination_by_id(clean_id)
+
+    if not destination:
+        all_d = get_all_destinations()
+        for d in all_d:
+            if d.get("name", "").lower() == dest_id.lower() or d.get("id") == dest_id:
+                destination = d
+                dest_id = d["id"]
+                break
+
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    if len(text) > 2000:
+        return jsonify({"error": "comment too long (max 2000 characters)"}), 400
+
+    comment = create_comment(dest_id, username, username, text)
+    return jsonify(comment), 201
+
+
+
+@recommendation_bp.route("/destinations/<dest_id>/comments/<comment_id>", methods=["DELETE"])
+@token_required
+def remove_comment(dest_id, comment_id):
+    """Delete a comment (only the author can delete)."""
+    username = g.current_user
+    success = delete_comment(comment_id, username)
+    if not success:
+        return jsonify({"error": "comment not found or access denied"}), 404
+    return jsonify({"message": "comment deleted"}), 200
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+
+@recommendation_bp.route("/notifications", methods=["GET"])
+@token_required
+def list_notifications():
+    """List notifications for the current user."""
+    username = g.current_user
+    notifications = get_notifications_for_user(username)
+    unread = get_unread_notification_count(username)
+    return jsonify({"notifications": notifications, "unread_count": unread}), 200
+
+
+@recommendation_bp.route("/notifications/<notif_id>/read", methods=["POST"])
+@token_required
+def read_notification(notif_id):
+    """Mark a single notification as read."""
+    username = g.current_user
+    mark_notification_read(notif_id, username)
+    return jsonify({"message": "notification marked as read"}), 200
+
+
+@recommendation_bp.route("/notifications/read-all", methods=["POST"])
+@token_required
+def read_all_notifications():
+    """Mark all notifications as read for the current user."""
+    username = g.current_user
+    mark_all_notifications_read(username)
+    return jsonify({"message": "all notifications marked as read"}), 200
+
+
+# ---------------------------------------------------------------------------
+# Feedback
+# ---------------------------------------------------------------------------
+
+@recommendation_bp.route("/feedback", methods=["POST"])
+@token_required
+def submit_feedback():
+    """Submit feedback or a bug report."""
+    username = g.current_user
+    data = request.get_json(silent=True) or {}
+
+    category = (data.get("category") or "feedback").strip()
+    if category not in ("bug", "feedback", "suggestion"):
+        category = "feedback"
+
+    subject = (data.get("subject") or "").strip()
+    message = (data.get("message") or "").strip()
+
+    if not subject:
+        return jsonify({"error": "subject is required"}), 400
+    if not message:
+        return jsonify({"error": "message is required"}), 400
+
+    result = create_feedback(username, username, category, subject, message)
+
+    # Notify admin
+    try:
+        create_notification(
+            user_id=ADMIN_USERNAME,
+            title="New Feedback",
+            message=f"{username} submitted a {category}: {subject}",
+            notif_type="feedback",
+            related_id=result["id"],
+        )
+    except Exception as e:
+        logger.warning(f"Failed to create feedback notification: {e}")
+
+    return jsonify({"message": "feedback submitted successfully", "feedback": result}), 201
+
+
+@recommendation_bp.route("/feedback", methods=["GET"])
+@token_required
+def list_feedback():
+    """List all feedback (admin only)."""
+    username = g.current_user
+    if username != ADMIN_USERNAME:
+        return jsonify({"error": "access denied"}), 403
+
+    feedback_list = get_all_feedback()
+    return jsonify(feedback_list), 200
+
+
+@recommendation_bp.route("/feedback/<feedback_id>/resolve", methods=["POST"])
+@token_required
+def resolve_feedback(feedback_id):
+    """Mark feedback as resolved (admin only)."""
+    username = g.current_user
+    if username != ADMIN_USERNAME:
+        return jsonify({"error": "access denied"}), 403
+
+    mark_feedback_resolved(feedback_id)
+    return jsonify({"message": "feedback marked as resolved"}), 200
+
+
+# ---------------------------------------------------------------------------
+# Recommendations
+# ---------------------------------------------------------------------------
 
 @recommendation_bp.route("/recommendations", methods=["GET"])
 @token_required
@@ -180,6 +389,10 @@ def get_recommendations():
     return jsonify(payload), 200
 
 
+# ---------------------------------------------------------------------------
+# Import / Proxy helpers
+# ---------------------------------------------------------------------------
+
 @recommendation_bp.route("/import-urls", methods=["POST"])
 def import_urls():
     """Accept a JSON payload with a list of URLs and import destination metadata for each."""
@@ -231,6 +444,3 @@ def proxy_image():
     except Exception as e:
         logger.warning(f"Image proxy failed for {image_url}: {e}")
         return jsonify({"error": str(e)}), 500
-
-
-

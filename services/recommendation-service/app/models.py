@@ -176,6 +176,48 @@ def init_db(app=None):
         cur.execute("CREATE INDEX IF NOT EXISTS idx_destinations_fsq_id ON destinations(fsq_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_ratings_dest_user ON ratings(destination_id, user_id)")
 
+        # --- Notifications table ---
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                type TEXT DEFAULT 'info',
+                is_read INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                related_id TEXT DEFAULT ''
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)")
+
+        # --- Comments table ---
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS comments (
+                id TEXT PRIMARY KEY,
+                destination_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                username TEXT NOT NULL,
+                text TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_comments_dest ON comments(destination_id)")
+
+        # --- Feedback table ---
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS feedback (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                username TEXT NOT NULL,
+                category TEXT DEFAULT 'feedback',
+                subject TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                is_resolved INTEGER DEFAULT 0
+            )
+        """)
+
         # Ensure the fsq_id column exists (safe migration for existing DBs).
         try:
             cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='destinations'")
@@ -232,15 +274,19 @@ def get_all_destinations(app=None):
 
 
 def get_destination_by_id(dest_id, app=None):
-    """Return a single destination by its primary key."""
+    """Return a single destination by its primary key (id), fsq_id, or name."""
     conn = get_connection(app)
     cur = conn.cursor()
-    cur.execute("SELECT * FROM destinations WHERE id = %s", (dest_id,))
+    cur.execute(
+        "SELECT * FROM destinations WHERE id = %s OR fsq_id = %s OR name = %s",
+        (dest_id, dest_id, dest_id)
+    )
     row = cur.fetchone()
     result = _row_to_dict(row, cur)
     cur.close()
     release_connection(conn)
     return result
+
 
 
 def get_destination_by_fsq_id(fsq_id, app=None):
@@ -423,4 +469,192 @@ def seed_initial_destinations(app=None):
     """No-op seed function ensuring a fresh, empty destination database."""
     pass
 
+
+# ---------------------------------------------------------------------------
+# Notification helpers
+# ---------------------------------------------------------------------------
+
+def create_notification(user_id, title, message, notif_type='info', related_id='', app=None):
+    """Create a notification for a user."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    notif_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    cur.execute(
+        "INSERT INTO notifications (id, user_id, title, message, type, is_read, created_at, related_id) "
+        "VALUES (%s, %s, %s, %s, %s, 0, %s, %s)",
+        (notif_id, user_id, title, message, notif_type, now, related_id)
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return notif_id
+
+
+def get_notifications_for_user(user_id, limit=50, app=None):
+    """Return notifications for a user, newest first."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, user_id, title, message, type, is_read, created_at, related_id "
+        "FROM notifications WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
+        (user_id, limit)
+    )
+    rows = cur.fetchall()
+    cols = ['id', 'user_id', 'title', 'message', 'type', 'is_read', 'created_at', 'related_id']
+    results = [dict(zip(cols, r)) for r in rows]
+    cur.close()
+    release_connection(conn)
+    return results
+
+
+def get_unread_notification_count(user_id, app=None):
+    """Return the number of unread notifications for a user."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT COUNT(*) FROM notifications WHERE user_id = %s AND is_read = 0",
+        (user_id,)
+    )
+    row = cur.fetchone()
+    cur.close()
+    release_connection(conn)
+    return row[0] if row else 0
+
+
+def mark_notification_read(notif_id, user_id, app=None):
+    """Mark a single notification as read."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE notifications SET is_read = 1 WHERE id = %s AND user_id = %s",
+        (notif_id, user_id)
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+
+
+def mark_all_notifications_read(user_id, app=None):
+    """Mark all notifications as read for a user."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE notifications SET is_read = 1 WHERE user_id = %s",
+        (user_id,)
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+
+
+# ---------------------------------------------------------------------------
+# Comment helpers
+# ---------------------------------------------------------------------------
+
+def create_comment(destination_id, user_id, username, text, app=None):
+    """Create a comment on a destination."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    comment_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    cur.execute(
+        "INSERT INTO comments (id, destination_id, user_id, username, text, created_at) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (comment_id, destination_id, user_id, username, text, now)
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return {"id": comment_id, "destination_id": destination_id, "user_id": user_id,
+            "username": username, "text": text, "created_at": now}
+
+
+def get_comments_for_destination(destination_id, app=None):
+    """Return all comments for a destination, newest first."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, destination_id, user_id, username, text, created_at "
+        "FROM comments WHERE destination_id = %s ORDER BY created_at DESC",
+        (destination_id,)
+    )
+    rows = cur.fetchall()
+    cols = ['id', 'destination_id', 'user_id', 'username', 'text', 'created_at']
+    results = [dict(zip(cols, r)) for r in rows]
+    cur.close()
+    release_connection(conn)
+    return results
+
+
+def delete_comment(comment_id, user_id, app=None):
+    """Delete a comment if it belongs to the user. Returns True if deleted."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id FROM comments WHERE id = %s AND user_id = %s",
+        (comment_id, user_id)
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        release_connection(conn)
+        return False
+    cur.execute("DELETE FROM comments WHERE id = %s", (comment_id,))
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Feedback helpers
+# ---------------------------------------------------------------------------
+
+ADMIN_USERNAME = "jbc"
+
+
+def create_feedback(user_id, username, category, subject, message, app=None):
+    """Create a feedback/bug report entry."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    feedback_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    cur.execute(
+        "INSERT INTO feedback (id, user_id, username, category, subject, message, created_at, is_resolved) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, 0)",
+        (feedback_id, user_id, username, category, subject, message, now)
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return {"id": feedback_id, "user_id": user_id, "username": username,
+            "category": category, "subject": subject, "message": message,
+            "created_at": now, "is_resolved": 0}
+
+
+def get_all_feedback(app=None):
+    """Return all feedback entries, newest first. Admin only."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, user_id, username, category, subject, message, created_at, is_resolved "
+        "FROM feedback ORDER BY created_at DESC"
+    )
+    rows = cur.fetchall()
+    cols = ['id', 'user_id', 'username', 'category', 'subject', 'message', 'created_at', 'is_resolved']
+    results = [dict(zip(cols, r)) for r in rows]
+    cur.close()
+    release_connection(conn)
+    return results
+
+
+def mark_feedback_resolved(feedback_id, app=None):
+    """Mark a feedback entry as resolved."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute("UPDATE feedback SET is_resolved = 1 WHERE id = %s", (feedback_id,))
+    conn.commit()
+    cur.close()
+    release_connection(conn)
 

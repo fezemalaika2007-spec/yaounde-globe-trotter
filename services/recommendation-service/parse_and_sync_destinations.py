@@ -422,6 +422,49 @@ RICH_DETAILS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Real prices in FCFA — researched from Google Maps, travel sites, official sources
+# ---------------------------------------------------------------------------
+# Each price represents the typical cost for a single visit/experience:
+#   - Hotels: starting room rate per night
+#   - Restaurants: average meal price per person
+#   - Transport: standard one-way ticket
+#   - Museums/Parks: entrance fee
+#   - Shopping malls: free entry (0)
+#   - Public monuments/squares: free entry (0)
+#   - Pools/Leisure: entrance/minimum spend
+#   - Pharmacies: average consultation/purchase
+
+DESTINATION_PRICES = {
+    "general express voyages mvan": 5000,      # Standard bus ticket Yaoundé–Douala ~3500-7000 FCFA
+    "playce yaounde": 0,                        # Free entry (shopping mall)
+    "fresh lunch": 3000,                        # Average meal 1000-8000 FCFA, typical plate ~3000
+    "hilton hotel": 161000,                     # Standard room starting rate per night
+    "le continent restaurant": 6500,            # Lunch menu ~6500 FCFA
+    "cosy pool yaounde": 5000,                  # Minimum spend / reservation fee ~5000-8000 FCFA
+    "blackitude museum": 3000,                  # Entrance fee 3000 FCFA
+    "pharmacie nkozoa": 2000,                   # Average pharmacy visit/purchase
+    "place charles atangana": 0,                # Free (public square)
+    "monument jaime mon pays": 0,               # Free (outdoor monument)
+    "parc de la mefou": 5000,                   # Entrance fee ~5000-10000 FCFA (currently suspended)
+    "presidential place grounds": 0,            # Free (public viewing area)
+}
+
+
+def get_real_price(name):
+    """Look up the real FCFA price for a destination by name."""
+    norm = normalize_text(name)
+    for key, price in DESTINATION_PRICES.items():
+        norm_key = normalize_text(key)
+        if norm_key in norm or norm in norm_key:
+            return price
+        key_tokens = [t for t in norm_key.split() if len(t) > 2]
+        name_tokens = set(norm.split())
+        if key_tokens and all(kt in name_tokens for kt in key_tokens):
+            return price
+    return None
+
+
 def get_rich_details(name):
     """Look up hand-crafted rich details for a known destination by name."""
     norm = normalize_text(name)
@@ -646,7 +689,7 @@ def parse_txt_and_sync():
             json.dumps(tags_list),
             meta["desc"],
             long_desc,
-            0.0,
+            get_real_price(name) if get_real_price(name) is not None else 0.0,
             dest_image,
             "google_maps",
             lat,

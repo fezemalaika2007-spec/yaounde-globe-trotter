@@ -32,6 +32,7 @@ KNOWN_PLACE_PHOTOS = {
     "monument jaime mon pays": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlSzhjDxJyNUYv2f8cdfr23F5PJ_DF-sCv_N84t7kfEQsmshSLcpUKjls78lBtXwxWXcFJMUSepwXKES58Nw6PQLLvZvqChD8-7_WFsL6NUvPItN4fD0SiOhpOnV15cKCNXQtbs=w408-h306-k-no",
     "parc de la mefou": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWkw_sv6Ia990VekqXZjbHrLGrizXjGL7SURBY95Lmoph42CJV_Z5tFVsNyYiu_rRr2uNiRH76D7493yJ3ML-rQ_SYfg5ePS6VvRe2iYjV-1A9rx8cQX_0-y8q2sMvxgDkORLW9o=w408-h271-k-no",
     "presidential place grounds": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnF_lP42zglnAtBolkorn2BBY68LNRLvs-UZvidD823fdKacER8OFF8V43k_6rhZZlHd_ZYH5II1Kw7aUL2-s5VZbU1m_oOomxtbk_-5uR-XyzRWyyvkByAaUJC2iS4kWtZHaiVVw=w408-h306-k-no",
+    "katios night club": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnCge6OXfk9JT7A-tvaym4c7U3pgl1PI8S3GbtQqZ4pMD3TKqGD1_7y1fwVsh4It6cw6LBP-l5UvnF3GJ3NfPjGqg2zVzF8E2pXOeLQjHgvs2a7sIp2i8b6Bo13FPmDs0Ji4YGNlw=w426-h240-k-no",
 }
 
 # Default placeholder when no image is provided

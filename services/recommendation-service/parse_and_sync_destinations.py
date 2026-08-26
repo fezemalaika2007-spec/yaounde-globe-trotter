@@ -33,6 +33,8 @@ KNOWN_PLACE_PHOTOS = {
     "parc de la mefou": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWkw_sv6Ia990VekqXZjbHrLGrizXjGL7SURBY95Lmoph42CJV_Z5tFVsNyYiu_rRr2uNiRH76D7493yJ3ML-rQ_SYfg5ePS6VvRe2iYjV-1A9rx8cQX_0-y8q2sMvxgDkORLW9o=w408-h271-k-no",
     "presidential place grounds": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnF_lP42zglnAtBolkorn2BBY68LNRLvs-UZvidD823fdKacER8OFF8V43k_6rhZZlHd_ZYH5II1Kw7aUL2-s5VZbU1m_oOomxtbk_-5uR-XyzRWyyvkByAaUJC2iS4kWtZHaiVVw=w408-h306-k-no",
     "katios night club": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnCge6OXfk9JT7A-tvaym4c7U3pgl1PI8S3GbtQqZ4pMD3TKqGD1_7y1fwVsh4It6cw6LBP-l5UvnF3GJ3NfPjGqg2zVzF8E2pXOeLQjHgvs2a7sIp2i8b6Bo13FPmDs0Ji4YGNlw=w426-h240-k-no",
+    "dade park": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWn61nJBx0H13ey7QpF_gVITP8pwp1FFmFdNGq5ZXpYLjc7VFcv9dQYhJBec1VGINNMTZXfvvZC2f9BKwWdojGmtQVBW1SE9CeDCbw0oR-RqKUYkTBFqFmv0VtqSfsKjXMBVdGZJt9PMm7v2=w408-h544-k-no",
+    "maneges de ya-fe": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWkATSjkIWP2QuxcYqeR2e_G_61PgR6a6Dg5tYV5nZHA9SUxLN8gz3dxXhyvO_SGOX2w0ZgI3N-J5UPtgW_xafyyvYydr3rjn7nJdReg0WDUptZUu9jCJTPLgu4hgC0X_N2TShyd=w408-h725-k-no",
 }
 
 # Default placeholder when no image is provided

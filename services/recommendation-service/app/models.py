@@ -205,7 +205,21 @@ def init_db(app=None):
             )
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS idx_comments_dest ON comments(destination_id)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id)")
+
+        # Ensure comments columns parent_id and updated_at exist for existing tables
+        try:
+            cur.execute("ALTER TABLE comments ADD COLUMN parent_id TEXT")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE comments ADD COLUMN updated_at TEXT")
+        except Exception:
+            pass
+
+        try:
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id)")
+        except Exception:
+            pass
 
         # --- Feedback table ---
         cur.execute("""
@@ -227,16 +241,6 @@ def init_db(app=None):
             existing_cols = {r[0] for r in cur.fetchall()}
             if "fsq_id" not in existing_cols:
                 cur.execute("ALTER TABLE destinations ADD COLUMN fsq_id TEXT")
-        except Exception:
-            pass
-
-        # Ensure comments columns parent_id and updated_at exist
-        try:
-            cur.execute("ALTER TABLE comments ADD COLUMN parent_id TEXT")
-        except Exception:
-            pass
-        try:
-            cur.execute("ALTER TABLE comments ADD COLUMN updated_at TEXT")
         except Exception:
             pass
 

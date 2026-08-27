@@ -109,6 +109,18 @@ String getLocalAssetFallback(String name) {
   if (norm.contains('independence') || norm.contains('independance') || norm.contains('independence square')) {
     return 'assets/images/independence_square.jpg';
   }
+  if (norm.contains('mvog') || norm.contains('betsi') || norm.contains('zoo')) {
+    return 'assets/images/mvog_betsi_botanical_zoo_garden.jpg';
+  }
+  if (norm.contains('ekom') || norm.contains('nkam') || norm.contains('waterfall') || norm.contains('chute')) {
+    return 'assets/images/ekom_nkam_waterfalls.jpg';
+  }
+  if (norm.contains('bonanjo')) {
+    return 'assets/images/parc_bonanjo.jpg';
+  }
+  if (norm.contains('bamun') || norm.contains('bamoun') || norm.contains('foumban') || norm.contains('sultan')) {
+    return 'assets/images/bamun_sultan_palace.jpg';
+  }
   return '';
 }
 

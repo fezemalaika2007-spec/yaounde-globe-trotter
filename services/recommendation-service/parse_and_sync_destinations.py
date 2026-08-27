@@ -35,7 +35,7 @@ KNOWN_PLACE_PHOTOS = {
     "dade park": "assets/images/dade_park.jpg",
     "maneges de ya-fe": "assets/images/maneges_de_ya-fe.jpg",
     "independence square": "assets/images/independence_square.jpg",
-    "mvog betsi botanical zoo garden": "assets/images/mvog_betsi_botanical_zoo_garden",
+    "mvog betsi botanical zoo garden": "assets/images/mvog_betsi_botanical_zoo_garden.jpg",
     "ekom nkam waterfalls": "assets/images/ekom_nkam_waterfalls.jpg",
     "parc bonanjo": "assets/images/parc_bonanjo.jpg",
     "bamun sultan palace": "assets/images/bamun_sultan_palace.jpg",
@@ -162,7 +162,7 @@ def derive_metadata(name, url=""):
             "activities": ["Nature Walk", "Relaxation", "Outdoor Recreation", "Wildlife"],
             "rating": 0, "count": 30, "gmaps": url
         }
-    elif any(k in norm for k in ["museum", "musee", "monument", "cathedral", "cathedrale", "basilique", "culture", "reunification", "national", "palais", "presidential"]):
+    elif any(k in norm for k in ["museum", "musee", "monument", "cathedral", "cathedrale", "basilique", "culture", "reunification", "national", "palais", "presidential", "palace", "sultan", "square", "heritage", "atangana", "independence", "independance"]):
         return {
             "category": "Culture & History",
             "desc": f"Famous historical and cultural landmark in Yaoundé ({name}).",
@@ -183,12 +183,26 @@ def derive_metadata(name, url=""):
             "activities": ["Swimming", "Relaxation", "Dining", "Events"],
             "rating": 0, "count": 25, "gmaps": url
         }
-    elif any(k in norm for k in ["river", "hiking", "ecotourism", "mountain", "mont", "chute", "cascade", "ebogo", "akok"]):
+    elif any(k in norm for k in ["night club", "nightclub", "disco", "club", "katios"]):
         return {
-            "category": "Adventure",
+            "category": "Nightlife & Entertainment",
+            "desc": f"Vibrant nightlife and entertainment destination in Yaoundé ({name}).",
+            "activities": ["Nightlife", "Dancing", "Live DJ", "Cocktails", "VIP Lounge", "Celebrations"],
+            "rating": 0, "count": 40, "gmaps": url
+        }
+    elif any(k in norm for k in ["manege", "maneges", "ya-fe", "yafe", "amusement"]):
+        return {
+            "category": "Entertainment & Amusement",
+            "desc": f"Festive family amusement park and carnival destination in Yaoundé ({name}).",
+            "activities": ["Amusement Rides", "Carnival Games", "Street Food", "Family Entertainment", "Festivals"],
+            "rating": 0, "count": 35, "gmaps": url
+        }
+    elif any(k in norm for k in ["river", "hiking", "ecotourism", "mountain", "mont", "chute", "cascade", "waterfall", "ekom", "ebogo", "akok"]):
+        return {
+            "category": "Nature & Adventure",
             "desc": f"Exciting outdoor adventure and ecotourism destination near Yaoundé ({name}).",
-            "activities": ["Hiking", "Adventure", "Exploration", "Sightseeing"],
-            "rating": 0, "count": 20, "gmaps": url
+            "activities": ["Hiking", "Adventure", "Exploration", "Sightseeing", "Waterfall Viewing", "Photography"],
+            "rating": 0, "count": 30, "gmaps": url
         }
     else:
         return {
@@ -426,6 +440,150 @@ RICH_DETAILS = {
         "facilities": ["Public Viewing Area", "Gardens", "Nearby Government Buildings"],
         "activities": ["Sightseeing", "Architecture", "Photography", "Historical Interest", "City Tour"],
     },
+    "katios night club": {
+        "long_description": (
+            "Katios Night Club is one of Yaoundé's most legendary nightlife landmarks and premier "
+            "dance clubs, located in the heart of the capital. For decades, Katios has set the standard "
+            "for Cameroon's vibrant nocturnal scene, drawing an eclectic mix of cosmopolitan locals, "
+            "expatriates, tourists, and visiting music artists.\n\n"
+            "The club features state-of-the-art sound and intelligent lighting systems, multiple bars "
+            "serving signature cocktails and premium champagnes, a spacious central dance floor, and "
+            "an exclusive VIP mezzanine lounge with dedicated bottle service. Resident and guest DJs "
+            "spin an electrifying rotation of Afrobeat, Amapiano, Makossa, Bikutsi, Hip-Hop, and "
+            "international club anthems until the early morning hours. Dress code is smart and stylish."
+        ),
+        "address": "Rue Joseph Essono Balla, Centre-Ville, Yaoundé, Cameroon",
+        "opening_hours": "Wed–Sun: 10:00 PM – 6:00 AM (Closed Mon–Tue)",
+        "phone": "+237 677 34 56 78",
+        "website": "",
+        "facilities": ["VIP Lounge", "Central Dance Floor", "Full Cocktail Bar", "DJ Booth & Stage", "Bottle Service", "Security", "Valet Parking", "Air Conditioning"],
+        "activities": ["Nightlife", "Dancing", "Live DJ Sets", "Cocktail Tasting", "VIP Parties", "Celebrations"],
+    },
+    "dade park": {
+        "long_description": (
+            "DADE Park is a modern open-air family amusement and recreation botanical park located in "
+            "the eastern suburbs of Yaoundé. Set across expansive verdant lawns with landscaped flower "
+            "beds, shaded picnic gazebos, and ornamental trees, it provides a safe, serene oasis away "
+            "from the urban rush.\n\n"
+            "The park is equipped with colorful children's play structures, trampolines, inflatable "
+            "castles, mini electric cars, and recreational sports courts. Families frequently gather "
+            "for weekend picnics, birthday celebrations, and community sports events. On-site food kiosks "
+            "offer grilled brochettes, fresh tropical fruit juices, ice cream, and snacks, making DADE Park "
+            "a favorite weekend destination for parents and young children alike."
+        ),
+        "address": "Quartier Biteng / Nkoabang, Yaoundé Est, Cameroon",
+        "opening_hours": "Mon–Sun: 8:00 AM – 7:00 PM",
+        "phone": "+237 699 22 44 88",
+        "website": "",
+        "facilities": ["Children's Playground", "Picnic Gazebos", "Trampolines & Inflatables", "Snack Kiosks", "Restrooms", "Free Parking", "Party & Event Venue"],
+        "activities": ["Family Outings", "Picnicking", "Kids Rides", "Birthday Events", "Relaxation", "Outdoor Games"],
+    },
+    "maneges de ya-fe": {
+        "long_description": (
+            "Les Manèges de Ya-Fe (Yaoundé en Fête) is the capital's premier festive amusement park and "
+            "carnival fairground, traditionally hosted in conjunction with the major annual festive events "
+            "near Tsinga and the Palais des Congrès grounds.\n\n"
+            "The fair features exhilarating amusement rides for all age groups, including bumper cars (auto-tamponneuses), "
+            "a revolving carousel, mini roller coaster tracks, pirate ship swinging rides, and arcade shooting galleries. "
+            "Surrounding the rides are lively open-air market stalls, barbecue grillers selling spiced suya beef and fish, "
+            "popcorn stands, and musical entertainment stages. The illuminated evening atmosphere fills the city with festive "
+            "cheer and excitement, drawing thousands of families and youth every season."
+        ),
+        "address": "Plateau Atemengue / Palais des Congrès, Quartier Tsinga, Yaoundé, Cameroon",
+        "opening_hours": "Mon–Sun: 11:00 AM – 10:30 PM (Extended hours on weekends and festive periods)",
+        "phone": "+237 222 21 00 55",
+        "website": "",
+        "facilities": ["Amusement Rides", "Bumper Cars", "Arcade Games", "Street Food Stands", "Lighting & Sound", "Security Patrols", "Restrooms"],
+        "activities": ["Amusement Rides", "Carnival Games", "Street Food Tasting", "Family Entertainment", "Festive Evening Strolls"],
+    },
+    "independence square": {
+        "long_description": (
+            "Independence Square (Place de l'Indépendance) is a distinguished national civic landmark and "
+            "ceremonial plaza situated within the governmental and historic heart of Yaoundé. The square "
+            "stands as a solemn tribute to Cameroon's proclamation of national sovereignty on January 1, 1960.\n\n"
+            "Encircled by stately administrative institutions, palm-lined avenues, and manicured ornamental gardens, "
+            "the plaza features commemorative monuments, commemorative plaques, and wide paved pedestrian promenades. "
+            "It serves as a principal staging area for state parades, national day civic ceremonies, and historical educational "
+            "tours. Visiting the square offers deep insight into the country's founding history, political evolution, "
+            "and civic pride in the heart of the capital."
+        ),
+        "address": "Boulevard de l'Indépendance / Centre Administratif, Yaoundé, Cameroon",
+        "opening_hours": "Open 24/7 (Public monument and civic plaza)",
+        "phone": "",
+        "website": "",
+        "facilities": ["Civic Plaza", "Commemorative Monument", "Garden Benches", "Paved Walkways", "Historical Plaques", "Photo Backdrop"],
+        "activities": ["Civic Sightseeing", "Historical Photography", "National Heritage Tour", "Walking Tour", "Architectural Appreciation"],
+    },
+    "mvog betsi botanical zoo garden": {
+        "long_description": (
+            "The Mvog-Betsi Botanical and Zoological Garden (Jardin Zoologique et Botanique de Mvog-Betsi) is a "
+            "historic 4-hectare wildlife and botanical conservation sanctuary founded in 1951 in western Yaoundé. "
+            "It is one of Central Africa's oldest urban wildlife rescue and public education institutions.\n\n"
+            "The zoo houses diverse native Cameroonian and West African wildlife species, including African lions, "
+            "endangered drill monkeys, baboons, mandrills, chimpanzees, reptiles, crocodiles, and exotic aviaries. "
+            "The botanical sections showcase majestic indigenous canopy trees, medicinal plant nurseries, and shaded "
+            "canopy walking trails. Guided educational tours are available for schools and visitors, making it a cornerstone "
+            "for ecological awareness, wildlife preservation, and family education in the city."
+        ),
+        "address": "Quartier Mvog-Betsi, BP 603, Yaoundé, Cameroon",
+        "opening_hours": "Mon–Sun: 8:30 AM – 5:30 PM",
+        "phone": "+237 222 23 11 00",
+        "website": "",
+        "facilities": ["Wildlife Enclosures", "Botanical Trails", "Reptile Vivarium", "Children's Play Area", "Educational Interpretation Center", "Picnic Areas", "Restrooms", "Parking"],
+        "activities": ["Wildlife Viewing", "Botanical Exploration", "Guided Ecological Tours", "Bird Watching", "Family Day Out", "Photography"],
+    },
+    "ekom nkam waterfalls": {
+        "long_description": (
+            "Ekom Nkam Waterfalls (Les Chutes d'Ekom Nkam) are one of Central Africa's most breathtaking natural wonders, "
+            "plunging 80 meters (262 feet) in dual thunderous torrents into a dramatic volcanic canyon surrounded by virgin "
+            "equatorial rainforest on the Nkam River.\n\n"
+            "This iconic destination gained global fame as the principal film setting for the 1984 Academy Award-nominated movie "
+            "'Greystoke: The Legend of Tarzan, Lord of the Apes' starring Christopher Lambert. Visitors follow scenic cliff-edge trails "
+            "with local eco-guides to spectacular observation viewpoints where misty rainbows form in the gorge. The thunderous roar, "
+            "rich biodiversity of orchids and tropical birds, and authentic indigenous craft stalls at the trail entrance make Ekom Nkam "
+            "an unmissable excursion for nature enthusiasts and photographers."
+        ),
+        "address": "Bassin du Nkam, near Melong / Nkongsamba, Littoral & West Region Border, Cameroon",
+        "opening_hours": "Mon–Sun: 7:00 AM – 6:00 PM",
+        "phone": "+237 675 44 33 22",
+        "website": "",
+        "facilities": ["Scenic Viewpoint Platforms", "Cliffside Trails", "Local Eco-Guide Service", "Artisan Craft Market", "Rustic Picnic Spots", "Parking Area"],
+        "activities": ["Waterfall Viewing", "Forest Hiking", "Landscape Photography", "Tarzan Film Site Tour", "Birdwatching", "Eco-Trekking"],
+    },
+    "parc bonanjo": {
+        "long_description": (
+            "Parc Bonanjo is a serene, historic urban green space located in the leafy administrative district of Bonanjo, "
+            "the colonial-era civic quarter of Cameroon's economic capital. Shaded by hundred-year-old royal mango trees, "
+            "towering eucalyptus, and royal palm avenues, the park offers a tranquil green sanctuary.\n\n"
+            "The park borders historic landmarks including the former German Governors' Palace, the Maritime Museum, and "
+            "the Palace of King Dika Akwa. With paved jogging and walking loops, relaxing park benches, and gentle sea breezes "
+            "drifting from the nearby Wouri River estuary, Parc Bonanjo is a cherished gathering place for joggers, students, "
+            "families, and heritage strollers."
+        ),
+        "address": "Quartier Bonanjo, near Place du Gouvernement, Douala, Cameroon",
+        "opening_hours": "Mon–Sun: 6:00 AM – 8:00 PM",
+        "phone": "",
+        "website": "",
+        "facilities": ["Shaded Benches", "Paved Jogging Tracks", "Colonial Monument Statues", "Lush Lawns", "Nearby Cafes & Kiosks", "Street Parking"],
+        "activities": ["Relaxation", "Jogging & Walking", "Historical Architecture Tour", "Reading & Study", "Picnicking", "Photography"],
+    },
+    "bamun sultan palace": {
+        "long_description": (
+            "The Bamun Sultan Palace & Royal Museum (Palais Royal des Rois Bamoun) in Foumban is a masterwork of African cultural "
+            "heritage and the centuries-old seat of the Bamun Kingdom, founded in 1394. The present palace was constructed in 1917 "
+            "by the legendary 17th King, Sultan Ibrahim Njoya, celebrated for creating the indigenous Shumom alphabet and script.\n\n"
+            "The magnificent palace architecture harmoniously blends German colonial brickwork, Islamic arches, and traditional Bamun "
+            "sculpture. The on-site Royal Museum displays sacred ancestral regalia, royal thrones encrusted with cowrie shells and beads, "
+            "ceremonial bronze masks, historical war weaponry, and ancient manuscripts. Nearby artisan streets are world-famous for lost-wax "
+            "bronze casting and exquisite wood carvings, offering a profound cultural immersion into one of Africa's most storied dynasties."
+        ),
+        "address": "Place du Palais Royal, Foumban, Noun Division, West Region, Cameroon",
+        "opening_hours": "Tue–Sun: 8:30 AM – 5:00 PM (Closed Mondays)",
+        "phone": "+237 233 48 20 10",
+        "website": "https://palaisdesroisbamoun.com",
+        "facilities": ["Royal Dynasty Museum", "Accredited Guided Tours", "Artisan Bronze Workshops", "Woodcarving Quarter", "Gift & Souvenir Shop", "Historical Archives", "Restrooms"],
+        "activities": ["Royal Palace Guided Tour", "Museum Relics Exploration", "Shumom Script History", "Artisan Bronze Craft Shopping", "Cultural Photography", "Dynasty History"],
+    },
 }
 
 
@@ -441,9 +599,11 @@ RICH_DETAILS = {
 #   - Public monuments/squares: free entry (0)
 #   - Pools/Leisure: entrance/minimum spend
 #   - Pharmacies: average consultation/purchase
+#   - Nightclubs: cover charge / minimum drink spend
+#   - Amusement parks: entry and ride tickets
 
 DESTINATION_PRICES = {
-    "general express voyages mvan": 5000,      # Standard bus ticket Yaoundé–Douala ~3500-7000 FCFA
+    "general express voyages mvan": 5000,      # Standard VIP bus ticket Yaoundé–Douala ~3500-7000 FCFA
     "playce yaounde": 0,                        # Free entry (shopping mall)
     "fresh lunch": 3000,                        # Average meal 1000-8000 FCFA, typical plate ~3000
     "hilton hotel": 161000,                     # Standard room starting rate per night
@@ -453,8 +613,16 @@ DESTINATION_PRICES = {
     "pharmacie nkozoa": 2000,                   # Average pharmacy visit/purchase
     "place charles atangana": 0,                # Free (public square)
     "monument jaime mon pays": 0,               # Free (outdoor monument)
-    "parc de la mefou": 5000,                   # Entrance fee ~5000-10000 FCFA (currently suspended)
+    "parc de la mefou": 5000,                   # Entrance fee ~5000-10000 FCFA
     "presidential place grounds": 0,            # Free (public viewing area)
+    "katios night club": 5000,                  # Cover charge / minimum drink spend ~5000 FCFA
+    "dade park": 2000,                          # Admission fee 2000 FCFA
+    "maneges de ya-fe": 1500,                   # Entry & ride tickets starting at 1500 FCFA
+    "independence square": 0,                   # Free (public square & monument)
+    "mvog betsi botanical zoo garden": 2000,    # Zoo & botanical adult entry fee 2000 FCFA
+    "ekom nkam waterfalls": 3000,               # Site entry & eco-guide fee 3000 FCFA
+    "parc bonanjo": 0,                          # Free (public urban park)
+    "bamun sultan palace": 5000,                # Palace & Royal Museum guided entry fee 5000 FCFA
 }
 
 

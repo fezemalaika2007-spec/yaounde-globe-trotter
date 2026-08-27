@@ -66,4 +66,14 @@ https://www.google.com/maps/place/Man%C3%A8ges+de+Ya-Fe/@3.8302578,11.3456328,11
 https://www.google.com/maps/place/Independence+Square/@3.8302578,11.3456328,11z/data=!4m10!1m2!2m1!1sThings+to+do!3m6!1s0x108bcfdd7b566d55:0x262a84e6efe19a10!8m2!3d3.8727837!4d11.5175507!15sCgxUaGluZ3MgdG8gZG9aDiIMdGhpbmdzIHRvIGRvkgETaGlzdG9yaWNhbF9sYW5kbWFya5oBJENoZERTVWhOTUc5blMwVkpRMEZuU1VScWF6aEhWemRuUlJBQuABAPoBBQjzARAy!16s%2Fg%2F11fmw2jt0t?entry=ttu&g_ep=EgoyMDI2MDgyNS4wIKXMDSoASAFQAw%3D%3D
 
 
+#Destination 17:mvog_betsi_botanical_zoo_garden | assets/images/mvog_betsi_botanical_zoo_garden.jpg
+https://www.google.com/maps/place/Mvog-Betsi+Botanical+Zoological+Garden/@3.8302578,11.3456328,11z/data=!4m10!1m2!2m1!1sThings+to+do!3m6!1s0x108bcfa9198a167d:0x820f37ec9f39e020!8m2!3d3.86478!4d11.4875163!15sCgxUaGluZ3MgdG8gZG9aDiIMdGhpbmdzIHRvIGRvkgEDem9vmgEkQ2hkRFNVaE5NRzluUzBWSlEwRm5TVVJNYjNGTGFEZDNSUkFC4AEA-gEECAAQQQ!16s%2Fm%2F047dmxq?entry=ttu&g_ep=EgoyMDI2MDgyNS4wIKXMDSoASAFQAw%3D%3D
 
+#Destination 18:ekom nkam waterfalls | assets/images/ekom_nkam_waterfalls.jpg
+https://www.google.com/maps/place/Ekom+Nkam+Waterfalls/@3.8302578,11.3456328,11z/data=!4m10!1m2!2m1!1sThings+to+do!3m6!1s0x105fd6d39ad5b20d:0xcf39cb9747d67207!8m2!3d5.0619617!4d10.0296593!15sCgxUaGluZ3MgdG8gZG9aDiIMdGhpbmdzIHRvIGRvkgESdG91cmlzdF9hdHRyYWN0aW9umgEjQ2haRFNVaE5NRzluUzBWSlEwRm5TVU0zTTA1aU4wVm5FQUXgAQD6AQQIABBI!16s%2Fg%2F122h0hm6?entry=ttu&g_ep=EgoyMDI2MDgyNS4wIKXMDSoASAFQAw%3D%
+
+#Destination 19:parc bonanjo | assets/images/parc_bonanjo.jpg
+https://www.google.com/maps/place/Parc+Bonanjo/@4.0428606,9.406281,11z/data=!4m10!1m2!2m1!1sThings+to+do!3m6!1s0x106112fb24bd48cd:0xc3aef65864faee29!8m2!3d4.0428606!4d9.6864324!15sCgxUaGluZ3MgdG8gZG9aDiIMdGhpbmdzIHRvIGRvkgEEcGFya5oBJENoZERTVWhOTUc5blMwVkpRMEZuU1VSVWQwNXFZM2RSUlJBQuABAPoBBAhREBE!16s%2Fg%2F11c1p5_d9y?entry=ttu&g_ep=EgoyMDI2MDgyNS4wIKXMDSoASAFQAw%3D%3D
+
+#Destination 20:bamun sultan palace | assets/images/bamun_sultan_palace.jpg
+https://www.google.com/maps/place/Bamun+Sultan+Palace/@5.7330479,10.6212743,11z/data=!4m11!1m3!2m2!1sThings+to+do!6e1!3m6!1s0x10f59967d160880d:0x4eb57d33ea0f21be!8m2!3d5.7330479!4d10.9014257!15sCgxUaGluZ3MgdG8gZG9aDiIMdGhpbmdzIHRvIGRvkgESdG91cmlzdF9hdHRyYWN0aW9umgEkQ2hkRFNVaE5NRzluUzBWSlEwRm5TVU14YVhVelRXOW5SUkFC4AEA-gEFCLYBEEk!16s%2Fg%2F12z84lnmr?entry=ttu&g_ep=EgoyMDI2MDgyNS4wIKXMDSoASAFQAw%3D%3D

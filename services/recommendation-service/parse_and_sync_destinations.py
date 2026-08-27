@@ -34,7 +34,11 @@ KNOWN_PLACE_PHOTOS = {
     "katios night club": "assets/images/katios_night_club.jpg",
     "dade park": "assets/images/dade_park.jpg",
     "maneges de ya-fe": "assets/images/maneges_de_ya-fe.jpg",
-    "independence square": "assets/images/independence_square.jpg"
+    "independence square": "assets/images/independence_square.jpg",
+    "mvog betsi botanical zoo garden": "assets/images/mvog_betsi_botanical_zoo_garden",
+    "ekom nkam waterfalls": "assets/images/ekom_nkam_waterfalls.jpg",
+    "parc bonanjo": "assets/images/parc_bonanjo.jpg",
+    "bamun sultan palace": "assets/images/bamun_sultan_palace.jpg",
 }
 
 # Default placeholder when no image is provided

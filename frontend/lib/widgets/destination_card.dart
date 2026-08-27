@@ -93,7 +93,7 @@ class _DestinationCardState extends State<DestinationCard> {
   }
 
   Widget _buildImage() {
-    final imageCandidate = widget.imagePath.trim();
+    final imageCandidate = widget.imagePath.trim().replaceAll('\\', '/');
     final localFallback = getLocalAssetFallback(widget.name);
     final fallbackIcon = _getCategoryIcon();
 

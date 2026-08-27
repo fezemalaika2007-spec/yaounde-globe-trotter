@@ -30,7 +30,7 @@ from app.models import (
     create_notification, get_notifications_for_user,
     get_unread_notification_count, mark_notification_read,
     mark_all_notifications_read,
-    create_comment, get_comments_for_destination, delete_comment,
+    create_comment, get_comments_for_destination, update_comment, delete_comment,
     create_feedback, get_all_feedback, mark_feedback_resolved,
     ADMIN_USERNAME,
 )
@@ -197,7 +197,7 @@ def get_comments(dest_id):
 @recommendation_bp.route("/destinations/<dest_id>/comments", methods=["POST"])
 @token_required
 def post_comment(dest_id):
-    """Add a comment to a destination (JWT required)."""
+    """Add a comment or reply to a destination (JWT required)."""
     username = g.current_user
     destination = get_destination_by_id(dest_id)
     if not destination:
@@ -215,14 +215,32 @@ def post_comment(dest_id):
 
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
+    parent_id = data.get("parent_id")
     if not text:
         return jsonify({"error": "text is required"}), 400
     if len(text) > 2000:
         return jsonify({"error": "comment too long (max 2000 characters)"}), 400
 
-    comment = create_comment(dest_id, username, username, text)
+    comment = create_comment(dest_id, username, username, text, parent_id=parent_id)
     return jsonify(comment), 201
 
+
+@recommendation_bp.route("/destinations/<dest_id>/comments/<comment_id>", methods=["PUT"])
+@token_required
+def edit_comment(dest_id, comment_id):
+    """Update an existing comment (only the author can edit)."""
+    username = g.current_user
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    if len(text) > 2000:
+        return jsonify({"error": "comment too long (max 2000 characters)"}), 400
+
+    comment = update_comment(comment_id, username, text)
+    if not comment:
+        return jsonify({"error": "comment not found or access denied"}), 404
+    return jsonify(comment), 200
 
 
 @recommendation_bp.route("/destinations/<dest_id>/comments/<comment_id>", methods=["DELETE"])

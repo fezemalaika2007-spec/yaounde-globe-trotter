@@ -209,7 +209,7 @@ class _NotificationPanelSheetState extends State<_NotificationPanelSheet> {
                 : ListView.separated(
                     controller: scrollController,
                     itemCount: notifications.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (c, i) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final item = notifications[index];
                       final isUnread = (item['is_read'] ?? 0) == 0;

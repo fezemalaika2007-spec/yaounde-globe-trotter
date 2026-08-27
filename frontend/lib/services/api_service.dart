@@ -674,17 +674,35 @@ class ApiService {
     return [];
   }
 
-  Future<Map<String, dynamic>> postComment(String destId, String text) async {
+  Future<Map<String, dynamic>> postComment(String destId, String text, {String? parentId}) async {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
     final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments');
+    final payload = <String, dynamic>{'text': text};
+    if (parentId != null && parentId.isNotEmpty) {
+      payload['parent_id'] = parentId;
+    }
     final response = await _post(
+      uri,
+      headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+    final body = _decode(response);
+    if (response.statusCode == 201) return Map<String, dynamic>.from(body);
+    throw ApiException(response.statusCode, _errorMessage(body));
+  }
+
+  Future<Map<String, dynamic>> updateComment(String destId, String commentId, String text) async {
+    final token = await getToken();
+    if (token == null) throw ApiException(401, 'Authentication required');
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments/$commentId');
+    final response = await _put(
       uri,
       headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
       body: jsonEncode({'text': text}),
     );
     final body = _decode(response);
-    if (response.statusCode == 201) return Map<String, dynamic>.from(body);
+    if (response.statusCode == 200) return Map<String, dynamic>.from(body);
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 

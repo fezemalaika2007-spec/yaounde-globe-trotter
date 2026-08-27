@@ -199,10 +199,13 @@ def init_db(app=None):
                 user_id TEXT NOT NULL,
                 username TEXT NOT NULL,
                 text TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                parent_id TEXT DEFAULT NULL,
+                updated_at TEXT DEFAULT NULL
             )
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS idx_comments_dest ON comments(destination_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id)")
 
         # --- Feedback table ---
         cur.execute("""
@@ -224,6 +227,16 @@ def init_db(app=None):
             existing_cols = {r[0] for r in cur.fetchall()}
             if "fsq_id" not in existing_cols:
                 cur.execute("ALTER TABLE destinations ADD COLUMN fsq_id TEXT")
+        except Exception:
+            pass
+
+        # Ensure comments columns parent_id and updated_at exist
+        try:
+            cur.execute("ALTER TABLE comments ADD COLUMN parent_id TEXT")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE comments ADD COLUMN updated_at TEXT")
         except Exception:
             pass
 
@@ -552,43 +565,116 @@ def mark_all_notifications_read(user_id, app=None):
 # Comment helpers
 # ---------------------------------------------------------------------------
 
-def create_comment(destination_id, user_id, username, text, app=None):
-    """Create a comment on a destination."""
+def create_comment(destination_id, user_id, username, text, parent_id=None, app=None):
+    """Create a comment or reply on a destination."""
     conn = get_connection(app)
     cur = conn.cursor()
     comment_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     cur.execute(
-        "INSERT INTO comments (id, destination_id, user_id, username, text, created_at) "
-        "VALUES (%s, %s, %s, %s, %s, %s)",
-        (comment_id, destination_id, user_id, username, text, now)
+        "INSERT INTO comments (id, destination_id, user_id, username, text, created_at, parent_id, updated_at) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+        (comment_id, destination_id, user_id, username, text, now, parent_id, None)
     )
     conn.commit()
+
+    # If this is a reply to another comment, send a notification to the parent author
+    if parent_id:
+        try:
+            cur.execute(
+                "SELECT user_id, username FROM comments WHERE id = %s",
+                (parent_id,)
+            )
+            parent_row = cur.fetchone()
+            if parent_row:
+                parent_user_id = parent_row[0]
+                if parent_user_id and parent_user_id != user_id:
+                    notif_id = str(uuid.uuid4())
+                    snippet = text[:50] + ("..." if len(text) > 50 else "")
+                    cur.execute(
+                        "INSERT INTO notifications (id, user_id, title, message, type, is_read, created_at, related_id) "
+                        "VALUES (%s, %s, %s, %s, %s, 0, %s, %s)",
+                        (
+                            notif_id,
+                            parent_user_id,
+                            f"New reply from {username}",
+                            f"{username} replied: \"{snippet}\"",
+                            "comment_reply",
+                            now,
+                            destination_id,
+                        )
+                    )
+                    conn.commit()
+        except Exception as e:
+            print(f"Warning: failed to create reply notification: {e}")
+
     cur.close()
     release_connection(conn)
-    return {"id": comment_id, "destination_id": destination_id, "user_id": user_id,
-            "username": username, "text": text, "created_at": now}
+    return {
+        "id": comment_id,
+        "destination_id": destination_id,
+        "user_id": user_id,
+        "username": username,
+        "text": text,
+        "created_at": now,
+        "parent_id": parent_id,
+        "updated_at": None,
+    }
 
 
 def get_comments_for_destination(destination_id, app=None):
-    """Return all comments for a destination, newest first."""
+    """Return all comments for a destination, oldest first (chronological thread)."""
     conn = get_connection(app)
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, destination_id, user_id, username, text, created_at "
-        "FROM comments WHERE destination_id = %s ORDER BY created_at DESC",
+        "SELECT id, destination_id, user_id, username, text, created_at, parent_id, updated_at "
+        "FROM comments WHERE destination_id = %s ORDER BY created_at ASC",
         (destination_id,)
     )
     rows = cur.fetchall()
-    cols = ['id', 'destination_id', 'user_id', 'username', 'text', 'created_at']
+    cols = ['id', 'destination_id', 'user_id', 'username', 'text', 'created_at', 'parent_id', 'updated_at']
     results = [dict(zip(cols, r)) for r in rows]
     cur.close()
     release_connection(conn)
     return results
 
 
+def update_comment(comment_id, user_id, text, app=None):
+    """Update a comment if it belongs to the user. Returns updated comment dict or None."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, destination_id, user_id, username, created_at, parent_id FROM comments WHERE id = %s AND user_id = %s",
+        (comment_id, user_id)
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        release_connection(conn)
+        return None
+
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    cur.execute(
+        "UPDATE comments SET text = %s, updated_at = %s WHERE id = %s",
+        (text, now, comment_id)
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return {
+        "id": row[0],
+        "destination_id": row[1],
+        "user_id": row[2],
+        "username": row[3],
+        "text": text,
+        "created_at": row[4],
+        "parent_id": row[5],
+        "updated_at": now,
+    }
+
+
 def delete_comment(comment_id, user_id, app=None):
-    """Delete a comment if it belongs to the user. Returns True if deleted."""
+    """Delete a comment and any child replies if it belongs to the user. Returns True if deleted."""
     conn = get_connection(app)
     cur = conn.cursor()
     cur.execute(
@@ -600,6 +686,8 @@ def delete_comment(comment_id, user_id, app=None):
         cur.close()
         release_connection(conn)
         return False
+    # Delete child replies as well
+    cur.execute("DELETE FROM comments WHERE parent_id = %s", (comment_id,))
     cur.execute("DELETE FROM comments WHERE id = %s", (comment_id,))
     conn.commit()
     cur.close()

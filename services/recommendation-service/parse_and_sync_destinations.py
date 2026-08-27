@@ -128,70 +128,70 @@ def derive_metadata(name, url=""):
             "category": "Hotels & Accommodation",
             "desc": f"Premier luxury hotel and accommodation destination in Yaoundé ({name}).",
             "activities": ["Accommodation", "Luxury Stay", "Dining", "Swimming Pool", "Relaxation"],
-            "rating": 4.8, "count": 45, "gmaps": url
+            "rating": 0, "count": 45, "gmaps": url
         }
     elif any(k in norm for k in ["restaurant", "lunch", "cafe", "bistro", "bakery", "patisserie", "food", "lounge", "grill", "snack", "traiteur"]):
         return {
             "category": "Food & Dining",
             "desc": f"Popular dining and gastronomic spot in Yaoundé ({name}).",
             "activities": ["Dining", "Local Cuisine", "Drinks", "Gastronomy"],
-            "rating": 4.7, "count": 35, "gmaps": url
+            "rating": 0, "count": 35, "gmaps": url
         }
     elif any(k in norm for k in ["playce", "carrefour", "mall", "market", "marche", "shop", "supermarche", "supermarket", "centre artisanal", "mokolo"]):
         return {
             "category": "Shopping",
             "desc": f"Premier shopping center and retail destination in Yaoundé ({name}).",
             "activities": ["Shopping", "Dining", "Supermarket", "Retail"],
-            "rating": 4.8, "count": 35, "gmaps": url
+            "rating": 0, "count": 35, "gmaps": url
         }
     elif any(k in norm for k in ["express", "voyage", "bus", "station", "gare", "mvan", "aeroport", "airport", "taxi", "agence"]):
         return {
             "category": "Travel & Transport",
             "desc": f"Major intercity travel and transport service hub in Yaoundé ({name}).",
             "activities": ["Intercity Travel", "Bus Terminal", "Transport Service"],
-            "rating": 4.6, "count": 30, "gmaps": url
+            "rating": 0, "count": 30, "gmaps": url
         }
     elif any(k in norm for k in ["park", "garden", "parc", "bois", "zoo", "nature", "mefou", "sainte anastasie", "botanique"]):
         return {
             "category": "Nature & Parks",
             "desc": f"Scenic tropical park and natural relaxation spot in Yaoundé ({name}).",
             "activities": ["Nature Walk", "Relaxation", "Outdoor Recreation", "Wildlife"],
-            "rating": 4.8, "count": 30, "gmaps": url
+            "rating": 0, "count": 30, "gmaps": url
         }
     elif any(k in norm for k in ["museum", "musee", "monument", "cathedral", "cathedrale", "basilique", "culture", "reunification", "national", "palais", "presidential"]):
         return {
             "category": "Culture & History",
             "desc": f"Famous historical and cultural landmark in Yaoundé ({name}).",
             "activities": ["Sightseeing", "Cultural History", "Guided Tour", "Architecture"],
-            "rating": 4.8, "count": 30, "gmaps": url
+            "rating": 0, "count": 30, "gmaps": url
         }
     elif any(k in norm for k in ["pharmacie", "pharmacy", "clinic", "hospital", "hopital"]):
         return {
             "category": "Health & Pharmacy",
             "desc": f"Essential healthcare and pharmacy service in Yaoundé ({name}).",
             "activities": ["Healthcare", "Pharmacy", "Medical Services"],
-            "rating": 4.5, "count": 20, "gmaps": url
+            "rating": 0, "count": 20, "gmaps": url
         }
     elif any(k in norm for k in ["pool", "swim", "piscine", "spa", "wellness"]):
         return {
             "category": "Leisure & Wellness",
             "desc": f"Premium leisure and wellness destination in Yaoundé ({name}).",
             "activities": ["Swimming", "Relaxation", "Dining", "Events"],
-            "rating": 4.6, "count": 25, "gmaps": url
+            "rating": 0, "count": 25, "gmaps": url
         }
     elif any(k in norm for k in ["river", "hiking", "ecotourism", "mountain", "mont", "chute", "cascade", "ebogo", "akok"]):
         return {
             "category": "Adventure",
             "desc": f"Exciting outdoor adventure and ecotourism destination near Yaoundé ({name}).",
             "activities": ["Hiking", "Adventure", "Exploration", "Sightseeing"],
-            "rating": 4.7, "count": 20, "gmaps": url
+            "rating": 0, "count": 20, "gmaps": url
         }
     else:
         return {
             "category": "Top Attractions",
             "desc": f"Popular destination in Yaoundé, Cameroon: {name}.",
             "activities": ["Sightseeing", "Photography", "City Visit"],
-            "rating": 4.5, "count": 15, "gmaps": url
+            "rating": 0, "count": 15, "gmaps": url
         }
 
 
@@ -513,15 +513,23 @@ def parse_destinations_file(dest_txt_path):
         if not raw_line:
             continue
 
+        lower_raw = raw_line.lower()
+        if any(bad in lower_raw for bad in [
+            "instruction", "format:", "sync command:", "http.server",
+            "run_web", "place name", "google_maps_place_url", "===", "build\\web"
+        ]):
+            continue
+
         if "parse_and_sync_destinations.py" in raw_line:
             continue
 
-        if raw_line.startswith("#"):
+        is_header = raw_line.startswith("#") or bool(re.match(r"^destination\s+\d+", raw_line, re.IGNORECASE))
+        if is_header:
             clean_head = raw_line.lstrip("#").strip()
             if not clean_head:
                 continue
 
-            if current_entry and (current_entry.get("url") or current_entry.get("image")):
+            if current_entry and (current_entry.get("url") or current_entry.get("image") or current_entry.get("name")):
                 entries.append(current_entry)
                 current_entry = None
 
@@ -539,8 +547,13 @@ def parse_destinations_file(dest_txt_path):
                 name_part = clean_head.split(":", 1)[1].strip()
                 if name_part:
                     dest_name = name_part
+                else:
+                    continue
             else:
                 dest_name = clean_head
+
+            if not dest_name:
+                continue
 
             current_entry = {
                 "name": dest_name, "url": "", "image": dest_image,

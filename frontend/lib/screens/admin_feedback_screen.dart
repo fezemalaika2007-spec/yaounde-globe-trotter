@@ -178,7 +178,7 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
                         : ListView.separated(
                             padding: const EdgeInsets.all(12),
                             itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            separatorBuilder: (c, i) => const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final item = filtered[index];
                               final isResolved = (item['is_resolved'] ?? 0) == 1;

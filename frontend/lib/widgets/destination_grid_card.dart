@@ -73,11 +73,12 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
     required List<dynamic> tags,
     required ThemeData theme,
   }) {
+    final cleanUrl = imageUrl.trim().replaceAll('\\', '/');
     final localFallback = getLocalAssetFallback(name);
 
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
       return Image.network(
-        imageUrl,
+        cleanUrl,
         fit: BoxFit.cover,
         gaplessPlayback: true,
         loadingBuilder: (context, child, loadingProgress) {
@@ -107,10 +108,10 @@ class _DestinationGridCardState extends State<DestinationGridCard> {
       );
     }
 
-    final effectiveAsset = imageUrl.isNotEmpty
-        ? (imageUrl.startsWith('assets/')
-            ? imageUrl
-            : 'assets/images/$imageUrl')
+    final effectiveAsset = cleanUrl.isNotEmpty
+        ? (cleanUrl.startsWith('assets/')
+            ? cleanUrl
+            : 'assets/images/$cleanUrl')
         : localFallback;
 
     if (effectiveAsset.isNotEmpty) {

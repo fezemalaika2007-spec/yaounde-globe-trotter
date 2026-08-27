@@ -91,13 +91,31 @@ String getLocalAssetFallback(String name) {
   if (norm.contains('jaime mon pays') || norm.contains("j'aime mon pays") || norm.contains('mon pays')) {
     return 'assets/images/monument_jaime_mon_pays.jpg';
   }
+  if (norm.contains('mefou') || norm.contains('méfou')) {
+    return 'assets/images/parc_de_la_mefou.jpg';
+  }
+  if (norm.contains('presidential') || norm.contains('palace') || norm.contains('palais')) {
+    return 'assets/images/presidential_place_grounds.jpg';
+  }
+  if (norm.contains('katio') || norm.contains('katios')) {
+    return 'assets/images/katios_night_club.jpg';
+  }
+  if (norm.contains('dade') || norm.contains('dade park')) {
+    return 'assets/images/dade_park.jpg';
+  }
+  if (norm.contains('ya-fe') || norm.contains('yafe') || norm.contains('ya fe') || norm.contains('manege') || norm.contains('manège')) {
+    return 'assets/images/maneges_de_ya-fe.jpg';
+  }
+  if (norm.contains('independence') || norm.contains('independance') || norm.contains('independence square')) {
+    return 'assets/images/independence_square.jpg';
+  }
   return '';
 }
 
 /// Resolves the candidate image (URL or asset path) for a destination map.
 String resolveDestinationImageUrl(Map<String, dynamic> destination) {
   // 1. Direct 'image' field
-  final direct = (destination['image'] ?? '').toString().trim();
+  final direct = (destination['image'] ?? '').toString().trim().replaceAll('\\', '/');
   if (direct.isNotEmpty && direct != 'null' && direct != 'None') {
     return direct;
   }
@@ -105,7 +123,7 @@ String resolveDestinationImageUrl(Map<String, dynamic> destination) {
   final images = destination['images'];
   if (images is List && images.isNotEmpty) {
     for (final img in images) {
-      final s = img.toString().trim();
+      final s = img.toString().trim().replaceAll('\\', '/');
       if (s.isNotEmpty && s != 'null' && s != 'None') return s;
     }
   }
@@ -119,7 +137,7 @@ String resolveDestinationImageUrl(Map<String, dynamic> destination) {
 
 /// Normalizes and formats an image URL for reliable rendering across Web and mobile.
 String formatImageUrl(String image) {
-  return image.trim();
+  return image.trim().replaceAll('\\', '/');
 }
 
 

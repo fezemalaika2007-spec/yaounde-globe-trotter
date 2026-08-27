@@ -6,7 +6,6 @@ import '../utils/destination_filters.dart';
 import '../widgets/star_rating_widget.dart';
 import '../widgets/comment_section.dart';
 
-
 class DestinationDetailScreen extends StatefulWidget {
   final Map<String, dynamic> destination;
   const DestinationDetailScreen({super.key, required this.destination});
@@ -58,20 +57,19 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           _dest['rating_count'] = result['rating_count'];
           _isSubmittingRating = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Rating saved! ($newRating ★)')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Rating saved! ($newRating ★)')));
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmittingRating = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit rating: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to submit rating: $e')));
       }
     }
   }
-
 
   void _onFavChange() {
     if (!mounted) return;
@@ -86,16 +84,25 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   }
 
   Future<void> _launchUrl(String urlString) async {
+    final trimmed = urlString.trim();
+    if (trimmed.isEmpty) return;
     try {
-      final Uri url = Uri.parse(urlString);
+      var target = trimmed;
+      if (!target.startsWith('http://') &&
+          !target.startsWith('https://') &&
+          !target.startsWith('tel:') &&
+          !target.startsWith('mailto:')) {
+        target = 'https://$target';
+      }
+      final Uri url = Uri.parse(target);
       final bool canLaunch = await canLaunchUrl(url);
       if (!mounted) return;
       if (canLaunch) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open link: $urlString')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open link: $target')));
       }
     } catch (e) {
       if (!mounted) return;
@@ -108,7 +115,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   /// Opens the full-screen, uncropped view of the image at [index].
   void _openFullImage(List<String> images, int index) {
     final imagePath = images[index];
-    final isNetwork = imagePath.startsWith('http://') || imagePath.startsWith('https://');
+    final isNetwork =
+        imagePath.startsWith('http://') || imagePath.startsWith('https://');
     final localFallback = getLocalAssetFallback(_dest['name'] ?? '');
 
     showDialog<void>(
@@ -135,12 +143,20 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                               width: double.infinity,
                               height: double.infinity,
                               errorBuilder: (c, e, s) => const Center(
-                                child: Icon(Icons.broken_image, size: 64, color: Colors.white70),
+                                child: Icon(
+                                  Icons.broken_image,
+                                  size: 64,
+                                  color: Colors.white70,
+                                ),
                               ),
                             );
                           }
                           return const Center(
-                            child: Icon(Icons.broken_image, size: 64, color: Colors.white70),
+                            child: Icon(
+                              Icons.broken_image,
+                              size: 64,
+                              color: Colors.white70,
+                            ),
                           );
                         },
                       )
@@ -153,7 +169,11 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                         height: double.infinity,
                         errorBuilder: (context, error, stackTrace) {
                           return const Center(
-                            child: Icon(Icons.broken_image, size: 64, color: Colors.white70),
+                            child: Icon(
+                              Icons.broken_image,
+                              size: 64,
+                              color: Colors.white70,
+                            ),
                           );
                         },
                       ),
@@ -215,9 +235,9 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
             end: Alignment.bottomCenter,
             colors: [
               Theme.of(context).colorScheme.primaryContainer,
-              Theme.of(context).colorScheme.primaryContainer.withValues(
-                alpha: 0.5,
-              ),
+              Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withValues(alpha: 0.5),
             ],
           ),
         ),
@@ -263,7 +283,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                 index,
                 uniqueGalleryImages.length,
               );
-              final isNet = url.startsWith('http://') || url.startsWith('https://');
+              final isNet =
+                  url.startsWith('http://') || url.startsWith('https://');
               final localFallback = getLocalAssetFallback(destName);
 
               return GestureDetector(
@@ -282,13 +303,17 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                               width: double.infinity,
                               semanticLabel: caption,
                               errorBuilder: (c, e, s) => Container(
-                                color: Theme.of(context).colorScheme.secondaryContainer,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.secondaryContainer,
                                 child: const Icon(Icons.broken_image, size: 48),
                               ),
                             );
                           }
                           return Container(
-                            color: Theme.of(context).colorScheme.secondaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.secondaryContainer,
                             child: const Icon(Icons.broken_image, size: 48),
                           );
                         },
@@ -300,7 +325,9 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                         semanticLabel: caption,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
-                            color: Theme.of(context).colorScheme.secondaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.secondaryContainer,
                             child: const Icon(Icons.broken_image, size: 48),
                           );
                         },
@@ -400,9 +427,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
   void _showAddToItineraryDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => _AddToItineraryDialog(
-        destinationName: _dest['name'] ?? '',
-      ),
+      builder: (ctx) =>
+          _AddToItineraryDialog(destinationName: _dest['name'] ?? ''),
     );
   }
 
@@ -412,12 +438,6 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     final String name = _dest['name'] ?? 'Destination';
     final String description = _realDescription();
     final String address = _dest['address'] ?? '';
-    final double? lat = _dest['latitude'] != null
-        ? (_dest['latitude'] as num).toDouble()
-        : null;
-    final double? lon = _dest['longitude'] != null
-        ? (_dest['longitude'] as num).toDouble()
-        : null;
     final bool hasCost = _dest['cost'] != null;
     final double avgRating = (_dest['average_rating'] ?? 0).toDouble();
     final int ratingCount = (_dest['rating_count'] ?? 0).toInt();
@@ -495,7 +515,11 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.star, size: 16, color: Colors.amber),
+                              const Icon(
+                                Icons.star,
+                                size: 16,
+                                color: Colors.amber,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 avgRating.toStringAsFixed(1),
@@ -550,21 +574,30 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.dividerColor.withValues(alpha: 0.5)),
+                      border: Border.all(
+                        color: theme.dividerColor.withValues(alpha: 0.5),
+                      ),
                     ),
                     child: Column(
                       children: [
                         Text(
-                          _userRating > 0 ? 'Your Rating: $_userRating / 5 ★' : 'Tap a star to rate this place',
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                          _userRating > 0
+                              ? 'Your Rating: $_userRating / 5 ★'
+                              : 'Tap a star to rate this place',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         _isSubmittingRating
                             ? const SizedBox(
                                 height: 28,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : StarRatingWidget(
                                 initialRating: _userRating,
@@ -592,49 +625,85 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                   if ((_dest['opening_hours'] ?? '').isNotEmpty ||
                       (_dest['phone'] ?? '').isNotEmpty ||
                       (_dest['website'] ?? '').isNotEmpty) ...[
-                    _buildSectionHeader(theme, Icons.access_time_rounded, 'Opening Hours & Contact'),
+                    _buildSectionHeader(
+                      theme,
+                      Icons.access_time_rounded,
+                      'Opening Hours & Contact',
+                    ),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: theme.cardColor,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
+                        border: Border.all(
+                          color: theme.dividerColor.withValues(alpha: 0.4),
+                        ),
                       ),
                       child: Column(
                         children: [
                           if ((_dest['opening_hours'] ?? '').isNotEmpty)
                             ListTile(
                               dense: true,
-                              leading: const Icon(Icons.schedule_rounded, color: Colors.blueAccent),
-                              title: const Text('Opening Hours', style: TextStyle(fontWeight: FontWeight.bold)),
+                              leading: const Icon(
+                                Icons.schedule_rounded,
+                                color: Colors.blueAccent,
+                              ),
+                              title: const Text(
+                                'Opening Hours',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                               subtitle: Text(_dest['opening_hours']),
                               contentPadding: EdgeInsets.zero,
                             ),
                           if ((_dest['phone'] ?? '').isNotEmpty)
                             ListTile(
                               dense: true,
-                              leading: const Icon(Icons.phone_rounded, color: Colors.green),
-                              title: const Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold)),
+                              leading: const Icon(
+                                Icons.phone_rounded,
+                                color: Colors.green,
+                              ),
+                              title: const Text(
+                                'Phone Number',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                               subtitle: Text(_dest['phone']),
                               contentPadding: EdgeInsets.zero,
                               trailing: IconButton(
-                                icon: const Icon(Icons.call_rounded, color: Colors.green),
-                                onPressed: () => _launchUrl('tel:${_dest['phone']}'),
+                                icon: const Icon(
+                                  Icons.call_rounded,
+                                  color: Colors.green,
+                                ),
+                                onPressed: () =>
+                                    _launchUrl('tel:${_dest['phone']}'),
                                 tooltip: 'Call',
                               ),
                             ),
                           if ((_dest['website'] ?? '').isNotEmpty)
                             ListTile(
                               dense: true,
-                              leading: const Icon(Icons.language_rounded, color: Colors.purpleAccent),
-                              title: const Text('Website / Map Link', style: TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text(_dest['website'], maxLines: 1, overflow: TextOverflow.ellipsis),
+                              leading: const Icon(
+                                Icons.language_rounded,
+                                color: Colors.purpleAccent,
+                              ),
+                              title: const Text(
+                                'Official Website / Link',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                _dest['website'],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               contentPadding: EdgeInsets.zero,
+                              onTap: () => _launchUrl(_dest['website']),
                               trailing: IconButton(
-                                icon: const Icon(Icons.open_in_new_rounded, color: Colors.purpleAccent),
+                                icon: const Icon(
+                                  Icons.open_in_new_rounded,
+                                  color: Colors.purpleAccent,
+                                ),
                                 onPressed: () => _launchUrl(_dest['website']),
-                                tooltip: 'Open Link',
+                                tooltip: 'Open Website',
                               ),
                             ),
                         ],
@@ -644,26 +713,48 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                   ],
 
                   // --- Facilities ---
-                  if ((_dest['facilities'] as List<dynamic>? ?? []).isNotEmpty) ...[
-                    _buildSectionHeader(theme, Icons.local_offer_rounded, 'Facilities & Amenities'),
+                  if ((_dest['facilities'] as List<dynamic>? ?? [])
+                      .isNotEmpty) ...[
+                    _buildSectionHeader(
+                      theme,
+                      Icons.local_offer_rounded,
+                      'Facilities & Amenities',
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
                       children: (_dest['facilities'] as List<dynamic>?)!
-                          .map((f) => Chip(
-                                avatar: const Icon(Icons.check_rounded, size: 14, color: Colors.green),
-                                label: Text(f.toString(), style: const TextStyle(fontSize: 12)),
-                                backgroundColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
-                              ))
+                          .map(
+                            (f) => Chip(
+                              avatar: const Icon(
+                                Icons.check_rounded,
+                                size: 14,
+                                color: Colors.green,
+                              ),
+                              label: Text(
+                                f.toString(),
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              backgroundColor: theme
+                                  .colorScheme
+                                  .primaryContainer
+                                  .withValues(alpha: 0.2),
+                            ),
+                          )
                           .toList(),
                     ),
                     const SizedBox(height: 16),
                   ],
 
                   // --- Activities ---
-                  if ((_dest['activities'] as List<dynamic>? ?? []).isNotEmpty) ...[
-                    _buildSectionHeader(theme, Icons.local_activity, 'Things to Do'),
+                  if ((_dest['activities'] as List<dynamic>? ?? [])
+                      .isNotEmpty) ...[
+                    _buildSectionHeader(
+                      theme,
+                      Icons.local_activity,
+                      'Things to Do',
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
@@ -684,14 +775,6 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // --- Map preview card ---
-                  if (lat != null && lon != null) ...[
-                    _buildSectionHeader(theme, Icons.map, 'Location'),
-                    const SizedBox(height: 8),
-                    _buildMapPreviewCard(theme, lat, lon, name),
-                    const SizedBox(height: 20),
-                  ],
-
                   const Divider(),
                   const SizedBox(height: 16),
 
@@ -706,7 +789,6 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
       ),
     );
   }
-
 
   Widget _buildQuickStats(ThemeData theme, bool hasCost) {
     return Container(
@@ -804,198 +886,6 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
       ],
     );
   }
-
-  bool _hasPracticalInfo() {
-    return (_dest['opening_hours'] ?? '').toString().isNotEmpty ||
-        (_dest['phone'] ?? '').toString().isNotEmpty ||
-        (_dest['website'] ?? '').toString().isNotEmpty ||
-        (_dest['cuisine'] ?? '').toString().isNotEmpty;
-  }
-
-  Widget _buildPracticalInfoCard(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        children: [
-          if ((_dest['opening_hours'] ?? '').toString().isNotEmpty)
-            _infoRow(
-              Icons.schedule,
-              'Hours',
-              (_dest['opening_hours'] ?? '').toString(),
-            ),
-          if ((_dest['phone'] ?? '').toString().isNotEmpty) ...[
-            const Divider(height: 16),
-            _infoRow(Icons.phone, 'Phone', (_dest['phone'] ?? '').toString()),
-          ],
-          if ((_dest['website'] ?? '').toString().isNotEmpty) ...[
-            const Divider(height: 16),
-            _infoRow(
-              Icons.language,
-              'Website',
-              (_dest['website'] ?? '').toString(),
-            ),
-          ],
-          if ((_dest['cuisine'] ?? '').toString().isNotEmpty) ...[
-            const Divider(height: 16),
-            _infoRow(
-              Icons.restaurant,
-              'Cuisine',
-              (_dest['cuisine'] ?? '').toString(),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// Interactive map preview card with a static map image and a button to
-  /// launch Google Maps navigation.
-  Widget _buildMapPreviewCard(
-    ThemeData theme,
-    double lat,
-    double lon,
-    String name,
-  ) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: () => _launchUrl(
-          'https://www.google.com/maps/search/?api=1&query=$lat,$lon',
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Static map image preview using OpenStreetMap tiles
-            Container(
-              height: 160,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    theme.colorScheme.primaryContainer,
-                    theme.colorScheme.secondaryContainer,
-                  ],
-                ),
-              ),
-              child: Stack(
-                children: [
-                  // Map placeholder with coordinates
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.map,
-                          size: 48,
-                          color: theme.colorScheme.onPrimaryContainer
-                              .withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${lat.toStringAsFixed(4)}°N, ${lon.toStringAsFixed(4)}°E',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Pin icon overlay
-                  Center(
-                    child: Transform.translate(
-                      offset: const Offset(0, -20),
-                      child: Icon(
-                        Icons.location_on,
-                        size: 40,
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Action bar
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.navigation,
-                    size: 20,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'View on Google Maps',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                        Text(
-                          'Get directions to $name',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.open_in_new,
-                    size: 18,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
-    final theme = Theme.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: '$label: ',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                TextSpan(text: value),
-              ],
-            ),
-            style: theme.textTheme.bodyMedium,
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1078,8 +968,9 @@ class _AddToItineraryDialogState extends State<_AddToItineraryDialog> {
       _error = null;
     });
     try {
-      final existingDests =
-          List<String>.from(itinerary['destinations'] as List? ?? []);
+      final existingDests = List<String>.from(
+        itinerary['destinations'] as List? ?? [],
+      );
       if (!existingDests.contains(widget.destinationName)) {
         existingDests.add(widget.destinationName);
       }
@@ -1216,8 +1107,7 @@ class _AddToItineraryDialogState extends State<_AddToItineraryDialog> {
                         child: ChoiceChip(
                           label: const Text('Existing'),
                           selected: !_createNew,
-                          onSelected: (v) =>
-                              setState(() => _createNew = false),
+                          onSelected: (v) => setState(() => _createNew = false),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1225,8 +1115,7 @@ class _AddToItineraryDialogState extends State<_AddToItineraryDialog> {
                         child: ChoiceChip(
                           label: const Text('Create New'),
                           selected: _createNew,
-                          onSelected: (v) =>
-                              setState(() => _createNew = true),
+                          onSelected: (v) => setState(() => _createNew = true),
                         ),
                       ),
                     ],
@@ -1238,8 +1127,7 @@ class _AddToItineraryDialogState extends State<_AddToItineraryDialog> {
                   ...List.generate(_itineraries.length, (i) {
                     final it = _itineraries[i];
                     final dests = (it['destinations'] as List? ?? []);
-                    final alreadyAdded =
-                        dests.contains(widget.destinationName);
+                    final alreadyAdded = dests.contains(widget.destinationName);
                     return Card(
                       child: ListTile(
                         leading: Icon(
@@ -1266,8 +1154,7 @@ class _AddToItineraryDialogState extends State<_AddToItineraryDialog> {
                               )
                             : null,
                         enabled: !alreadyAdded && !_submitting,
-                        onTap:
-                            alreadyAdded ? null : () => _addToExisting(it),
+                        onTap: alreadyAdded ? null : () => _addToExisting(it),
                       ),
                     );
                   }),

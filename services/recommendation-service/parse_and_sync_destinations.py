@@ -19,22 +19,22 @@ from app.models import get_connection, release_connection, clear_all_destination
 
 # Place photo mappings — add your lh3.googleusercontent.com image URLs here (all keys lowercase)
 KNOWN_PLACE_PHOTOS = {
-    "playce yaounde": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnGJ8xQxKaLreAJm7fzvvweZHmPlMxuppI6Ti6FDqI6uSD6PBZ31f1dcZWKAMrGxu0dNqGZsVOESMJ1Vq4WK3c5XfooEp8p_A06qXQZ2kt-cbhCFAOErD883mngzjpVuSa-IY5UVux2HIs=w408-h307-k-no",
-    "general express": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWloAOppif50O2ZNT5xuEUFuI1rCEaa5gk858TwLR_-BC7_q-ckRMwmIEtcxl0haMAWa3L-mCNx1kbw3Q59XPoiFlwnG9ScoVnBuIGNh7GIp6dO0yvUiMMt90xIqPbJCDgf-iNEthw=w408-h544-k-no",
-    "fresh lunch": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnYYEjx6GCK3k-GrbcWvHhnAVrfoGXGzH66LhBOcS-JfcuWYQO4Qqjeev-Vq6yoscPWVuqsgZWngOA7ifPtrgz1lpmj2x8ZMvG3haIy6Dgg56K4MIjA-JdT-3ieJZ8nBC3ZudHa=w504-h240-k-no",
-    "hilton": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlB9aMzHeHos3IFh4wtTmQq8v8vd6f06kCRkuXxsnlq-E_FO84UUpSZvz21eMLb2HJba1FdFp1jW-z1MZ9zw_F3JHRTLWfCMWc6BQj6fcuO6JuVZMdS0blMxTuKuKXuRE7FRGgyLQBeDhA=w408-h273-k-no",
-    "le continent restaurant": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmdRYaFw8-feoCxdg3AXQissR5eqLm6OXeBv1_nvAwZswwLUDDDNzIpOJzl__UvpaxChqCYlbz0CSnjQfjyWl8IZ-AWVTAae1a3qNk4zlVkX33BjCnb7N69DWe5LmsWeGygRPqy=w408-h306-k-no",
-    "cosy pool": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmDBuprrKdvGAlDOmncVbZ1MJXeLLqfVT7Phoe72yl8h10aixRoPKNe2G0jvyu4VXIEMljiz0hdWCqAkoL7qIUqItFi97kz5Eur_ARXROBnPuqqBYz5Tgp0MTwTkjs88j7lPqkX=w426-h240-k-no",
-    "cosy pool yaounde": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmDBuprrKdvGAlDOmncVbZ1MJXeLLqfVT7Phoe72yl8h10aixRoPKNe2G0jvyu4VXIEMljiz0hdWCqAkoL7qIUqItFi97kz5Eur_ARXROBnPuqqBYz5Tgp0MTwTkjs88j7lPqkX=w426-h240-k-no",
-    "blackitude museum": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmUjQUiJXbecmKC533fikxUjOFLaTvUnl7xXGrGWFAk76vqwAOzZZCBbPzJW1HIsVtOi40vWQmqFtsIfcJd82jniLoYpUhtKAB2zsM8QzUazFPOVwXbdZ8AYNfZgmgXPUpSPq8=w408-h272-k-no",
-    "pharmacie nkozoa": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnJ0nB1d-XkLiTRDWvUUYklzAqkAe559Zkalovc9QQrQA46fvoJfRQ8ZsDRmyAXtkqCI3i9uost1D-EwCooTFcSLiNuYioacByzbSo2HGZFfYHCOCi7JW3JdCbIoWFpFCJA1d_U=w408-h877-k-no",
-    "place charles atangana": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWm5x81unNsApCwCxH8mJPr2QAV2je1SkPWrnaiKUZlsTOan_TzBXeLeMCmpcOkVxkjl7MnIFwFsMix8rD028wDwNqjDwz8WxzGxfUX_2TAF4Vbbhgy_TVlA0vVoQ1DsY8a0Euvz=w408-h272-k-no",
-    "monument jaime mon pays": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlSzhjDxJyNUYv2f8cdfr23F5PJ_DF-sCv_N84t7kfEQsmshSLcpUKjls78lBtXwxWXcFJMUSepwXKES58Nw6PQLLvZvqChD8-7_WFsL6NUvPItN4fD0SiOhpOnV15cKCNXQtbs=w408-h306-k-no",
-    "parc de la mefou": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWkw_sv6Ia990VekqXZjbHrLGrizXjGL7SURBY95Lmoph42CJV_Z5tFVsNyYiu_rRr2uNiRH76D7493yJ3ML-rQ_SYfg5ePS6VvRe2iYjV-1A9rx8cQX_0-y8q2sMvxgDkORLW9o=w408-h271-k-no",
-    "presidential place grounds": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnF_lP42zglnAtBolkorn2BBY68LNRLvs-UZvidD823fdKacER8OFF8V43k_6rhZZlHd_ZYH5II1Kw7aUL2-s5VZbU1m_oOomxtbk_-5uR-XyzRWyyvkByAaUJC2iS4kWtZHaiVVw=w408-h306-k-no",
-    "katios night club": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnCge6OXfk9JT7A-tvaym4c7U3pgl1PI8S3GbtQqZ4pMD3TKqGD1_7y1fwVsh4It6cw6LBP-l5UvnF3GJ3NfPjGqg2zVzF8E2pXOeLQjHgvs2a7sIp2i8b6Bo13FPmDs0Ji4YGNlw=w426-h240-k-no",
-    "dade park": "https://lh3.googleusercontent.com/gps-cs-s/AHRPTWn61nJBx0H13ey7QpF_gVITP8pwp1FFmFdNGq5ZXpYLjc7VFcv9dQYhJBec1VGINNMTZXfvvZC2f9BKwWdojGmtQVBW1SE9CeDCbw0oR-RqKUYkTBFqFmv0VtqSfsKjXMBVdGZJt9PMm7v2=w408-h544-k-no",
+    "playce yaounde": "assets/images/playce_yaounde.jpg",
+    "general express": "assets/images/general_express.jpg",
+    "fresh lunch": "assets/images/fresh_lunch.jpg",
+    "hilton": "assets/images/hilton.jpg",
+    "le continent restaurant": "assets/images/le_continent_restaurant.jpg",
+    "cosy pool yaounde": "assets/images/cosy_pool_yaounde.jpg",
+    "blackitude museum": "assets/images/blackitude_meseum.jpg",
+    "pharmacie nkozoa": "assets/images/pharmacie_nkozoa.jpg",
+    "place charles atangana": "assets/images/place_charles_atangana.jpg",
+    "monument jaime mon pays": "assets/images/monument_jaime_mon_pays.jpg",
+    "parc de la mefou": "assets/images/parc_de_la_mefou.jpg",
+    "presidential place grounds": "assets/images/presidential_place_grounds.jpg",
+    "katios night club": "assets/images/katios_night_club.jpg",
+    "dade park": "assets/images/dade_park.jpg",
     "maneges de ya-fe": "assets/images/maneges_de_ya-fe.jpg",
+    "independence square": "assets/images/independence_square.jpg"
 }
 
 # Default placeholder when no image is provided

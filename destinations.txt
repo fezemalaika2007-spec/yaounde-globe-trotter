@@ -63,7 +63,8 @@ https://www.google.com/maps/place/DADE+Park/@3.8968935,11.5924159,17z/data=!3m1!
 Destination 15:maneges de ya-fe | assets/images/maneges_de_ya-fe.jpg
 https://www.google.com/maps/place/Man%C3%A8ges+de+Ya-Fe/@3.8302578,11.3456328,11z/data=!4m10!1m2!2m1!1sThings+to+do!3m6!1s0x108bcf778a5b305d:0xf4219145a45b7e44!8m2!3d3.8948442!4d11.5009919!15sCgxUaGluZ3MgdG8gZG-SARNhbXVzZW1lbnRfcGFya19yaWRl4AEA!16s%2Fg%2F11j9fxrdjz?entry=ttu&g_ep=EgoyMDI2MDgyMy4wIKXMDSoASAFQAw%3D%3D
 
-Destination 16:
+Destination 16: independence square | assets/images/independence_square.jpg
+https://www.google.com/maps/place/Independence+Square/@3.8302578,11.3456328,11z/data=!4m10!1m2!2m1!1sThings+to+do!3m6!1s0x108bcfdd7b566d55:0x262a84e6efe19a10!8m2!3d3.8727837!4d11.5175507!15sCgxUaGluZ3MgdG8gZG9aDiIMdGhpbmdzIHRvIGRvkgETaGlzdG9yaWNhbF9sYW5kbWFya5oBJENoZERTVWhOTUc5blMwVkpRMEZuU1VScWF6aEhWemRuUlJBQuABAPoBBQjzARAy!16s%2Fg%2F11fmw2jt0t?entry=ttu&g_ep=EgoyMDI2MDgyNS4wIKXMDSoASAFQAw%3D%3D
 
 
 Destination 17:

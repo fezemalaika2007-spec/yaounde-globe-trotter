@@ -181,3 +181,45 @@ def test_service_unavailable(client, app, mock_routes_urls):
         resp = client.get("/destinations")
         assert resp.status_code == 503
         assert resp.get_json()["error"] == "service unavailable"
+
+
+def test_comments_proxy_get_and_post(client, app, mock_routes_urls):
+    with mock.patch("app.routes.requests.request") as mock_request:
+        mock_request.return_value = _mock_response(200, [{"id": "c1", "text": "Nice place"}])
+        resp = client.get("/destinations/dest-1/comments")
+        assert resp.status_code == 200
+        call = mock_request.call_args
+        assert call.kwargs["url"].startswith("http://rec.test:5003/destinations/dest-1/comments")
+
+
+def test_comment_edit_put_and_delete(client, app, mock_routes_urls):
+    with mock.patch("app.routes.requests.request") as mock_request:
+        # Test PUT (edit comment)
+        mock_request.return_value = _mock_response(200, {"id": "c1", "text": "Updated text"})
+        resp_put = client.put(
+            "/destinations/dest-1/comments/c1",
+            json={"text": "Updated text"},
+            headers={"Authorization": "Bearer token123"},
+        )
+        assert resp_put.status_code == 200
+        assert mock_request.call_args.kwargs["url"].endswith("/destinations/dest-1/comments/c1")
+        assert mock_request.call_args.kwargs["method"].lower() == "put"
+
+        # Test DELETE (delete comment)
+        mock_request.return_value = _mock_response(200, {"message": "comment deleted"})
+        resp_del = client.delete(
+            "/destinations/dest-1/comments/c1",
+            headers={"Authorization": "Bearer token123"},
+        )
+        assert resp_del.status_code == 200
+        assert mock_request.call_args.kwargs["url"].endswith("/destinations/dest-1/comments/c1")
+        assert mock_request.call_args.kwargs["method"].lower() == "delete"
+
+
+def test_notifications_routes(client, app, mock_routes_urls):
+    with mock.patch("app.routes.requests.request") as mock_request:
+        mock_request.return_value = _mock_response(200, [{"id": "n1", "title": "Reply"}])
+        resp = client.get("/notifications", headers={"Authorization": "Bearer token123"})
+        assert resp.status_code == 200
+        assert mock_request.call_args.kwargs["url"].startswith("http://rec.test:5003/notifications")
+

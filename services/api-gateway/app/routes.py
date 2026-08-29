@@ -180,9 +180,9 @@ def destination_comments(dest_id):
     return _proxy("DYNAMIC", f"{RECOMMENDATION_SERVICE_URL}/destinations/{dest_id}/comments")
 
 
-@gateway_bp.route("/destinations/<dest_id>/comments/<comment_id>", methods=["DELETE", "OPTIONS"])
-def delete_destination_comment(dest_id, comment_id):
-    return _proxy("DELETE", f"{RECOMMENDATION_SERVICE_URL}/destinations/{dest_id}/comments/{comment_id}")
+@gateway_bp.route("/destinations/<dest_id>/comments/<comment_id>", methods=["PUT", "DELETE", "OPTIONS"])
+def destination_comment_detail(dest_id, comment_id):
+    return _proxy("DYNAMIC", f"{RECOMMENDATION_SERVICE_URL}/destinations/{dest_id}/comments/{comment_id}")
 
 
 # ---------------------------------------------------------------------------

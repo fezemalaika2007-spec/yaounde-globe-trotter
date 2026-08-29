@@ -7,6 +7,7 @@ import '../services/auth_provider.dart';
 import '../services/favorites_provider.dart';
 import '../utils/image_paths.dart';
 import '../widgets/auth_background.dart';
+import '../widgets/google_logo_widget.dart';
 
 class LoginScreen extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
@@ -217,7 +218,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: _loading ? null : _googleLogin,
-            icon: const Icon(Icons.g_mobiledata, size: 30),
+            icon: const GoogleLogoWidget(size: 20),
             label: const Text('Continue with Google'),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(48),

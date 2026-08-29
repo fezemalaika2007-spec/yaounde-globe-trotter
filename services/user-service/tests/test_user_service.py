@@ -17,16 +17,7 @@ from app.models import init_db
 
 @pytest.fixture
 def client():
-    """Create a Flask test client against the configured online PostgreSQL DB.
-
-    The User Service now uses an online PostgreSQL database configured via
-    the DATABASE_URL environment variable (never hardcoded). If DATABASE_URL
-    is not set, the tests skip gracefully so the suite stays runnable without
-    cloud credentials.
-    """
-    if not os.environ.get("DATABASE_URL"):
-        pytest.skip("DATABASE_URL not set; skipping PostgreSQL-backed tests")
-
+    """Create a Flask test client with an initialized database."""
     app = create_app()
     app.config["TESTING"] = True
 

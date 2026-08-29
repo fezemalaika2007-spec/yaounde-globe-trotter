@@ -18,16 +18,7 @@ from app.models import init_db
 
 @pytest.fixture
 def client():
-    """Create a Flask test client against the configured online PostgreSQL DB.
-
-    The User Service now uses an online PostgreSQL database configured via
-    the DATABASE_URL environment variable (never hardcoded). If DATABASE_URL
-    is not set, the tests skip gracefully so the suite stays runnable without
-    cloud credentials.
-    """
-    if not os.environ.get("DATABASE_URL"):
-        pytest.skip("DATABASE_URL not set; skipping PostgreSQL-backed tests")
-
+    """Create a Flask test client with an initialized database."""
     app = create_app()
     app.config["TESTING"] = True
 
@@ -71,7 +62,7 @@ class TestInternalPreferencesEndpoint:
         assert isinstance(data["favorites"], list)
 
     def test_add_favorite_then_preferences_include_it(self, client):
-        token = _register_and_login(client, "bob", "pass")
+        token = _register_and_login(client, "bob", "mypassword")
         headers = {"Authorization": f"Bearer {token}"}
 
         # Add a favorite

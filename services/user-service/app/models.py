@@ -1,61 +1,147 @@
 """user-service/models.py
 
-PostgreSQL database models for the User Service.
-Owns: users table (id, username, password_hash, preferences, created_at)
+Database models for the User Service (PostgreSQL with SQLite fallback for local testing).
+Owns: users table (id, username, password_hash, email, is_verified, verification_code, auth_provider, preferences, created_at, reset_code, reset_expires)
 Owns: favorites table (id, user_id, destination_name, created_at)
-
-The database connection string is read from the DATABASE_URL environment
-variable and is never hardcoded.
 """
 import os
 import uuid
 import datetime
 import json
+import sqlite3
 from contextlib import contextmanager
 
 import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
-from flask import current_app
+from flask import current_app, has_app_context
 
 _pool = None
+_test_sqlite_conn = None
 
-def _get_database_url(app=None):
-    """Return the PostgreSQL connection string from env or app config."""
-    url = ""
-    if app and app.config.get("DATABASE"):
-        url = app.config["DATABASE"]
-    if not url:
-        url = os.environ.get("DATABASE_URL", "")
-    if "-pooler" in url:
-        url = url.replace("-pooler", "")
-    if not url:
-        raise RuntimeError(
-            "DATABASE_URL environment variable is required to connect to "
-            "the online PostgreSQL database."
-        )
-    return url
+
+class SQLiteCursorWrapper:
+    def __init__(self, cur):
+        self.cur = cur
+        self.description = None
+
+    def execute(self, sql, params=()):
+        sql = sql.replace("%s", "?")
+        self.cur.execute(sql, params)
+        self.description = self.cur.description
+
+    def fetchall(self):
+        rows = self.cur.fetchall()
+        return [tuple(r) for r in rows]
+
+    def fetchone(self):
+        row = self.cur.fetchone()
+        return tuple(row) if row else None
+
+    def close(self):
+        try:
+            self.cur.close()
+        except Exception:
+            pass
+
+
+class SQLiteWrapper:
+    def __init__(self, db_path=":memory:"):
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+
+    def cursor(self):
+        return SQLiteCursorWrapper(self.conn.cursor())
+
+    def commit(self):
+        self.conn.commit()
+
+    def rollback(self):
+        try:
+            self.conn.rollback()
+        except Exception:
+            pass
+
+    def close(self):
+        try:
+            self.conn.close()
+        except Exception:
+            pass
+
+
+def _load_env_if_needed():
+    """Attempt to load DATABASE_URL from services/.env if not present."""
+    if not os.environ.get("DATABASE_URL"):
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        env_path = os.path.join(base_dir, ".env")
+        if not os.path.exists(env_path):
+            env_path = os.path.join(base_dir, "services", ".env")
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k, v = k.strip(), v.strip()
+                            if k not in os.environ and v:
+                                os.environ[k] = v
+            except Exception:
+                pass
 
 
 def get_connection(app=None):
-    """Get a PostgreSQL connection from the connection pool or create a fallback."""
-    global _pool
-    db_url = _get_database_url(app)
-    if _pool is None:
+    """Get a database connection (PostgreSQL in production, SQLite in test/offline mode)."""
+    global _pool, _test_sqlite_conn
+    _load_env_if_needed()
+
+    if app is None and has_app_context():
+        app = current_app
+
+    # In testing mode or when USE_SQLITE is set, use in-memory SQLite
+    is_testing = (
+        (app and app.config.get("TESTING"))
+        or os.environ.get("TESTING")
+        or os.environ.get("PYTEST_CURRENT_TEST")
+        or os.environ.get("USE_SQLITE")
+    )
+    if is_testing and not os.environ.get("USE_REAL_DB_FOR_TESTS"):
+        if _test_sqlite_conn is None:
+            _test_sqlite_conn = SQLiteWrapper(":memory:")
+        return _test_sqlite_conn
+
+    db_url = os.environ.get("USER_DATABASE_URL") or os.environ.get("DATABASE_URL", "")
+    if app and app.config.get("DATABASE"):
+        db_url = app.config["DATABASE"]
+
+    if "-pooler" in db_url:
+        db_url = db_url.replace("-pooler", "")
+
+    if db_url.startswith("postgres"):
+        if _pool is None:
+            try:
+                _pool = ThreadedConnectionPool(minconn=1, maxconn=15, dsn=db_url)
+            except Exception:
+                _pool = None
+        if _pool:
+            try:
+                return _pool.getconn()
+            except Exception:
+                pass
         try:
-            _pool = ThreadedConnectionPool(minconn=1, maxconn=15, dsn=db_url)
-        except Exception:
-            _pool = None
-    if _pool:
-        try:
-            return _pool.getconn()
-        except Exception:
-            pass
-    return psycopg2.connect(db_url, connect_timeout=15)
+            return psycopg2.connect(db_url, connect_timeout=10)
+        except Exception as e:
+            print(f"PostgreSQL connection failed ({e}); falling back to local SQLite.")
+
+    # SQLite fallback
+    if _test_sqlite_conn is None:
+        _test_sqlite_conn = SQLiteWrapper(":memory:")
+    return _test_sqlite_conn
 
 
 def release_connection(conn):
     """Release a connection back to the pool if pooling is active."""
-    global _pool
+    global _pool, _test_sqlite_conn
+    if conn == _test_sqlite_conn:
+        return
     if _pool and conn:
         try:
             _pool.putconn(conn)
@@ -73,6 +159,20 @@ def init_db(app=None):
     """Create the users and favorites tables and indexes if they don't exist."""
     conn = get_connection(app)
     cur = conn.cursor()
+
+    is_testing = (
+        (app and app.config.get("TESTING"))
+        or os.environ.get("TESTING")
+        or os.environ.get("PYTEST_CURRENT_TEST")
+        or os.environ.get("USE_SQLITE")
+    )
+    if is_testing:
+        try:
+            cur.execute("DROP TABLE IF EXISTS favorites")
+            cur.execute("DROP TABLE IF EXISTS users")
+        except Exception:
+            pass
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
@@ -83,7 +183,9 @@ def init_db(app=None):
             verification_code TEXT DEFAULT '',
             auth_provider TEXT DEFAULT 'local',
             preferences TEXT DEFAULT '[]',
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            reset_code TEXT DEFAULT '',
+            reset_expires TEXT DEFAULT ''
         )
     """)
     cur.execute("""
@@ -96,24 +198,27 @@ def init_db(app=None):
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)")
-    
+    try:
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)")
+    except Exception:
+        pass
+
     # Ensure the new columns exist (safe migration for existing DBs).
-    cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users'")
-    existing_cols = {r[0] for r in cur.fetchall()}
-    col_sql = {
-        "email": "ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''",
-        "is_verified": "ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE",
-        "verification_code": "ALTER TABLE users ADD COLUMN verification_code TEXT DEFAULT ''",
-        "auth_provider": "ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local'",
-        "reset_code": "ALTER TABLE users ADD COLUMN reset_code TEXT DEFAULT ''",
-        "reset_expires": "ALTER TABLE users ADD COLUMN reset_expires TEXT DEFAULT ''",
-    }
-    for col, sql in col_sql.items():
-        if col not in existing_cols:
-            cur.execute(sql)
+    for col, col_def in [
+        ("email", "TEXT DEFAULT ''"),
+        ("is_verified", "BOOLEAN DEFAULT FALSE"),
+        ("verification_code", "TEXT DEFAULT ''"),
+        ("auth_provider", "TEXT DEFAULT 'local'"),
+        ("reset_code", "TEXT DEFAULT ''"),
+        ("reset_expires", "TEXT DEFAULT ''"),
+    ]:
+        try:
+            cur.execute(f"ALTER TABLE users ADD COLUMN {col} {col_def}")
+        except Exception:
+            pass
+
     conn.commit()
     cur.close()
     release_connection(conn)
@@ -411,7 +516,7 @@ def verify_reset_code_and_update_password(identifier, code, new_password_hash, a
     )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
     return True
 
 

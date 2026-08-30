@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/favorites_provider.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 import '../utils/destination_filters.dart';
 import '../widgets/star_rating_widget.dart';
 import '../widgets/comment_section.dart';
@@ -31,6 +32,11 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     _isFav = _favProvider.isFavorite(_dest['name'] ?? '');
     _favProvider.addListener(_onFavChange);
     _loadUserRating();
+    AnalyticsService().logViewDestination(
+      id: _dest['id']?.toString() ?? '',
+      name: _dest['name']?.toString() ?? 'Unknown',
+      category: _dest['category']?.toString(),
+    );
   }
 
   Future<void> _loadUserRating() async {

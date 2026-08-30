@@ -11,7 +11,7 @@ The **Recommendation Service** provides intelligent place discovery, Foursquare 
 - **Destinations Synchronization**: Automatically parses `destinations.txt` and syncs real place descriptions, exact addresses, opening hours, phone numbers, website links, facilities, activities, and prices in FCFA.
 - **Threaded Community Comments**: Supports top-level destination reviews, author comment updates (`PUT`), cascading deletion (`DELETE`), and nested reply threads with real-time notification alerts.
 - **Notifications System**: In-app notification center tracking replies, ratings, and travel updates with unread counts and batch mark-as-read endpoints.
-- **Feedback & Bug Reporting**: Direct user support channel for suggestions, issues, and bug submissions.
+- **Feedback & Bug Reporting**: Direct user support channel for suggestions, issues, and bug submissions open to all authenticated users.
 - **Database Connection Pooling**: Built with `ThreadedConnectionPool` (1–15 connections) and `release_connection` safety wrappers.
 - **SQL Indexes**: Includes `idx_destinations_fsq_id`, `idx_ratings_dest_user`, `idx_comments_dest`, `idx_comments_parent`, and `idx_notifications_user`.
 
@@ -39,8 +39,8 @@ The **Recommendation Service** provides intelligent place discovery, Foursquare 
 
 ### Feedback & Support
 - `POST /feedback`: Submits a feedback report or bug inquiry (JWT required).
-- `GET /feedback`: Retrieves all submitted feedback entries (Admin only).
-- `POST /feedback/<feedback_id>/resolve`: Marks a feedback ticket as resolved (Admin only).
+- `GET /feedback`: Retrieves all submitted feedback entries (JWT required, open access to all authenticated users).
+- `POST /feedback/<feedback_id>/resolve`: Marks a feedback ticket as resolved (JWT required, open access to all authenticated users).
 
 ## Running Locally & Testing
 
@@ -57,4 +57,3 @@ python parse_and_sync_destinations.py
 # Run test suite
 python -m pytest
 ```
-

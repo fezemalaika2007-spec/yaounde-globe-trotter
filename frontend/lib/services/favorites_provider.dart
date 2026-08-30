@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'api_service.dart';
+import 'analytics_service.dart';
 
 /// Simple app-scoped favorites cache + notifier.
 ///
@@ -39,6 +40,11 @@ class FavoritesProvider extends ChangeNotifier {
     try {
       final updated = await _api.toggleFavorite(destinationName);
       _favorites = updated.cast<String>();
+      final isNowFav = _favorites.contains(destinationName);
+      AnalyticsService().logToggleFavorite(
+        destinationId: destinationName,
+        isFavorite: isNowFav,
+      );
       notifyListeners();
       return _favorites;
     } catch (_) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
+import '../services/analytics_service.dart';
 import '../utils/image_paths.dart';
 import '../widgets/auth_background.dart';
 import 'verify_email_screen.dart';
@@ -71,6 +72,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _passwordCtrl.text,
         List.from(_selectedTags),
       );
+      await AnalyticsService().logSignUp(method: 'email');
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -140,13 +142,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     textInputAction: TextInputAction.next,
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
-                        return 'Please enter your email';
+                        return 'Please enter your email address';
                       }
                       final email = v.trim();
-                      final valid = RegExp(
-                        r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                      ).hasMatch(email);
-                      return valid ? null : 'Please enter a valid email';
+                      final emailRegex = RegExp(
+                        r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$",
+                      );
+                      if (!emailRegex.hasMatch(email)) {
+                        return 'Please enter a valid existing email address (e.g. name@domain.com)';
+                      }
+                      return null;
                     },
                   ),
                   const SizedBox(height: 14),

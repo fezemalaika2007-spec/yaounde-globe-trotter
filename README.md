@@ -1,12 +1,13 @@
 # GlobeTrotter — Smart Travel Assistant for Yaoundé, Cameroon
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
+[![Firebase](https://img.shields.io/badge/Firebase-Analytics-FFCA28?logo=firebase)](https://firebase.google.com/)
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.0%2B-000000?logo=flask)](https://flask.palletsprojects.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql)](https://neon.tech)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://www.docker.com/)
 
-**GlobeTrotter Travel Assistant** is a modern, distributed microservices platform designed for exploring Cameroon's vibrant capital, Yaoundé. The application provides intelligent search, personalized recommendations, itinerary planning, rating/reviews, and multi-language support across Web, Mobile, and Desktop clients.
+**GlobeTrotter Travel Assistant** is a modern, distributed microservices platform designed for exploring Cameroon's vibrant capital, Yaoundé. The application provides intelligent search, personalized recommendations, itinerary planning, rating/reviews, real-time background analytics, and multi-language support across Web, Mobile, and Desktop clients.
 
 ---
 
@@ -43,17 +44,20 @@
 
 ### Microservice Components
 1. **API Gateway (`port 5000`)**: Single entry point handling routing, proxying, header forwarding, CORS, and endpoint distribution.
-2. **User Service (`port 5001`)**: Handles user registration, bcrypt password hashing, JWT issuance, email format validation, interest tag profiles, and favorites management.
+2. **User Service (`port 5001`)**: Handles user registration, email address syntax verification, 6-digit verification code email dispatch, bcrypt password hashing, JWT issuance, password reset, interest tag profiles, and favorites management.
 3. **Itinerary Service (`port 5002`)**: Complete CRUD manager for multi-day itineraries, destinations sequencing, date range validation, and notes management.
-4. **Recommendation Service (`port 5003`)**: Intelligent recommendation engine featuring preference matching, Foursquare venue search integration, ratings engine, threaded community discussions & replies, notification center, bug/feedback tracking, and destination parsing/synchronization from `destinations.txt`.
-5. **Frontend Client (Flutter Web / Android / Desktop)**: Material 3 responsive UI featuring localized English/French interface, shimmer skeleton loading state, image lightboxes, tag chips, official Google sign-in branding, threaded comments, and real-time state synchronization.
+4. **Recommendation Service (`port 5003`)**: Intelligent recommendation engine featuring preference matching, Foursquare venue search integration, ratings engine, community discussions, in-app notification center, public feedback/bug tracking, and destination parsing/synchronization from `destinations.txt`.
+5. **Frontend Client (Flutter Web / Android / Desktop)**: Material 3 responsive UI featuring localized English/French interface, Firebase Analytics tracking, live in-app analytics dashboard, community feedback viewer, shimmer loading states, image lightboxes, tag chips, and real-time state synchronization.
 
 ---
 
 ## 2. Key Features
 
-- 🔒 **Security & Authentication**: Strict JWT context enforcement, bcrypt salted password hashing, regex email validation, client token storage, and official Google Sign-In integration.
-- 💬 **Threaded Community Discussions**: Interactive comment section with nested reply threads, author comment editing, cascading deletions, and instant reply notifications.
+- 📊 **Firebase Analytics & Live Dashboard**: Integrated `firebase_core` and `firebase_analytics` streaming real-time events (`app_open`, `login`, `sign_up`, `search`, `view_destination`, `add_to_favorites`, `generate_itinerary`, `submit_feedback`). Includes a dedicated **Analytics Dashboard** available directly inside the app for all users.
+- ✉️ **Strict Email Verification & Password Reset**: Robust RFC email address format validation on registration and password reset. Verification codes are dispatched directly to the user's valid email inbox for account activation and password recovery.
+- 🔓 **Universal App Access**: All community features (Analytics Dashboard & Community Feedback) are open to all authenticated users without restrictive admin locks.
+- 🔒 **Security & Authentication**: JWT token management, bcrypt salted password hashing, client-side secure storage fallback, and official Google Sign-In integration.
+- 💬 **Community Feedback & Discussions**: Threaded comment section with nested reply threads, author comment editing, confirmation-guided deletions, reply notifications, and a dedicated Community Feedback & Bug Reports manager.
 - 🔔 **In-App Notification Center**: Real-time notifications for comment replies, ratings, and travel updates with unread counts and batch mark-as-read.
 - ⚡ **High-Performance Connection Pooling**: Microservices utilize `ThreadedConnectionPool` (1-15 connections) with explicit connection release and optimized B-tree indexes (`idx_users_email`, `idx_destinations_fsq_id`, `idx_itineraries_user_id`, `idx_comments_dest`, `idx_comments_parent`, `idx_notifications_user`).
 - 🖼️ **Rich Media & Visual Gallery**: 20 synchronized Cameroonian destinations with high-resolution photo galleries, full-screen lightbox modal preview, and image deduplication.
@@ -70,10 +74,11 @@ yaounde-globe-trotter/
 ├── frontend/                     # Flutter Web/Mobile/Desktop client codebase
 │   ├── lib/
 │   │   ├── config/               # API endpoint configurations & auto host resolver
+│   │   ├── firebase_options.dart # Firebase CLI generated options (Android, Web, Windows)
 │   │   ├── l10n/                 # AppLocalizations (English / French)
 │   │   ├── models/               # Data models
-│   │   ├── screens/              # MainShell, Destinations, Recommendations, Itineraries, Auth
-│   │   ├── services/             # ApiService (JWT, HTTP guard, retry timeouts), FavoritesProvider
+│   │   ├── screens/              # MainShell, Destinations, Recommendations, AnalyticsDashboard, Auth
+│   │   ├── services/             # AnalyticsService, ApiService, AuthProvider, FavoritesProvider
 │   │   ├── theme/                # Material 3 Travel color scheme & components
 │   │   ├── utils/                # Image normalization & filters
 │   │   └── widgets/              # ShimmerGrid, DestinationGridCard, EmptyState
@@ -176,9 +181,26 @@ To launch the Flutter client in web or desktop mode:
   flutter run -d android
   ```
 
+- **Windows Desktop**:
+  ```bash
+  cd frontend
+  flutter run -d windows
+  ```
+
 ---
 
-## 6. Testing
+## 6. Firebase Analytics Configuration
+
+Firebase configuration file `lib/firebase_options.dart` is automatically created via FlutterFire CLI:
+```bash
+cd frontend
+dart pub global run flutterfire_cli:flutterfire configure
+```
+Supported platform targets: **Android**, **Web**, **Windows**.
+
+---
+
+## 7. Testing & Verification
 
 ### Backend Microservice Test Suite
 Run pytest from within each microservice directory:
@@ -189,30 +211,11 @@ cd services/recommendation-service && python -m pytest
 ```
 
 ### Frontend Analysis & Verification
-Verify Flutter compilation and static analysis:
+Verify Flutter static analysis:
 ```bash
 cd frontend
 flutter analyze
 ```
-
----
-
-## 7. Deployment Guide
-
-1. **Database Provisioning**: Ensure a PostgreSQL instance (e.g. Neon, AWS RDS, or GCP Cloud SQL) is active and update `DATABASE_URL` in `.env`.
-2. **Container Registry**: Build and push Docker images to your registry (Docker Hub, ECR, GCR):
-   ```bash
-   docker build -t your-org/api-gateway:latest services/api-gateway
-   docker build -t your-org/user-service:latest services/user-service
-   docker build -t your-org/itinerary-service:latest services/itinerary-service
-   docker build -t your-org/recommendation-service:latest services/recommendation-service
-   ```
-3. **Container Orchestration**: Deploy the images using Kubernetes (`kubectl apply -f k8s/`) or Docker Compose on a Cloud VM.
-4. **Frontend Hosting**: Build the web distribution bundle and deploy to Vercel, Netlify, or AWS S3 + CloudFront:
-   ```bash
-   cd frontend
-   flutter build web --release
-   ```
 
 ---
 

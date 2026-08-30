@@ -3,16 +3,19 @@ import 'l10n/app_localizations.dart';
 import 'services/auth_provider.dart';
 import 'services/favorites_provider.dart';
 import 'services/theme_provider.dart';
+import 'services/analytics_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/main_shell.dart';
+import 'screens/analytics_dashboard_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AuthProvider();
   ThemeProvider();
+  await AnalyticsService().initialize();
   runApp(const YaoundeTripApp());
 }
 
@@ -65,10 +68,13 @@ class _YaoundeTripAppState extends State<YaoundeTripApp> {
 
   void _setLocale(Locale locale) {
     setState(() => _locale = locale);
+    AnalyticsService().logChangeLanguage(languageCode: locale.languageCode);
   }
 
   @override
   Widget build(BuildContext context) {
+    final observer = AnalyticsService().observer;
+
     return MaterialApp(
       title: 'Yaounde.Trip',
       debugShowCheckedModeBanner: false,
@@ -78,6 +84,9 @@ class _YaoundeTripAppState extends State<YaoundeTripApp> {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: ThemeProvider().themeMode,
+      navigatorObservers: [
+        ?observer,
+      ],
       onGenerateRoute: (settings) {
         final args = settings.arguments as void Function(Locale)?;
         final localeCallback = args ?? _setLocale;
@@ -94,6 +103,10 @@ class _YaoundeTripAppState extends State<YaoundeTripApp> {
             return MaterialPageRoute(
               builder: (_) =>
                   ForgotPasswordScreen(onLocaleChanged: localeCallback),
+            );
+          case '/analytics':
+            return MaterialPageRoute(
+              builder: (_) => const AnalyticsDashboardScreen(),
             );
           default:
             return MaterialPageRoute(

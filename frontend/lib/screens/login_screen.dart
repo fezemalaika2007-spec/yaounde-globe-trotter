@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../config/google_auth_config.dart';
 import '../services/auth_provider.dart';
 import '../services/favorites_provider.dart';
+import '../services/analytics_service.dart';
 import '../utils/image_paths.dart';
 import '../widgets/auth_background.dart';
 import '../widgets/google_logo_widget.dart';
@@ -42,6 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await AuthProvider().login(_usernameCtrl.text.trim(), _passwordCtrl.text);
+      await AnalyticsService().logLogin(method: 'password');
       await FavoritesProvider().loadFavorites().catchError((e) {
         debugPrint('Error loading favorites after login: $e');
       });
@@ -96,6 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
         idToken: idToken,
         accessToken: accessToken,
       );
+      await AnalyticsService().logLogin(method: 'google');
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       }

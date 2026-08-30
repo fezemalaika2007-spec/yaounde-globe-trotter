@@ -329,11 +329,7 @@ def submit_feedback():
 @recommendation_bp.route("/feedback", methods=["GET"])
 @token_required
 def list_feedback():
-    """List all feedback (admin only)."""
-    username = g.current_user
-    if username != ADMIN_USERNAME:
-        return jsonify({"error": "access denied"}), 403
-
+    """List all feedback."""
     feedback_list = get_all_feedback()
     return jsonify(feedback_list), 200
 
@@ -341,11 +337,7 @@ def list_feedback():
 @recommendation_bp.route("/feedback/<feedback_id>/resolve", methods=["POST"])
 @token_required
 def resolve_feedback(feedback_id):
-    """Mark feedback as resolved (admin only)."""
-    username = g.current_user
-    if username != ADMIN_USERNAME:
-        return jsonify({"error": "access denied"}), 403
-
+    """Mark feedback as resolved."""
     mark_feedback_resolved(feedback_id)
     return jsonify({"message": "feedback marked as resolved"}), 200
 

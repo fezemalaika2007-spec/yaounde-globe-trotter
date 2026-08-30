@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 class FeedbackScreen extends StatefulWidget {
   const FeedbackScreen({super.key});
@@ -40,6 +41,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         subject: _subjectController.text.trim(),
         message: _messageController.text.trim(),
       );
+      await AnalyticsService().logSubmitFeedback(category: _selectedCategory);
 
       if (mounted) {
         setState(() => _isSubmitting = false);

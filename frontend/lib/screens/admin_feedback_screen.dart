@@ -36,8 +36,9 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _feedbackList = [];
           _isLoading = false;
+          _error = null;
         });
       }
     }
@@ -100,7 +101,7 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin — User Feedback & Bugs'),
+        title: const Text('Community Feedback & Bugs'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),

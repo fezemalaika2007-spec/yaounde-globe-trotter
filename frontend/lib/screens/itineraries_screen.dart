@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 import '../widgets/empty_state.dart';
 
 class ItinerariesScreen extends StatefulWidget {
@@ -93,6 +94,7 @@ class _ItinerariesScreenState extends State<ItinerariesScreen> {
     if (confirmed == true) {
       try {
         await _api.deleteItinerary(id: itinerary['id'].toString());
+        await AnalyticsService().logDeleteItinerary(id: itinerary['id'].toString());
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -519,6 +521,10 @@ class _ItineraryFormDialogState extends State<_ItineraryFormDialog> {
           startDate: _startCtrl.text.trim(),
           endDate: _endCtrl.text.trim(),
           notes: _notesCtrl.text.trim(),
+        );
+        await AnalyticsService().logGenerateItinerary(
+          days: destinations.length,
+          pace: 'moderate',
         );
       } else {
         await ApiService().updateItinerary(

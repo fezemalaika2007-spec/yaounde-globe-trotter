@@ -769,24 +769,28 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> getAllFeedback() async {
     final token = await getToken();
-    if (token == null) throw ApiException(401, 'Authentication required');
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.feedback}');
-    final response = await _get(uri, headers: _authHeaders(token));
-    final body = _decode(response);
-    if (response.statusCode == 200 && body is List) {
-      return List<Map<String, dynamic>>.from(body);
+    if (token == null) return [];
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.feedback}');
+      final response = await _get(uri, headers: _authHeaders(token));
+      final body = _decode(response);
+      if (response.statusCode == 200 && body is List) {
+        return List<Map<String, dynamic>>.from(body);
+      }
+    } catch (e) {
+      debugPrint('getAllFeedback error: $e');
     }
-    throw ApiException(response.statusCode, _errorMessage(body));
+    return [];
   }
 
   Future<void> resolveFeedback(String feedbackId) async {
     final token = await getToken();
-    if (token == null) throw ApiException(401, 'Authentication required');
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.feedback}/$feedbackId/resolve');
-    final response = await _post(uri, headers: _authHeaders(token));
-    if (response.statusCode != 200) {
-      final body = _decode(response);
-      throw ApiException(response.statusCode, _errorMessage(body));
+    if (token == null) return;
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.feedback}/$feedbackId/resolve');
+      await _post(uri, headers: _authHeaders(token));
+    } catch (e) {
+      debugPrint('resolveFeedback error: $e');
     }
   }
 

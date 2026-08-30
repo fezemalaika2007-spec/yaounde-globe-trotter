@@ -16,6 +16,8 @@ import 'itineraries_screen.dart';
 import 'favorites_screen.dart';
 import 'feedback_screen.dart';
 import 'admin_feedback_screen.dart';
+import 'analytics_dashboard_screen.dart';
+import '../services/analytics_service.dart';
 import '../widgets/notification_bell.dart';
 
 
@@ -135,10 +137,8 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  /// Builds the app bar actions menu (theme, language, profile, logout, feedback).
+  /// Builds the app bar actions menu (theme, language, profile, logout, feedback, analytics).
   List<Widget> _buildAppBarActions(AppLocalizations l10n, ThemeProvider theme) {
-    final isAdmin = AuthProvider().username == 'jbc';
-
     return [
       const NotificationBell(),
       PopupMenuButton<String>(
@@ -151,10 +151,15 @@ class _MainShellState extends State<MainShell> {
               context,
               MaterialPageRoute(builder: (_) => const FeedbackScreen()),
             );
-          } else if (value == 'admin_feedback') {
+          } else if (value == 'community_feedback') {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminFeedbackScreen()),
+            );
+          } else if (value == 'analytics') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AnalyticsDashboardScreen()),
             );
           } else if (value == 'logout') {
             _logout();
@@ -166,6 +171,9 @@ class _MainShellState extends State<MainShell> {
             widget.onLocaleChanged(const Locale('fr'));
           } else if (value == 'toggle_theme') {
             await theme.toggleTheme();
+            AnalyticsService().logChangeTheme(
+              themeMode: theme.isDarkMode ? 'dark' : 'light',
+            );
           }
         },
         itemBuilder: (_) => [
@@ -211,17 +219,26 @@ class _MainShellState extends State<MainShell> {
               ],
             ),
           ),
-          if (isAdmin)
-            PopupMenuItem(
-              value: 'admin_feedback',
-              child: const Row(
-                children: [
-                  Icon(Icons.admin_panel_settings_outlined, size: 20, color: Colors.purple),
-                  SizedBox(width: 8),
-                  Text('Admin: View Feedback'),
-                ],
-              ),
+          PopupMenuItem(
+            value: 'analytics',
+            child: const Row(
+              children: [
+                Icon(Icons.analytics_outlined, size: 20, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('Analytics Dashboard'),
+              ],
             ),
+          ),
+          PopupMenuItem(
+            value: 'community_feedback',
+            child: const Row(
+              children: [
+                Icon(Icons.rate_review_outlined, size: 20, color: Colors.purple),
+                SizedBox(width: 8),
+                Text('View Community Feedback'),
+              ],
+            ),
+          ),
           const PopupMenuDivider(),
           PopupMenuItem(
             value: 'profile',
@@ -662,6 +679,7 @@ class _DestinationsTabState extends State<_DestinationsTab> {
 
   Future<void> _performLiveSearch(String query) async {
     try {
+      AnalyticsService().logSearch(searchTerm: query);
       final results = await _api.searchDestinations(query, limit: 12);
       final deduped = _deduplicateDestinations(results);
       if (mounted) {

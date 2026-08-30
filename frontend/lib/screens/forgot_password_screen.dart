@@ -170,8 +170,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _requestResetCode(),
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? l10n.enterUsernameOrEmail : null,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return l10n.enterUsernameOrEmail;
+                  }
+                  final input = v.trim();
+                  if (input.contains('@')) {
+                    final emailRegex = RegExp(
+                      r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$",
+                    );
+                    if (!emailRegex.hasMatch(input)) {
+                      return 'Please enter a valid existing email address';
+                    }
+                  }
+                  return null;
+                },
                 ),
               ),
               const SizedBox(height: 20),

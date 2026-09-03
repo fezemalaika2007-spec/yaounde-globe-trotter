@@ -15,8 +15,8 @@ import 'recommendations_screen.dart';
 import 'itineraries_screen.dart';
 import 'favorites_screen.dart';
 import 'feedback_screen.dart';
-import 'admin_feedback_screen.dart';
 import 'analytics_dashboard_screen.dart';
+import 'chat_screen.dart';
 import '../services/analytics_service.dart';
 import '../widgets/notification_bell.dart';
 
@@ -137,7 +137,7 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  /// Builds the app bar actions menu (theme, language, profile, logout, feedback, analytics).
+  /// Builds the app bar actions menu (theme, language, profile, logout, feedback, analytics, chat).
   List<Widget> _buildAppBarActions(AppLocalizations l10n, ThemeProvider theme) {
     return [
       const NotificationBell(),
@@ -146,15 +146,17 @@ class _MainShellState extends State<MainShell> {
         onSelected: (value) async {
           if (value == 'profile') {
             _showProfileSheet();
+          } else if (value == 'chat') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(onLocaleChanged: widget.onLocaleChanged),
+              ),
+            );
           } else if (value == 'feedback') {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const FeedbackScreen()),
-            );
-          } else if (value == 'community_feedback') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminFeedbackScreen()),
             );
           } else if (value == 'analytics') {
             Navigator.push(
@@ -177,6 +179,17 @@ class _MainShellState extends State<MainShell> {
           }
         },
         itemBuilder: (_) => [
+          PopupMenuItem(
+            value: 'chat',
+            child: const Row(
+              children: [
+                Icon(Icons.forum_outlined, size: 20, color: Colors.teal),
+                SizedBox(width: 8),
+                Text('Live Community Chat'),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
           PopupMenuItem(
             value: 'toggle_theme',
             child: Row(
@@ -226,37 +239,6 @@ class _MainShellState extends State<MainShell> {
                 Icon(Icons.analytics_outlined, size: 20, color: Colors.blue),
                 SizedBox(width: 8),
                 Text('Analytics Dashboard'),
-              ],
-            ),
-          ),
-          PopupMenuItem(
-            value: 'community_feedback',
-            child: const Row(
-              children: [
-                Icon(Icons.rate_review_outlined, size: 20, color: Colors.purple),
-                SizedBox(width: 8),
-                Text('View Community Feedback'),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          PopupMenuItem(
-            value: 'profile',
-            child: Row(
-              children: [
-                const Icon(Icons.person, size: 20),
-                const SizedBox(width: 8),
-                Text(l10n.profile),
-              ],
-            ),
-          ),
-          PopupMenuItem(
-            value: 'logout',
-            child: Row(
-              children: [
-                const Icon(Icons.logout, size: 20),
-                const SizedBox(width: 8),
-                Text(l10n.logout),
               ],
             ),
           ),

@@ -240,6 +240,16 @@ class AnalyticsService {
     }
   }
 
+  /// Logs live community chat message send event.
+  Future<void> logSendChatMessage() async {
+    _recordEventLocally('send_chat_message', {'status': 'success'});
+    try {
+      await _analytics?.logEvent(name: 'send_chat_message');
+    } catch (e) {
+      debugPrint('[AnalyticsService] logSendChatMessage failed: $e');
+    }
+  }
+
   /// Logs user feedback submission.
   Future<void> logSubmitFeedback({
     required String category,

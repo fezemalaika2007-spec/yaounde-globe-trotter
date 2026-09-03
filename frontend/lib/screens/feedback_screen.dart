@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
 
@@ -30,48 +31,93 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     super.dispose();
   }
 
+  /// Open Gmail compose directly in a new browser tab pre-filled with
+  /// the feedback addressed to fezemalaika2007@gmail.com.
+  Future<void> _openGmailCompose(String subject, String message) async {
+    final encodedSubject = Uri.encodeComponent(
+      '[GlobeTrotter ${_selectedCategory.toUpperCase()}] $subject',
+    );
+    final encodedBody = Uri.encodeComponent(
+      'Category: $_selectedCategory\n\n$message\n\n— Sent from GlobeTrotter App',
+    );
+    final gmailUrl = Uri.parse(
+      'https://mail.google.com/mail/?view=cm&to=fezemalaika2007@gmail.com&su=$encodedSubject&body=$encodedBody',
+    );
+
+    try {
+      await launchUrl(gmailUrl, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // Fallback to mailto if Gmail web compose fails
+      final mailtoUri = Uri(
+        scheme: 'mailto',
+        path: 'fezemalaika2007@gmail.com',
+        queryParameters: {
+          'subject': '[GlobeTrotter ${_selectedCategory.toUpperCase()}] $subject',
+          'body': 'Category: $_selectedCategory\n\n$message\n\n— Sent from GlobeTrotter App',
+        },
+      );
+      try {
+        await launchUrl(mailtoUri);
+      } catch (_) {}
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final subject = _subjectController.text.trim();
+    final message = _messageController.text.trim();
+
     setState(() => _isSubmitting = true);
 
+    // 1. Try saving to backend (non-blocking — don't fail if backend is down)
     try {
       await ApiService().submitFeedback(
         category: _selectedCategory,
-        subject: _subjectController.text.trim(),
-        message: _messageController.text.trim(),
+        subject: subject,
+        message: message,
       );
       await AnalyticsService().logSubmitFeedback(category: _selectedCategory);
+    } catch (_) {
+      // Backend save failed — that's OK, email delivery is the priority
+    }
 
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            icon: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 48),
-            title: const Text('Thank You!'),
-            content: const Text(
-              'Your feedback has been sent directly to the developer. We appreciate your help in making GlobeTrotter better!',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context); // close dialog
-                  Navigator.pop(context); // return to previous screen
-                },
-                child: const Text('OK'),
+    // 2. Open Gmail compose window — this is the PRIMARY delivery method
+    await _openGmailCompose(subject, message);
+
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.mark_email_read_rounded, color: Colors.teal, size: 54),
+          title: const Text('Almost Done!'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'A Gmail compose window has been opened with your feedback pre-filled.',
+                style: TextStyle(fontSize: 14),
+              ),
+              SizedBox(height: 12),
+              Text(
+                '👉 Just press "Send" in Gmail to deliver your feedback to the developer.',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
             ],
           ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit feedback: $e')),
-        );
-      }
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // close dialog
+                Navigator.pop(context); // return to previous screen
+              },
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -122,7 +168,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Encountered a bug or have a idea for a new feature? Send your thoughts directly to the developer team.',
+                      'Your feedback will be sent via Gmail to the developer.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
                       ),
@@ -161,7 +207,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               TextFormField(
                 controller: _subjectController,
                 decoration: InputDecoration(
-                  hintText: 'Brief summary (e.g., Image not loading on details screen)',
+                  hintText: 'Brief summary of the issue or feedback',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
@@ -212,7 +258,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.send_rounded),
-                  label: Text(_isSubmitting ? 'Submitting...' : 'Submit Feedback'),
+                  label: Text(_isSubmitting ? 'Opening Gmail...' : 'Submit Feedback via Gmail'),
                 ),
               ),
             ],

@@ -21,6 +21,12 @@ class AuthProvider extends ChangeNotifier {
   String? _username;
   String? get username => _username;
 
+  /// Update display name locally and notify listeners.
+  void updateUsername(String? newName) {
+    _username = (newName != null && newName.trim().isNotEmpty) ? newName.trim() : null;
+    notifyListeners();
+  }
+
   /// Check whether a stored token exists (e.g. when the app starts).
   Future<void> checkAuthStatus() async {
     final token = await _api.getToken();

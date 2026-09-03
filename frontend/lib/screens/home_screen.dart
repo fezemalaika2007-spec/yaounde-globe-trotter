@@ -252,26 +252,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // --- Welcome / Intro Section ---
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.welcomeToYaounde,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      l10n.homeIntroText,
-                      style: theme.textTheme.bodyLarge?.copyWith(height: 1.6),
-                    ),
-                  ],
-                ),
-              ),
 
               // --- Feature Cards (What you can do) ---
               Padding(
@@ -309,33 +289,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.favorite,
                       title: l10n.homeFeatureSaveTitle,
                       description: l10n.homeFeatureSaveDesc,
-                      onTap: () => widget.onSwitchTab?.call(2),
+                      onTap: () => widget.onSwitchTab?.call(3),
                     ),
-                  ],
-                ),
-              ),
-
-              // --- Quick Navigation Buttons ---
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 10,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () => widget.onSwitchTab?.call(1),
-                      icon: const Icon(Icons.explore_outlined),
-                      label: Text(l10n.destinations),
+                    const _FeatureCard(
+                      icon: Icons.forum_outlined,
+                      title: 'Live Community Chatroom',
+                      description: 'Connect, chat live, and share travel tips with fellow travelers in real-time (open from the top-right 3-dots menu).',
                     ),
-                    ElevatedButton.icon(
-                      onPressed: () => widget.onSwitchTab?.call(2),
-                      icon: const Icon(Icons.star_outline),
-                      label: Text(l10n.recommendations),
+                    const _FeatureCard(
+                      icon: Icons.feedback_outlined,
+                      title: 'Feedback & Bug Reporting',
+                      description: 'Submit app feedback, report issues, and send feature suggestions directly to the developer team.',
                     ),
-                    ElevatedButton.icon(
-                      onPressed: () => widget.onSwitchTab?.call(4),
-                      icon: const Icon(Icons.map_outlined),
-                      label: Text(l10n.itineraries),
+                    const _FeatureCard(
+                      icon: Icons.analytics_outlined,
+                      title: 'Live Analytics Dashboard',
+                      description: 'Track real-time platform usage, destination popularity trends, and live community stats.',
                     ),
                   ],
                 ),

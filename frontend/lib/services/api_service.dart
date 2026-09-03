@@ -794,6 +794,118 @@ class ApiService {
     }
   }
 
+  static final List<String> _chatCandidateHosts = [
+    'http://127.0.0.1:5003',
+    'http://localhost:5003',
+    'http://127.0.0.1:5000',
+    'http://localhost:5000',
+    ApiConfig.baseUrl,
+    'http://10.0.2.2:5003',
+    'http://10.0.2.2:5000',
+  ];
+
+  /// Fetch recent live community chat messages with multi-host failover.
+  Future<List<Map<String, dynamic>>> getChatMessages({int limit = 100}) async {
+    final token = await getToken();
+    final headers = token != null ? _authHeaders(token) : <String, String>{};
+
+    for (final host in _chatCandidateHosts) {
+      try {
+        final uri = Uri.parse('$host${ApiConfig.chat}?limit=$limit');
+        final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 4));
+        final body = _decode(response);
+        if (response.statusCode == 200 && body is List) {
+          return List<Map<String, dynamic>>.from(body);
+        }
+      } catch (e) {
+        debugPrint('getChatMessages host $host failed: $e');
+      }
+    }
+    return [];
+  }
+
+  /// Send a new message or media/reply to the live community chatroom with multi-host failover.
+  Future<Map<String, dynamic>> sendChatMessage(
+    String message, {
+    String? username,
+    String? mediaUrl,
+    String? mediaType,
+    String? replyToId,
+    String? replyToUsername,
+    String? replyToMessage,
+  }) async {
+    final token = await getToken();
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      if (token != null) ..._authHeaders(token),
+    };
+    final payload = jsonEncode({
+      'username': username ?? '',
+      'message': message,
+      'media_url': mediaUrl ?? '',
+      'media_type': mediaType ?? '',
+      'reply_to_id': replyToId ?? '',
+      'reply_to_username': replyToUsername ?? '',
+      'reply_to_message': replyToMessage ?? '',
+    });
+
+    String lastErr = 'Could not reach server';
+    for (final host in _chatCandidateHosts) {
+      try {
+        final uri = Uri.parse('$host${ApiConfig.chat}');
+        final response = await http.post(uri, headers: headers, body: payload).timeout(const Duration(seconds: 5));
+        final body = _decode(response);
+        if (response.statusCode == 201 && body is Map) {
+          return Map<String, dynamic>.from(body);
+        }
+        if (body is Map && body.containsKey('error')) {
+          lastErr = body['error'].toString();
+        }
+      } catch (e) {
+        debugPrint('sendChatMessage host $host failed: $e');
+      }
+    }
+    throw ApiException(0, lastErr);
+  }
+
+  /// Edit an existing chat message.
+  Future<bool> editChatMessage(String msgId, String newText, {String? username}) async {
+    final token = await getToken();
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      if (token != null) ..._authHeaders(token),
+    };
+    final payload = jsonEncode({'message': newText, 'username': username ?? ''});
+
+    for (final host in _chatCandidateHosts) {
+      try {
+        final uri = Uri.parse('$host${ApiConfig.chat}/$msgId');
+        final response = await http.put(uri, headers: headers, body: payload).timeout(const Duration(seconds: 4));
+        if (response.statusCode == 200) return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  /// Delete a chat message.
+  Future<bool> deleteChatMessage(String msgId, {String? username}) async {
+    final token = await getToken();
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      if (token != null) ..._authHeaders(token),
+    };
+    final payload = jsonEncode({'username': username ?? ''});
+
+    for (final host in _chatCandidateHosts) {
+      try {
+        final uri = Uri.parse('$host${ApiConfig.chat}/$msgId');
+        final response = await http.delete(uri, headers: headers, body: payload).timeout(const Duration(seconds: 4));
+        if (response.statusCode == 200) return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
   // Helpers
   Map<String, String> _authHeaders(String token) => {
     'Authorization': 'Bearer $token',

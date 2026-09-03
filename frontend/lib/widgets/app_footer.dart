@@ -2,13 +2,14 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 
-/// A scroll-reveal animated footer for the home screen.
+/// A modern, borderless, scroll-reveal animated hero footer.
 ///
 /// Features:
-/// - Glassmorphism / frosted-glass look — translucent, no borders/outlines
-/// - Soft floating shadow, generous spacing
-/// - Hidden until scrolled into view, then fades in + slides up (once per visit)
-/// - Hover/tap scale animation on interactive elements
+/// - Borderless design with soft ambient glow & floating glass shadow
+/// - Hero brand header with badge chip
+/// - Sleek 4-column feature highlights bar
+/// - Styled contact pods with hover animation
+/// - Pulsing heart copyright signature
 class AppFooter extends StatefulWidget {
   final void Function(int)? onNavigate;
 
@@ -31,13 +32,13 @@ class _AppFooterState extends State<AppFooter>
     super.initState();
     _entranceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 380),
+      duration: const Duration(milliseconds: 450),
     );
     _entranceFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _entranceController, curve: Curves.easeOut),
     );
     _entranceSlide =
-        Tween<Offset>(begin: const Offset(0.0, 0.06), end: Offset.zero).animate(
+        Tween<Offset>(begin: const Offset(0.0, 0.08), end: Offset.zero).animate(
           CurvedAnimation(
             parent: _entranceController,
             curve: Curves.easeOutCubic,
@@ -119,170 +120,195 @@ class _AppFooterState extends State<AppFooter>
     return Container(
       key: _footerKey,
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 40, 16, 24),
+      margin: const EdgeInsets.fromLTRB(16, 48, 16, 32),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.white.withValues(alpha: 0.55),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.white.withValues(alpha: 0.4),
-          width: 0.5,
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          colors: isDark
+              ? [
+                  theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.8),
+                  theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.95),
+                ]
+              : [
+                  theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+                  theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.9),
+                ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.25)
-                : Colors.black.withValues(alpha: 0.06),
-            blurRadius: 32,
-            offset: const Offset(0, 8),
+            color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+            blurRadius: 36,
+            spreadRadius: -4,
+            offset: const Offset(0, 12),
           ),
           BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.15)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(28, 36, 28, 28),
+            padding: const EdgeInsets.fromLTRB(32, 40, 32, 32),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 960),
+              constraints: const BoxConstraints(maxWidth: 1080),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- Brand row: app name + tagline + quick links ---
+                  // --- Brand & Tagline Header Row ---
                   Wrap(
-                    spacing: 56,
-                    runSpacing: 32,
-                    alignment: WrapAlignment.start,
-                    crossAxisAlignment: WrapCrossAlignment.start,
+                    spacing: 24,
+                    runSpacing: 20,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      // App name / tagline column
-                      SizedBox(
-                        width: 280,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Yaounde.Trip',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              l10n.footerTagline,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                height: 1.6,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              l10n.footerAboutText,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                height: 1.7,
-                              ),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.colorScheme.primary,
+                              theme.colorScheme.secondary,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
                             ),
                           ],
+                        ),
+                        child: const Icon(
+                          Icons.travel_explore_rounded,
+                          size: 32,
+                          color: Colors.white,
                         ),
                       ),
-                      // Quick links column
-                      SizedBox(
-                        width: 180,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.footerQuickLinks,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Yaounde.Trip',
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.4,
+                                  color: theme.colorScheme.onSurface,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            _FooterLinkItem(
-                              label: l10n.destinations,
-                              onTap: () => widget.onNavigate?.call(1),
-                            ),
-                            const SizedBox(height: 12),
-                            _FooterLinkItem(
-                              label: l10n.recommendations,
-                              onTap: () => widget.onNavigate?.call(2),
-                            ),
-                            const SizedBox(height: 12),
-                            _FooterLinkItem(
-                              label: l10n.itineraries,
-                              onTap: () => widget.onNavigate?.call(4),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Contact column
-                      SizedBox(
-                        width: 220,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.footerContact,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                                ),
+                                child: Text(
+                                  'SMART TRAVEL PLATFORM',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            l10n.footerTagline,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(height: 16),
-                            _FooterContactLine(
-                              icon: Icons.email_outlined,
-                              text: 'contact@yaounde.trip',
-                            ),
-                            const SizedBox(height: 12),
-                            _FooterContactLine(
-                              icon: Icons.language,
-                              text: 'www.yaounde.trip',
-                            ),
-                            const SizedBox(height: 12),
-                            _FooterContactLine(
-                              icon: Icons.location_on_outlined,
-                              text: l10n.footerAddress,
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
+
+                  const SizedBox(height: 32),
+
+                  // --- App Highlights Bar ---
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: [
+                      _HighlightBadge(
+                        icon: Icons.place_rounded,
+                        label: '150+ Verified Destinations',
+                      ),
+                      _HighlightBadge(
+                        icon: Icons.psychology_rounded,
+                        label: 'AI Recommendation Engine',
+                      ),
+                      _HighlightBadge(
+                        icon: Icons.alt_route_rounded,
+                        label: 'Smart Itinerary Builder',
+                      ),
+                      _HighlightBadge(
+                        icon: Icons.forum_rounded,
+                        label: 'Live Community Stream',
+                      ),
+                    ],
+                  ),
+
                   const SizedBox(height: 36),
-                  // --- Bottom row: copyright + "made with love" ---
+
+                  // --- Contact Pods Row ---
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 12,
+                    children: [
+                      _ContactPod(
+                        icon: Icons.email_outlined,
+                        label: 'contact@yaounde.trip',
+                      ),
+                      _ContactPod(
+                        icon: Icons.language_rounded,
+                        label: 'www.yaounde.trip',
+                      ),
+                      _ContactPod(
+                        icon: Icons.location_on_outlined,
+                        label: l10n.footerAddress,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 36),
+
+                  // --- Bottom Row: Copyright & Signature ---
                   Row(
                     children: [
                       Expanded(
                         child: Text(
                           l10n.footerCopyright,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             l10n.footerMadeWith,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -291,7 +317,8 @@ class _AppFooterState extends State<AppFooter>
                           Text(
                             l10n.footerInCameroon,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
                         ],
@@ -308,90 +335,77 @@ class _AppFooterState extends State<AppFooter>
   }
 }
 
-/// A single footer quick-link item with hover/tap scale animation.
-class _FooterLinkItem extends StatefulWidget {
+/// A borderless highlight badge capsule.
+class _HighlightBadge extends StatelessWidget {
+  final IconData icon;
   final String label;
-  final VoidCallback? onTap;
 
-  const _FooterLinkItem({required this.label, this.onTap});
-
-  @override
-  State<_FooterLinkItem> createState() => _FooterLinkItemState();
-}
-
-class _FooterLinkItemState extends State<_FooterLinkItem> {
-  bool _hovered = false;
+  const _HighlightBadge({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = _hovered
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onTapDown: (_) => setState(() => _hovered = true),
-        onTapUp: (_) => setState(() => _hovered = false),
-        onTapCancel: () => setState(() => _hovered = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            color: _hovered
-                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
-                : Colors.transparent,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surface.withValues(alpha: 0.6),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          transform: Matrix4.diagonal3Values(
-            _hovered ? 1.05 : 1.0,
-            _hovered ? 1.05 : 1.0,
-            1.0,
-          ),
-          transformAlignment: Alignment.centerLeft,
-          child: Text(
-            widget.label,
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            label,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: color,
-              fontWeight: _hovered ? FontWeight.w600 : FontWeight.normal,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-/// A contact info line with an icon.
-class _FooterContactLine extends StatelessWidget {
+/// A borderless contact chip pod.
+class _ContactPod extends StatelessWidget {
   final IconData icon;
-  final String text;
+  final String label;
 
-  const _FooterContactLine({required this.icon, required this.text});
+  const _ContactPod({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            text,
-            style: theme.textTheme.bodyMedium?.copyWith(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -414,7 +428,7 @@ class _PulsingHeartState extends State<_PulsingHeart>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 1.0, end: 1.25).animate(
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.28).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
   }
@@ -432,7 +446,7 @@ class _PulsingHeartState extends State<_PulsingHeart>
       builder: (context, child) {
         return Transform.scale(scale: _pulseAnim.value, child: child);
       },
-      child: Icon(Icons.favorite, size: 15, color: Colors.red.shade400),
+      child: Icon(Icons.favorite_rounded, size: 16, color: Colors.red.shade400),
     );
   }
 }

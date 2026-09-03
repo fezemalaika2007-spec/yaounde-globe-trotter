@@ -18,12 +18,18 @@ Routes:
 """
 import json
 import logging
+import os
+import smtplib
+import threading
 import urllib.parse
 import urllib.request
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import datetime
 
 from flask import Blueprint, request, jsonify, g, current_app, Response
 
-from app.auth_middleware import token_required
+from app.auth_middleware import token_required, optional_token
 from app.models import (
     get_all_destinations, get_destination_by_id,
     upsert_rating, get_user_rating,
@@ -32,6 +38,7 @@ from app.models import (
     mark_all_notifications_read,
     create_comment, get_comments_for_destination, update_comment, delete_comment,
     create_feedback, get_all_feedback, mark_feedback_resolved,
+    create_chat_message, get_chat_messages, update_chat_message, delete_chat_message,
     ADMIN_USERNAME,
 )
 from app.recommendations import get_sectioned_recommendations as _section_recommendations
@@ -40,6 +47,77 @@ recommendation_bp = Blueprint("recommendation", __name__)
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Developer Email Configuration
+# ---------------------------------------------------------------------------
+DEVELOPER_EMAIL = "fezemalaika2007@gmail.com"
+
+# SMTP credentials – set these environment variables for Gmail App-Password delivery.
+#   SMTP_EMAIL   = your-sending-gmail@gmail.com
+#   SMTP_PASSWORD = your-app-password  (generate at https://myaccount.google.com/apppasswords)
+SMTP_EMAIL = os.environ.get("SMTP_EMAIL", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+
+
+def _send_feedback_email(username, category, subject, body_text):
+    """Send a feedback/bug-report email directly to fezemalaika2007@gmail.com.
+
+    Runs in a background daemon thread so it never blocks the HTTP response.
+    First tries sending via FormSubmit API (which delivers directly to fezemalaika2007@gmail.com).
+    Falls back to SMTP if configured.
+    """
+    def worker():
+        # 1. Dispatch real email via FormSubmit API directly to fezemalaika2007@gmail.com
+        try:
+            url = "https://formsubmit.co/ajax/fezemalaika2007@gmail.com"
+            params = urllib.parse.urlencode({
+                "name": f"GlobeTrotter User ({username})",
+                "email": "fezemalaika2007@gmail.com",
+                "_subject": f"[GlobeTrotter {category.upper()}] {subject}",
+                "Category": category,
+                "Username": username,
+                "Subject": subject,
+                "Message": body_text,
+                "_captcha": "false"
+            }).encode('utf-8')
+
+            req = urllib.request.Request(
+                url,
+                data=params,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                    "Referer": "http://localhost:8080/"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                logger.info(f"FormSubmit email dispatched to fezemalaika2007@gmail.com: {resp.status}")
+        except Exception as e:
+            logger.warning(f"FormSubmit dispatch note: {e}")
+
+        # 2. SMTP delivery if configured
+        if SMTP_EMAIL and SMTP_PASSWORD:
+            try:
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = f"[GlobeTrotter {category.capitalize()}] {subject}"
+                msg["From"] = SMTP_EMAIL
+                msg["To"] = DEVELOPER_EMAIL
+                msg.attach(MIMEText(body_text, "plain"))
+
+                with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                    server.ehlo()
+                    server.starttls()
+                    server.login(SMTP_EMAIL, SMTP_PASSWORD)
+                    server.sendmail(SMTP_EMAIL, DEVELOPER_EMAIL, msg.as_string())
+
+                logger.info(f"Feedback email sent to {DEVELOPER_EMAIL} via SMTP")
+            except Exception as e:
+                logger.error(f"SMTP email failed: {e}")
+
+    threading.Thread(target=worker, daemon=True).start()
 
 @recommendation_bp.route("/", methods=["GET"])
 def health():
@@ -291,10 +369,10 @@ def read_all_notifications():
 # ---------------------------------------------------------------------------
 
 @recommendation_bp.route("/feedback", methods=["POST"])
-@token_required
+@optional_token
 def submit_feedback():
-    """Submit feedback or a bug report."""
-    username = g.current_user
+    """Submit feedback or a bug report and email it to the developer."""
+    username = g.current_user or "Anonymous"
     data = request.get_json(silent=True) or {}
 
     category = (data.get("category") or "feedback").strip()
@@ -311,7 +389,7 @@ def submit_feedback():
 
     result = create_feedback(username, username, category, subject, message)
 
-    # Notify admin
+    # Notify admin via in-app notification
     try:
         create_notification(
             user_id=ADMIN_USERNAME,
@@ -322,6 +400,13 @@ def submit_feedback():
         )
     except Exception as e:
         logger.warning(f"Failed to create feedback notification: {e}")
+
+    # Send email to developer in background thread
+    threading.Thread(
+        target=_send_feedback_email,
+        args=(username, category, subject, message),
+        daemon=True,
+    ).start()
 
     return jsonify({"message": "feedback submitted successfully", "feedback": result}), 201
 
@@ -454,3 +539,80 @@ def proxy_image():
     except Exception as e:
         logger.warning(f"Image proxy failed for {image_url}: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Live Community Chatroom Routes
+# ---------------------------------------------------------------------------
+
+@recommendation_bp.route("/chat/messages", methods=["GET", "OPTIONS"])
+@optional_token
+def list_chat_messages():
+    """List recent chat messages."""
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+    limit = request.args.get("limit", 100, type=int)
+    messages = get_chat_messages(limit=limit)
+    return jsonify(messages), 200
+
+
+@recommendation_bp.route("/chat/messages", methods=["POST", "OPTIONS"])
+@optional_token
+def send_chat_message():
+    """Send a new message to the live community chatroom."""
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+    data = request.get_json() or {}
+    message_text = (data.get("message") or "").strip()
+    media_url = (data.get("media_url") or "").strip()
+    media_type = (data.get("media_type") or "").strip()
+    reply_to_id = (data.get("reply_to_id") or "").strip()
+    reply_to_username = (data.get("reply_to_username") or "").strip()
+    reply_to_message = (data.get("reply_to_message") or "").strip()
+
+    if not message_text and not media_url:
+        return jsonify({"error": "Message content or media attachment is required"}), 400
+
+    custom_name = (data.get("username") or "").strip()
+    username = custom_name if custom_name else (g.current_user if (g.current_user and g.current_user != "Traveler") else "GlobeTrotter User")
+
+    msg = create_chat_message(
+        user_id=username,
+        username=username,
+        message=message_text,
+        media_url=media_url,
+        media_type=media_type,
+        reply_to_id=reply_to_id,
+        reply_to_username=reply_to_username,
+        reply_to_message=reply_to_message,
+    )
+    return jsonify(msg), 201
+
+
+@recommendation_bp.route("/chat/messages/<msg_id>", methods=["PUT", "OPTIONS"])
+@optional_token
+def edit_chat_message_route(msg_id):
+    """Edit an existing chat message."""
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+    data = request.get_json() or {}
+    new_text = (data.get("message") or "").strip()
+    if not new_text:
+        return jsonify({"error": "Message content cannot be empty"}), 400
+    custom_name = (data.get("username") or "").strip()
+    username = custom_name if custom_name else (g.current_user or "GlobeTrotter User")
+    update_chat_message(msg_id, username, new_text)
+    return jsonify({"success": True, "message": "Message edited"}), 200
+
+
+@recommendation_bp.route("/chat/messages/<msg_id>", methods=["DELETE", "OPTIONS"])
+@optional_token
+def delete_chat_message_route(msg_id):
+    """Delete a chat message."""
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+    data = request.get_json() or {}
+    custom_name = (data.get("username") or "").strip()
+    username = custom_name if custom_name else (g.current_user or "GlobeTrotter User")
+    delete_chat_message(msg_id, username)
+    return jsonify({"success": True, "message": "Message deleted"}), 200

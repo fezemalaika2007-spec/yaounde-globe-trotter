@@ -14,10 +14,26 @@ def token_required(f):
     """
     @wraps(f)
     def decorated(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return f(*args, **kwargs)
         username = _get_current_user()
         if not username:
             return jsonify({"error": "authentication required"}), 401
         g.current_user = username
+        return f(*args, **kwargs)
+    return decorated
+
+
+def optional_token(f):
+    """Decorator for routes that allow both authenticated and guest users.
+    Sets g.current_user to the authenticated username, or 'Traveler' if unauthenticated.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return f(*args, **kwargs)
+        username = _get_current_user()
+        g.current_user = username or "Traveler"
         return f(*args, **kwargs)
     return decorated
 

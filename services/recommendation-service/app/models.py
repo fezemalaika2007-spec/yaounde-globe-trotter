@@ -16,6 +16,9 @@ import os
 import uuid
 import datetime
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 import psycopg2
 import psycopg2.extras
@@ -47,6 +50,7 @@ class SQLiteCursorWrapper:
     def __init__(self, cur):
         self.cur = cur
         self.description = None
+        self._rows = None
 
     def execute(self, sql, params=()):
         sql = sql.replace("%s", "?")
@@ -56,15 +60,35 @@ class SQLiteCursorWrapper:
                 self.cur.execute("DELETE FROM ratings;")
             except Exception:
                 pass
+            self.description = self.cur.description
+            self._rows = None
+        elif "information_schema.columns" in sql:
+            tbl = "chat_messages" if "chat_messages" in sql else "destinations"
+            try:
+                self.cur.execute(f"PRAGMA table_info({tbl});")
+                pragma_rows = self.cur.fetchall()
+                self._rows = [(r[1],) for r in pragma_rows]
+                self.description = [("column_name", None, None, None, None, None, None)]
+            except Exception:
+                self._rows = []
+                self.description = [("column_name", None, None, None, None, None, None)]
         else:
             self.cur.execute(sql, params)
-        self.description = self.cur.description
+            self.description = self.cur.description
+            self._rows = None
 
     def fetchall(self):
+        if self._rows is not None:
+            res = self._rows
+            self._rows = None
+            return res
         rows = self.cur.fetchall()
         return [tuple(r) for r in rows]
 
     def fetchone(self):
+        if self._rows is not None and len(self._rows) > 0:
+            res = self._rows.pop(0)
+            return res
         row = self.cur.fetchone()
         return tuple(row) if row else None
 
@@ -234,6 +258,35 @@ def init_db(app=None):
                 is_resolved INTEGER DEFAULT 0
             )
         """)
+
+        # --- Live Chat Messages table ---
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                username TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        # Ensure new columns exist on chat_messages (safe migrations for existing DBs)
+        try:
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='chat_messages'")
+            chat_cols = {r[0] for r in cur.fetchall()}
+            if "media_url" not in chat_cols:
+                cur.execute("ALTER TABLE chat_messages ADD COLUMN media_url TEXT DEFAULT ''")
+            if "media_type" not in chat_cols:
+                cur.execute("ALTER TABLE chat_messages ADD COLUMN media_type TEXT DEFAULT ''")
+            if "reply_to_id" not in chat_cols:
+                cur.execute("ALTER TABLE chat_messages ADD COLUMN reply_to_id TEXT DEFAULT ''")
+            if "reply_to_username" not in chat_cols:
+                cur.execute("ALTER TABLE chat_messages ADD COLUMN reply_to_username TEXT DEFAULT ''")
+            if "reply_to_message" not in chat_cols:
+                cur.execute("ALTER TABLE chat_messages ADD COLUMN reply_to_message TEXT DEFAULT ''")
+            if "is_edited" not in chat_cols:
+                cur.execute("ALTER TABLE chat_messages ADD COLUMN is_edited INTEGER DEFAULT 0")
+        except Exception as e:
+            logger.warning(f"chat_messages migration error: {e}")
 
         # Ensure the fsq_id column exists (safe migration for existing DBs).
         try:
@@ -749,4 +802,79 @@ def mark_feedback_resolved(feedback_id, app=None):
     conn.commit()
     cur.close()
     release_connection(conn)
+
+
+def create_chat_message(user_id, username, message, media_url='', media_type='', reply_to_id='', reply_to_username='', reply_to_message='', app=None):
+    """Post a message to the live community chatroom."""
+    msg_id = str(uuid.uuid4())
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO chat_messages (id, user_id, username, message, media_url, media_type, reply_to_id, reply_to_username, reply_to_message, is_edited, created_at) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s)",
+        (msg_id, user_id, username, message, media_url or '', media_type or '', reply_to_id or '', reply_to_username or '', reply_to_message or '', now)
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return {
+        "id": msg_id,
+        "user_id": user_id,
+        "username": username,
+        "message": message,
+        "media_url": media_url or '',
+        "media_type": media_type or '',
+        "reply_to_id": reply_to_id or '',
+        "reply_to_username": reply_to_username or '',
+        "reply_to_message": reply_to_message or '',
+        "is_edited": 0,
+        "created_at": now
+    }
+
+
+def update_chat_message(msg_id, username, new_text, app=None):
+    """Edit an existing chat message."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE chat_messages SET message = %s, is_edited = 1 WHERE id = %s AND username = %s",
+        (new_text, msg_id, username)
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return True
+
+
+def delete_chat_message(msg_id, username, app=None):
+    """Delete a chat message."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM chat_messages WHERE id = %s AND username = %s",
+        (msg_id, username)
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+    return True
+
+
+def get_chat_messages(limit=100, app=None):
+    """Return recent chat messages ordered chronologically."""
+    conn = get_connection(app)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, user_id, username, message, COALESCE(media_url, ''), COALESCE(media_type, ''), "
+        "COALESCE(reply_to_id, ''), COALESCE(reply_to_username, ''), COALESCE(reply_to_message, ''), COALESCE(is_edited, 0), created_at "
+        "FROM (SELECT * FROM chat_messages ORDER BY created_at DESC LIMIT %s) sub ORDER BY created_at ASC",
+        (limit,)
+    )
+    rows = cur.fetchall()
+    cols = ['id', 'user_id', 'username', 'message', 'media_url', 'media_type', 'reply_to_id', 'reply_to_username', 'reply_to_message', 'is_edited', 'created_at']
+    results = [dict(zip(cols, r)) for r in rows]
+    cur.close()
+    release_connection(conn)
+    return results
 

@@ -8,7 +8,7 @@ from flask_cors import CORS
 def create_app():
     """Create and configure the Recommendation Service Flask application."""
     app = Flask(__name__)
-    CORS(app)
+    CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
     app.config["SECRET_KEY"] = os.environ.get(
         "SECRET_KEY", "globetrotter-secret-change-in-prod"

@@ -21,6 +21,10 @@
   <meta name="description" content="Yaounde.Trip — Smart travel planner for Yaoundé, Cameroon and beyond">
   <meta name="google-signin-client_id" content="824888913806-usgcqsvb37aic8tgjs72fv33kbjtrhf5.apps.googleusercontent.com">
 
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -39,6 +43,13 @@
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (let registration of registrations) {
           registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) {
+          caches.delete(name);
         }
       });
     }

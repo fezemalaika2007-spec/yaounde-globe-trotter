@@ -10,7 +10,8 @@ plugins {
 
 android {
     namespace = "com.globetrotter.frontend"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 34
+    buildToolsVersion = "34.0.0"
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -27,7 +28,7 @@ android {
         applicationId = "com.globetrotter.frontend"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 21
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

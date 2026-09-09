@@ -90,3 +90,54 @@ flutter build web --release --no-tree-shake-icons
 ```
 The production bundle will be generated under `build/web/`.
 
+---
+
+## 🐳 Docker Containerization
+
+The frontend application can be built and run as an isolated containerized service using Docker and Nginx.
+
+### Option A: Using Docker Compose (Recommended)
+
+Run directly from within the `frontend/` directory:
+```bash
+cd frontend
+docker compose up -d --build
+```
+Access the application in your web browser at: `http://localhost:8080`
+
+To stop the container:
+```bash
+docker compose down
+```
+
+---
+
+### Option B: Using Docker CLI
+
+1. **Build the Docker image**:
+   ```bash
+   cd frontend
+   docker build -t globetrotter-frontend:latest .
+   ```
+
+2. **Run the container**:
+   ```bash
+   docker run -d -p 8080:80 --name globetrotter-frontend globetrotter-frontend:latest
+   ```
+   Access the application at `http://localhost:8080`.
+
+3. **Stop and remove the container**:
+   ```bash
+   docker stop globetrotter-frontend
+   docker rm globetrotter-frontend
+   ```
+
+---
+
+### Key Containerization Configuration Files
+- **`Dockerfile`**: Multi-stage build (Flutter SDK compilation builder stage -> Nginx 1.25-alpine production runner).
+- **`nginx.conf`**: Single Page Application (SPA) `try_files` route fallback, Gzip compression, and asset caching headers.
+- **`docker-compose.yml`**: Port mapping `8080:80` with built-in HTTP healthchecks.
+- **`.dockerignore`**: Excludes native mobile/desktop platforms and build artifacts to minimize Docker build context.
+
+

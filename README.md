@@ -42,20 +42,22 @@
 ```
 
 ### Microservice Components
-1. **API Gateway (`port 5000`)**: Single entry point handling routing, proxying, header forwarding, CORS, and endpoint distribution.
-2. **User Service (`port 5001`)**: Handles user registration, bcrypt password hashing, JWT issuance, email format validation, interest tag profiles, and favorites management.
-3. **Itinerary Service (`port 5002`)**: Complete CRUD manager for multi-day itineraries, destinations sequencing, date range validation, and notes management.
-4. **Recommendation Service (`port 5003`)**: Intelligent recommendation engine featuring preference matching, Foursquare venue search integration, ratings engine, auto-seeding with high-resolution Unsplash destination photos, and category grouping (Nature, Culture, Dining, Shopping, Adventure).
-5. **Frontend Client (Flutter Web / Android / Desktop)**: Material 3 responsive UI featuring localized English/French interface, shimmer skeleton loading state, image lightboxes, tag chips, map integration, and real-time state synchronization.
+1. **API Gateway (`port 5000`)**: Single entry point handling reverse proxying, CORS header negotiation, dynamic route forwarding, and consolidated health diagnostics.
+2. **User Service (`port 5001`)**: Handles user registration, email verification with 6-digit confirmation codes, password reset with code validation, Google OAuth sign-in, JWT token generation, interest profile tags, and favorites.
+3. **Itinerary Service (`port 5002`)**: Complete CRUD manager for multi-day itineraries, destinations sequencing, date range validation, and trip notes.
+4. **Recommendation Service (`port 5003`)**: Intelligent recommendation engine featuring preference matching, Foursquare integration, 1–5 star ratings, threaded community discussions, cascading comment deletion, notifications center, feedback ticketing, and destinations sync from `destinations.txt`.
+5. **Frontend Client (Flutter Web / Android / Desktop)**: Material 3 responsive UI featuring localized English/French interface, skeleton loading state, image lightboxes, tag chips, official Google sign-in branding, and real-time state synchronization.
 
 ---
 
 ## 2. Key Features
 
-- 🔒 **Security & Authentication**: Strict JWT context enforcement, bcrypt salted password hashing, regex email validation, and client token storage.
-- ⚡ **High-Performance Connection Pooling**: Microservices utilize `ThreadedConnectionPool` (1-15 connections) with explicit connection release and optimized B-tree indexes (`idx_users_email`, `idx_destinations_fsq_id`, `idx_itineraries_user_id`).
-- 🖼️ **Rich Media & Visual Gallery**: Photo gallery with full-screen lightbox modal preview, image deduplication, high-resolution Yaoundé landmarks (Mont Fébé, Musée National, Marché Central, Mvog-Betsi Zoo, Cathédrale, Monument de la Réunification, Bois Sainte Anastasie).
-- 📍 **Interactive Maps & Navigation**: Map preview card with exact latitude/longitude coordinates and direct Google Maps navigation launcher.
+- 🔒 **Security & Authentication**: Strict JWT context enforcement, salted password hashing, regex email validation, 6-digit email confirmation codes, password recovery, and official Google OAuth integration.
+- 💬 **Threaded Community Discussions**: Destination comment sections with nested reply threads, author comment editing (`PUT`), cascading deletion (`DELETE`), and real-time reply notifications.
+- 🔔 **In-App Notification Center**: Instant notifications for comment replies, ratings, and travel updates with unread counts and batch mark-as-read actions.
+- ⚡ **High-Performance Connection Pooling**: Microservices utilize `ThreadedConnectionPool` (1-15 connections) with explicit connection release and optimized B-tree indexes (`idx_users_email`, `idx_destinations_fsq_id`, `idx_itineraries_user_id`, `idx_comments_dest`, `idx_comments_parent`, `idx_notifications_user`).
+- 🖼️ **Rich Media & Visual Gallery**: 20 synchronized Cameroonian destinations with high-resolution photo galleries, full-screen lightbox modal preview, and image deduplication.
+- 💰 **Verified Details & Real Pricing**: Detailed multi-paragraph descriptions, opening hours, direct phone dialing (`tel:`), official website links, and real prices in FCFA for every destination.
 - 📅 **Itinerary CRUD & Auto-add**: Full create, read, update (PUT), and delete (DELETE) functionality for trip plans with direct "Add to Itinerary" action from destination details.
 - 🌍 **Multilingual & Responsive**: Instant English/French toggle with persisted preferences, bottom navigation bar on mobile (`<850px`), permanent side navigation on desktop/web (`>=850px`).
 
@@ -181,16 +183,18 @@ To launch the Flutter client in web or desktop mode:
 ### Backend Microservice Test Suite
 Run pytest from within each microservice directory:
 ```bash
+cd services/api-gateway && python -m pytest
 cd services/user-service && python -m pytest
 cd services/itinerary-service && python -m pytest
 cd services/recommendation-service && python -m pytest
 ```
 
 ### Frontend Analysis & Verification
-Verify Flutter compilation and static analysis:
+Verify Flutter compilation, static analysis, and execute the test suite:
 ```bash
 cd frontend
 flutter analyze
+flutter test
 ```
 
 ---

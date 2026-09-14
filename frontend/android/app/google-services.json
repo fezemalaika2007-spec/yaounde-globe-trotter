@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "455037082371",
+    "project_id": "yaounde-3658f",
+    "storage_bucket": "yaounde-3658f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:455037082371:android:d8a1d0b4854ac526536736",
+        "android_client_info": {
+          "package_name": "com.globetrotter.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTEE97t2t4LbgzjqF3G0GvvfiaPRztdZc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

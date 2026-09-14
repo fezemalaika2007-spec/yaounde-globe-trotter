@@ -1,0 +1,30 @@
+# Flutter & Dart tool build directories
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/*
+!build/web
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Git repository
+.git/
+.gitignore
+.github/
+
+# Native Mobile & Desktop platform folders (not required for Web container build)
+android/
+ios/
+windows/
+linux/
+macos/
+
+# Logs & Temporary files
+*.log
+*.tmp
+*.bak

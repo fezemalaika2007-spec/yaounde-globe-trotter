@@ -1,11 +1,16 @@
 @echo off
 REM ============================================================
-REM  GlobeTrotter Web Launcher
-REM  Builds the Flutter web app and serves it statically.
-REM  Requires: Python for HTTP server.
+REM  GlobeTrotter Web Launcher & Service Runner
+REM  Starts Backend Recommendation Service & Serves Web App.
 REM ============================================================
 setlocal
-cd /d "%~dp0frontend"
+cd /d "%~dp0"
+
+echo.
+echo === Starting GlobeTrotter Backend Service (Port 5003) ===
+start "GlobeTrotter Backend" /B python services\recommendation-service\app\main.py
+
+cd frontend
 
 echo.
 echo === Building web bundle ===
@@ -19,7 +24,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo === Starting static server on http://localhost:8080 ===
+echo === Starting static web server on http://localhost:8080 ===
 cd build\web
 echo Opening browser...
 start "" http://localhost:8080/

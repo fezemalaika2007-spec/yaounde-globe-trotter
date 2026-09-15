@@ -223,3 +223,56 @@ def test_notifications_routes(client, app, mock_routes_urls):
         assert resp.status_code == 200
         assert mock_request.call_args.kwargs["url"].startswith("http://rec.test:5003/notifications")
 
+
+@pytest.mark.parametrize(
+    "method,path,payload,status",
+    [
+        ("GET", "/chat/messages", None, 200),
+        ("POST", "/chat/messages", {"message": "Hello", "username": "alice"}, 201),
+        ("PUT", "/chat/messages/message-1", {"message": "Updated", "username": "alice"}, 200),
+        ("DELETE", "/chat/messages/message-1", {"username": "alice"}, 200),
+    ],
+)
+@pytest.mark.parametrize("authenticated", [False, True])
+def test_chat_proxies_to_recommendation(
+    client, mock_routes_urls, method, path, payload, status, authenticated
+):
+    headers = {"Authorization": "Bearer test-token"} if authenticated else {}
+    response_payload = [{"id": "message-1"}] if method == "GET" else {"id": "message-1"}
+    with mock.patch("app.routes.requests.request") as mock_request:
+        mock_request.return_value = _mock_response(status, response_payload)
+        resp = client.open(
+            path,
+            method=method,
+            query_string={"limit": "20"} if method == "GET" else None,
+            json=payload,
+            headers=headers,
+        )
+        assert resp.status_code == status
+        assert resp.get_json() == response_payload
+        mock_request.assert_called_once_with(
+            method=method,
+            url=f"http://rec.test:5003{path}",
+            headers={"Content-Type": "application/json", **headers},
+            params={"limit": "20"} if method == "GET" else None,
+            json=payload,
+            timeout=30,
+        )
+
+
+@pytest.mark.parametrize("path", ["/chat/messages", "/chat/messages/message-1"])
+def test_chat_preflight_does_not_contact_backend(client, path):
+    with mock.patch("app.routes.requests.request") as mock_request:
+        resp = client.options(path)
+        assert resp.status_code == 200
+        assert "Authorization" in resp.headers["Access-Control-Allow-Headers"]
+        mock_request.assert_not_called()
+
+
+def test_chat_reports_unavailable_backend(client, mock_routes_urls):
+    from requests.exceptions import ConnectionError
+
+    with mock.patch("app.routes.requests.request", side_effect=ConnectionError()):
+        resp = client.get("/chat/messages")
+        assert resp.status_code == 503
+        assert resp.get_json()["error"] == "service unavailable"

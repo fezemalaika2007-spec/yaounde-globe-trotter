@@ -206,6 +206,19 @@ The production target is `185.202.223.228`, served at
 `https://yaoundeglobe.duckdns.org`. The frontend and API bind only to VPS
 loopback; host Nginx owns public ports 80 and 443.
 
+For a frontend running locally on your PC, all Flutter platforms default to
+`http://185.202.223.228/api`, including community chat. The IP-specific Nginx
+server in `deploy/nginx/yaoundeglobe.conf` proxies `/api/` to the private
+gateway on port 5000, independently of the domain's HTTPS redirect.
+
+HTTP API traffic is unencrypted. The HTTPS-hosted frontend build below uses
+an explicit HTTPS API override to protect credentials and avoid mixed-content
+blocking. The loopback addresses in Compose, health checks, and host Nginx
+are intentional server-internal connections, not browser API URLs.
+Rebuild the frontend bundle after changing API configuration, and add
+`https://yaoundeglobe.duckdns.org` to the Google OAuth web client's
+Authorized JavaScript origins.
+
 1. Point the DuckDNS `A` record for `yaoundeglobe.duckdns.org` to
    `185.202.223.228`. Allow inbound TCP ports 80 and 443 in the VPS firewall.
 2. Copy `.env.example` to `services/.env`, then set the database URLs and a
@@ -213,7 +226,7 @@ loopback; host Nginx owns public ports 80 and 443.
 3. Build the Flutter bundle and start both Compose projects:
    ```bash
    cd frontend
-   flutter build web --release --no-tree-shake-icons
+   flutter build web --release --no-tree-shake-icons --dart-define=API_BASE_URL=https://yaoundeglobe.duckdns.org/api
    docker compose up -d --build
    cd ../services
    docker compose up -d --build
@@ -292,7 +305,7 @@ This project is released under the [MIT License](LICENSE).
 
 - 💬 **Live Global Community Chat**:
   - Real-time global chat room open to all users (authenticated & guests with custom display names).
-  - Robust multi-host automated connection resolver with explicit IPv4 binding (`http://127.0.0.1:5003`).
+  - Uses the VPS gateway at `http://185.202.223.228/api`, with no local host fallbacks.
   - Rich media attachments: photo uploading, video links, interactive emoji picker, and sticker gallery.
   - Message interaction capabilities: inline message editing (✏️), deletion (🗑️), and threaded quote replies.
 - 👤 **Profile Display Name Management**:
@@ -306,9 +319,9 @@ This project is released under the [MIT License](LICENSE).
 - 📊 **Firebase Analytics & Live Dashboard**:
   - Integrated `firebase_core` and `firebase_analytics` streaming real-time events (`app_open`, `login`, `sign_up`, `search`, `view_destination`, `add_to_favorites`, `generate_itinerary`, `submit_feedback`).
   - Dedicated **Analytics Dashboard** (`AnalyticsDashboardScreen`) available directly inside the app for all users.
-- 📱 **Mobile USB Connectivity & ADB Port Forwarding**:
+- 📱 **Mobile USB Connectivity & Online Backend**:
   - Out-of-the-box support for tethered physical Android phones via USB cable.
-  - Automatic port mapping scripts using `adb reverse` ensuring seamless communication between mobile device and host machine backend services (`127.0.0.1:5003`).
+  - Connects directly to the configured VPS gateway using the phone's internet connection; no ADB port forwarding is needed.
 - 🔓 **Universal App Access & Micro-Animations**:
   - Open community feature access with smooth shimmer loading states (`ShimmerGrid`), full-screen gallery lightbox previews, and Material 3 design tokens.
 - 🖼️ **Rich Media & Cameroonian Visual Gallery**:
@@ -387,24 +400,21 @@ Double-click `run_web.bat` in the project root, or execute:
 ```cmd
 .\run_web.bat
 ```
-This launcher automatically initializes the backend Recommendation Service on `http://127.0.0.1:5003` in a background window and starts the Flutter Web application in Chrome.
+This launcher starts a local Recommendation Service and serves the Flutter
+web bundle locally. The frontend still connects to the online VPS API by
+default; the local service is not used unless `API_BASE_URL` is explicitly
+overridden when building the bundle.
 
 ---
 
 ### Option A: Running on a Physical Android Phone via USB
 
 1. **Connect your Android phone** to your computer using a USB cable and enable **USB Debugging** in Developer Options.
-2. **Setup ADB Port Forwarding**:
-   Reverse host ports so the Android phone can reach the local machine's backend services:
-   ```bash
-   adb reverse tcp:5000 tcp:5000
-   adb reverse tcp:5003 tcp:5003
-   ```
-3. **Verify Connected Device**:
+2. **Verify Connected Device** (an internet connection is required to reach the VPS):
    ```bash
    flutter devices
    ```
-4. **Run Application on Phone**:
+3. **Run Application on Phone**:
    ```bash
    cd frontend
    flutter run -d <your_device_id>

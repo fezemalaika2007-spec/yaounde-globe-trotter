@@ -12,7 +12,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 /// ID:
 ///
 ///   * **Web**   → create an "OAuth client ID" of type **Web application** and
-///                 add your app's origin (e.g. http://localhost:60394) to the
+///                 add https://yaoundeglobe.duckdns.org to the
 ///                 "Authorized JavaScript origins".
 ///   * **Android** → create an "OAuth client ID" of type **Android** using your
 ///                 app's package name + SHA-1 signing certificate, and place

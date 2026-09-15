@@ -6,7 +6,7 @@ The **GlobeTrotter Frontend** is a modern, responsive cross-platform client buil
 
 - 💬 **Live Global Community Chat (`LiveChatScreen`)**:
   - Global real-time community chat room accessible to all app users (authenticated users & guests).
-  - Automatic candidate host resolver connecting directly to backend microservices over IPv4 (`http://127.0.0.1:5003`).
+  - Uses the VPS API gateway at `http://185.202.223.228/api`, without local host fallbacks.
   - Quick action controls for message authors: inline message editing (✏️), message deletion (🗑️), and quote replies with target message preview.
   - Rich media capabilities: photo upload preview, video URL rendering, interactive emoji picker, and sticker gallery.
 - 👤 **Profile Display Name Management (`ProfileScreen`)**:
@@ -50,12 +50,7 @@ flutter run -d chrome
 ### Run Android Physical USB Device
 
 1. Enable **USB Debugging** on your Android phone and connect it via USB.
-2. Configure **ADB Reverse Port Forwarding**:
-   ```bash
-   adb reverse tcp:5000 tcp:5000
-   adb reverse tcp:5003 tcp:5003
-   ```
-3. Run on your connected phone:
+2. Run on your connected phone with an internet connection (no ADB port forwarding is needed):
    ```bash
    flutter run -d <your_device_id>
    ```
@@ -74,6 +69,36 @@ flutter run -d windows
 dart pub global run flutterfire_cli:flutterfire configure
 ```
 
+Add `https://yaoundeglobe.duckdns.org` to the Google OAuth web client's
+Authorized JavaScript origins before using Google sign-in in production.
+
+---
+
+### API Configuration
+
+The frontend runs locally on your PC and defaults to
+`http://185.202.223.228/api`. On the VPS, the IP-specific Nginx server in
+`../deploy/nginx/yaoundeglobe.conf` must forward port 80 `/api/` requests to
+the API gateway on `127.0.0.1:5000`. Port 5000 stays private. This API
+endpoint does not require DuckDNS or a domain certificate.
+
+Chat uses this same gateway for listing, sending, editing, and deleting
+messages, including when a request fails; it never retries against the
+visitor's local machine.
+
+HTTP does not encrypt passwords, tokens, or other traffic. For real
+credentials or a frontend hosted over HTTPS, use the HTTPS domain override
+below once the domain and certificate are configured; browsers block HTTP
+API calls from HTTPS pages.
+
+For intentional local development only, override the backend at build/run time:
+```bash
+flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000
+```
+Do not include this local override when building for the VPS. Rebuild the
+Flutter web bundle after configuration changes; restarting Nginx alone does
+not update the compiled API URL.
+
 ---
 
 ### Static Analysis & Testing
@@ -86,8 +111,10 @@ flutter test
 
 ### Production Web Build
 ```bash
-flutter build web --release --no-tree-shake-icons
+flutter build web --release --no-tree-shake-icons --dart-define=API_BASE_URL=https://yaoundeglobe.duckdns.org/api
 ```
+This HTTPS-hosted build explicitly uses the HTTPS API. For the local-PC
+frontend with the IP-based API, omit the `--dart-define` argument.
 The production bundle will be generated under `build/web/`.
 
 ---
@@ -142,4 +169,3 @@ docker compose down
 - **`docker-compose.yml`**: Loopback-only port mapping `127.0.0.1:8080:80`
   with built-in HTTP healthchecks.
 - **`.dockerignore`**: Excludes native mobile/desktop platforms and build artifacts to minimize Docker build context.
-

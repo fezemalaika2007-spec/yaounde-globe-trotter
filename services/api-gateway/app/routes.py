@@ -219,6 +219,20 @@ def resolve_feedback(feedback_id):
 
 
 # ---------------------------------------------------------------------------
+# Chat routes → Recommendation Service
+# ---------------------------------------------------------------------------
+
+@gateway_bp.route("/chat/messages", methods=["GET", "POST", "OPTIONS"])
+def chat_messages():
+    return _proxy("DYNAMIC", f"{RECOMMENDATION_SERVICE_URL}/chat/messages")
+
+
+@gateway_bp.route("/chat/messages/<msg_id>", methods=["PUT", "DELETE", "OPTIONS"])
+def chat_message_detail(msg_id):
+    return _proxy("DYNAMIC", f"{RECOMMENDATION_SERVICE_URL}/chat/messages/{msg_id}")
+
+
+# ---------------------------------------------------------------------------
 # Itinerary routes → Itinerary Service
 # ---------------------------------------------------------------------------
 

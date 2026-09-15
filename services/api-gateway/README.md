@@ -4,7 +4,9 @@ The **API Gateway** serves as the unified reverse proxy and routing entry point 
 
 ## Port & Base Endpoint
 - **Port**: `5000`
-- **Base URL**: `http://localhost:5000`
+- **Default URL for the local frontend**: `http://185.202.223.228/api`
+- **HTTPS alternative**: `https://yaoundeglobe.duckdns.org/api`
+- **VPS-internal Base URL**: `http://127.0.0.1:5000` (host Nginx strips the public `/api/` prefix)
 
 ## Proxy Mappings
 
@@ -34,6 +36,10 @@ The **API Gateway** serves as the unified reverse proxy and routing entry point 
   - `POST /destinations/<id>/comments`: Post comment or reply with optional `parent_id`
   - `PUT /destinations/<id>/comments/<comment_id>`: Edit existing comment (author only)
   - `DELETE /destinations/<id>/comments/<comment_id>`: Delete comment and child replies (author only)
+- **Live Community Chat**:
+  - `GET`, `POST /chat/messages`: List and send messages
+  - `PUT`, `DELETE /chat/messages/<msg_id>`: Edit and delete messages
+  - Guest requests, authorization headers, query parameters, and JSON bodies are forwarded to the Recommendation Service.
 - **Notification System**:
   - `GET /notifications`: List all user notifications
   - `GET /notifications/unread-count`: Fetch count of unread notifications
@@ -60,6 +66,5 @@ python -m pytest
 ```
 
 ## Healthcheck Endpoint
-- **URL**: `GET http://localhost:5000/health`
+- **Public URL**: `GET http://185.202.223.228/api/health`
 - **Response**: Returns HTTP `200 OK` when all downstream services (`user-service`, `itinerary-service`, `recommendation-service`) are healthy, or `503 Service Unavailable` with a diagnostic breakdown if any microservice is degraded.
-

@@ -811,17 +811,9 @@ class ApiService {
     }
   }
 
-  static final List<String> _chatCandidateHosts = [
-    ApiConfig.baseUrl,
-    'http://127.0.0.1:5003',
-    'http://localhost:5003',
-    'http://127.0.0.1:5000',
-    'http://localhost:5000',
-    'http://10.0.2.2:5003',
-    'http://10.0.2.2:5000',
-  ];
+  static final List<String> _chatCandidateHosts = [ApiConfig.baseUrl];
 
-  /// Fetch recent live community chat messages with multi-host failover.
+  /// Fetch recent live community chat messages through the API gateway.
   Future<List<Map<String, dynamic>>> getChatMessages({int limit = 100}) async {
     final token = await getToken();
     final headers = token != null ? _authHeaders(token) : <String, String>{};
@@ -843,7 +835,7 @@ class ApiService {
     return [];
   }
 
-  /// Send a new message or media/reply to the live community chatroom with multi-host failover.
+  /// Send a new message or media/reply through the API gateway.
   Future<Map<String, dynamic>> sendChatMessage(
     String message, {
     String? username,

@@ -84,10 +84,7 @@ class ApiService {
     return _guard(http.put(uri, headers: headers, body: body));
   }
 
-  Future<http.Response> _delete(
-    Uri uri, {
-    Map<String, String>? headers,
-  }) {
+  Future<http.Response> _delete(Uri uri, {Map<String, String>? headers}) {
     return _guard(http.delete(uri, headers: headers));
   }
 
@@ -587,9 +584,7 @@ class ApiService {
   Future<Map<String, dynamic>> submitRating(String destId, int rating) async {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
-    final uri = Uri.parse(
-      '${ApiConfig.baseUrl}/destinations/$destId/rating',
-    );
+    final uri = Uri.parse('${ApiConfig.baseUrl}/destinations/$destId/rating');
     final response = await _post(
       uri,
       headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
@@ -599,7 +594,6 @@ class ApiService {
     if (response.statusCode == 200) return body as Map<String, dynamic>;
     throw ApiException(response.statusCode, _errorMessage(body));
   }
-
 
   // Favorites
   Future<List<String>> getFavorites() async {
@@ -648,11 +642,12 @@ class ApiService {
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 
-
   Future<int?> getUserRating(String destId) async {
     final token = await getToken();
     if (token == null) return null;
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/user-rating');
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/user-rating',
+    );
     final response = await _get(uri, headers: _authHeaders(token));
     if (response.statusCode == 200) {
       final body = _decode(response);
@@ -665,7 +660,9 @@ class ApiService {
 
   // Comments
   Future<List<Map<String, dynamic>>> getComments(String destId) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments');
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments',
+    );
     final response = await _get(uri);
     final body = _decode(response);
     if (response.statusCode == 200 && body is List) {
@@ -674,10 +671,16 @@ class ApiService {
     return [];
   }
 
-  Future<Map<String, dynamic>> postComment(String destId, String text, {String? parentId}) async {
+  Future<Map<String, dynamic>> postComment(
+    String destId,
+    String text, {
+    String? parentId,
+  }) async {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments');
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments',
+    );
     final payload = <String, dynamic>{'text': text};
     if (parentId != null && parentId.isNotEmpty) {
       payload['parent_id'] = parentId;
@@ -692,10 +695,16 @@ class ApiService {
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 
-  Future<Map<String, dynamic>> updateComment(String destId, String commentId, String text) async {
+  Future<Map<String, dynamic>> updateComment(
+    String destId,
+    String commentId,
+    String text,
+  ) async {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments/$commentId');
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments/$commentId',
+    );
     final response = await _put(
       uri,
       headers: {..._authHeaders(token), 'Content-Type': 'application/json'},
@@ -709,7 +718,9 @@ class ApiService {
   Future<void> deleteComment(String destId, String commentId) async {
     final token = await getToken();
     if (token == null) throw ApiException(401, 'Authentication required');
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments/$commentId');
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.destinations}/$destId/comments/$commentId',
+    );
     final response = await _delete(uri, headers: _authHeaders(token));
     if (response.statusCode != 200) {
       final body = _decode(response);
@@ -733,14 +744,18 @@ class ApiService {
   Future<void> markNotificationRead(String notifId) async {
     final token = await getToken();
     if (token == null) return;
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.notifications}/$notifId/read');
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.notifications}/$notifId/read',
+    );
     await _post(uri, headers: _authHeaders(token));
   }
 
   Future<void> markAllNotificationsRead() async {
     final token = await getToken();
     if (token == null) return;
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.notifications}/read-all');
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.notifications}/read-all',
+    );
     await _post(uri, headers: _authHeaders(token));
   }
 
@@ -787,7 +802,9 @@ class ApiService {
     final token = await getToken();
     if (token == null) return;
     try {
-      final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.feedback}/$feedbackId/resolve');
+      final uri = Uri.parse(
+        '${ApiConfig.baseUrl}${ApiConfig.feedback}/$feedbackId/resolve',
+      );
       await _post(uri, headers: _authHeaders(token));
     } catch (e) {
       debugPrint('resolveFeedback error: $e');
@@ -795,11 +812,11 @@ class ApiService {
   }
 
   static final List<String> _chatCandidateHosts = [
+    ApiConfig.baseUrl,
     'http://127.0.0.1:5003',
     'http://localhost:5003',
     'http://127.0.0.1:5000',
     'http://localhost:5000',
-    ApiConfig.baseUrl,
     'http://10.0.2.2:5003',
     'http://10.0.2.2:5000',
   ];
@@ -812,7 +829,9 @@ class ApiService {
     for (final host in _chatCandidateHosts) {
       try {
         final uri = Uri.parse('$host${ApiConfig.chat}?limit=$limit');
-        final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 4));
+        final response = await http
+            .get(uri, headers: headers)
+            .timeout(const Duration(seconds: 4));
         final body = _decode(response);
         if (response.statusCode == 200 && body is List) {
           return List<Map<String, dynamic>>.from(body);
@@ -853,7 +872,9 @@ class ApiService {
     for (final host in _chatCandidateHosts) {
       try {
         final uri = Uri.parse('$host${ApiConfig.chat}');
-        final response = await http.post(uri, headers: headers, body: payload).timeout(const Duration(seconds: 5));
+        final response = await http
+            .post(uri, headers: headers, body: payload)
+            .timeout(const Duration(seconds: 5));
         final body = _decode(response);
         if (response.statusCode == 201 && body is Map) {
           return Map<String, dynamic>.from(body);
@@ -869,18 +890,27 @@ class ApiService {
   }
 
   /// Edit an existing chat message.
-  Future<bool> editChatMessage(String msgId, String newText, {String? username}) async {
+  Future<bool> editChatMessage(
+    String msgId,
+    String newText, {
+    String? username,
+  }) async {
     final token = await getToken();
     final headers = <String, String>{
       'Content-Type': 'application/json',
       if (token != null) ..._authHeaders(token),
     };
-    final payload = jsonEncode({'message': newText, 'username': username ?? ''});
+    final payload = jsonEncode({
+      'message': newText,
+      'username': username ?? '',
+    });
 
     for (final host in _chatCandidateHosts) {
       try {
         final uri = Uri.parse('$host${ApiConfig.chat}/$msgId');
-        final response = await http.put(uri, headers: headers, body: payload).timeout(const Duration(seconds: 4));
+        final response = await http
+            .put(uri, headers: headers, body: payload)
+            .timeout(const Duration(seconds: 4));
         if (response.statusCode == 200) return true;
       } catch (_) {}
     }
@@ -899,7 +929,9 @@ class ApiService {
     for (final host in _chatCandidateHosts) {
       try {
         final uri = Uri.parse('$host${ApiConfig.chat}/$msgId');
-        final response = await http.delete(uri, headers: headers, body: payload).timeout(const Duration(seconds: 4));
+        final response = await http
+            .delete(uri, headers: headers, body: payload)
+            .timeout(const Duration(seconds: 4));
         if (response.statusCode == 200) return true;
       } catch (_) {}
     }
@@ -910,7 +942,6 @@ class ApiService {
   Map<String, String> _authHeaders(String token) => {
     'Authorization': 'Bearer $token',
   };
-
 
   dynamic _decode(http.Response response) {
     try {

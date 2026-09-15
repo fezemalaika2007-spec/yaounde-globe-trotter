@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 /// API configuration for the GlobeTrotter backend.
 ///
@@ -10,10 +11,15 @@ import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, Tar
 ///                                   the host machine's localhost)
 ///   * **Physical Android device** → override [baseUrl] below to your PC's
 ///                                   LAN IP, e.g. http://192.168.1.50:5000
-///   * **Web / Windows / other**   → http://localhost:5000
+///   * **Production web**          → same-origin `/api` reverse proxy
+///   * **Local web / Windows**     → http://localhost:5000
 ///
 /// The API Gateway (and all microservices) run on those ports via Docker.
 class ApiConfig {
+  static const String _configuredBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+  );
+
   /// The default API Gateway port.
   static const int gatewayPort = 5000;
 
@@ -30,29 +36,28 @@ class ApiConfig {
     // Web / desktop: the backend runs on the same machine.
     if (kIsWeb) return _localHost;
 
-    // Android: the emulator route is localhost -> 10.0.2.2; physical
-    // devices need a reachable LAN IP (override [manualBaseUrl]).
-    if (defaultTargetPlatform == TargetPlatform.android) return _androidEmulatorHost;
+    // Android: the emulator route is localhost -> 10.0.2.2; physical devices
+    // can override this with the API_BASE_URL dart define.
+    if (defaultTargetPlatform == TargetPlatform.android)
+      return _androidEmulatorHost;
 
     return _localHost;
   }
 
-
-  /// If you run on a physical Android device (or a device that can't reach
-  /// the default host), set this to your computer's LAN IP, e.g.
-  /// `'http://192.168.1.50:5000'`, then change [useManualBaseUrl] to true.
-  static const String manualBaseUrl = '';
-
-  /// Set to true to force using [manualBaseUrl] instead of the auto-detected
-  /// host (needed for physical devices / remote servers).
-  static const bool useManualBaseUrl = false;
-
   /// The base URL of the GlobeTrotter REST API (API Gateway).
   ///
-  /// For local development this points to the Flask server running on
-  /// port 5000. Override with [manualBaseUrl] for physical devices.
+  /// Set `API_BASE_URL` with `--dart-define` to override automatic resolution.
   static String get baseUrl {
-    if (useManualBaseUrl && manualBaseUrl.isNotEmpty) return manualBaseUrl;
+    if (_configuredBaseUrl.isNotEmpty) {
+      return _configuredBaseUrl.replaceFirst(RegExp(r'/$'), '');
+    }
+
+    if (kIsWeb &&
+        Uri.base.host != 'localhost' &&
+        Uri.base.host != '127.0.0.1') {
+      return '${Uri.base.origin}/api';
+    }
+
     return 'http://$_resolvedHost:$gatewayPort';
   }
 
@@ -77,4 +82,3 @@ class ApiConfig {
   static const String feedback = '/feedback';
   static const String chat = '/chat/messages';
 }
-

@@ -202,20 +202,32 @@ flutter test
 
 ## 7. Deployment Guide
 
-1. **Database Provisioning**: Ensure a PostgreSQL instance (e.g. Neon, AWS RDS, or GCP Cloud SQL) is active and update `DATABASE_URL` in `.env`.
-2. **Container Registry**: Build and push Docker images to your registry (Docker Hub, ECR, GCR):
-   ```bash
-   docker build -t your-org/api-gateway:latest services/api-gateway
-   docker build -t your-org/user-service:latest services/user-service
-   docker build -t your-org/itinerary-service:latest services/itinerary-service
-   docker build -t your-org/recommendation-service:latest services/recommendation-service
-   ```
-3. **Container Orchestration**: Deploy the images using Kubernetes (`kubectl apply -f k8s/`) or Docker Compose on a Cloud VM.
-4. **Frontend Hosting**: Build the web distribution bundle and deploy to Vercel, Netlify, or AWS S3 + CloudFront:
+The production target is `185.202.223.228`, served at
+`https://yaoundeglobe.duckdns.org`. The frontend and API bind only to VPS
+loopback; host Nginx owns public ports 80 and 443.
+
+1. Point the DuckDNS `A` record for `yaoundeglobe.duckdns.org` to
+   `185.202.223.228`. Allow inbound TCP ports 80 and 443 in the VPS firewall.
+2. Copy `.env.example` to `services/.env`, then set the database URLs and a
+   strong `SECRET_KEY`.
+3. Build the Flutter bundle and start both Compose projects:
    ```bash
    cd frontend
-   flutter build web --release
+   flutter build web --release --no-tree-shake-icons
+   docker compose up -d --build
+   cd ../services
+   docker compose up -d --build
+   cd ..
    ```
+4. Install the host Nginx site and request the Let's Encrypt certificate:
+   ```bash
+   chmod +x deploy/configure-vps.sh
+   sudo ./deploy/configure-vps.sh admin@example.com
+   ```
+
+The script verifies DNS, installs Nginx and Certbot, enables the virtual host,
+redirects HTTP to HTTPS, enables certificate renewal, and performs a dry-run
+renewal. Replace `admin@example.com` with the certificate renewal email.
 
 ---
 

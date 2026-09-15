@@ -103,7 +103,9 @@ Run directly from within the `frontend/` directory:
 cd frontend
 docker compose up -d --build
 ```
-Access the application in your web browser at: `http://localhost:8080`
+Access the application locally at `http://localhost:8080`. On the production
+VPS, host Nginx proxies `https://yaoundeglobe.duckdns.org` to this loopback
+port.
 
 To stop the container:
 ```bash
@@ -137,7 +139,7 @@ docker compose down
 ### Key Containerization Configuration Files
 - **`Dockerfile`**: Multi-stage build (Flutter SDK compilation builder stage -> Nginx 1.25-alpine production runner).
 - **`nginx.conf`**: Single Page Application (SPA) `try_files` route fallback, Gzip compression, and asset caching headers.
-- **`docker-compose.yml`**: Port mapping `8080:80` with built-in HTTP healthchecks.
+- **`docker-compose.yml`**: Loopback-only port mapping `127.0.0.1:8080:80`
+  with built-in HTTP healthchecks.
 - **`.dockerignore`**: Excludes native mobile/desktop platforms and build artifacts to minimize Docker build context.
-
 

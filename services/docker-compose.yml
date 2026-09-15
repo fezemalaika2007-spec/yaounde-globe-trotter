@@ -12,8 +12,8 @@ services:
     build: ./user-service
     container_name: user-service
     restart: unless-stopped
-    ports:
-      - "5001:5001"
+    expose:
+      - "5001"
     environment:
       - PORT=5001
       - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
@@ -31,8 +31,8 @@ services:
     build: ./itinerary-service
     container_name: itinerary-service
     restart: unless-stopped
-    ports:
-      - "5002:5002"
+    expose:
+      - "5002"
     environment:
       - PORT=5002
       - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
@@ -50,8 +50,8 @@ services:
     build: ./recommendation-service
     container_name: recommendation-service
     restart: unless-stopped
-    ports:
-      - "5003:5003"
+    expose:
+      - "5003"
     environment:
       - PORT=5003
       - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
@@ -69,8 +69,9 @@ services:
   api-gateway:
     build: ./api-gateway
     container_name: api-gateway
+    restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     environment:
       - PORT=5000
       - USER_SERVICE_URL=http://user-service:5001

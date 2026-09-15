@@ -117,6 +117,17 @@ This HTTPS-hosted build explicitly uses the HTTPS API. For the local-PC
 frontend with the IP-based API, omit the `--dart-define` argument.
 The production bundle will be generated under `build/web/`.
 
+### Frontend updates and browser caches
+
+Nginx requires browsers to revalidate Flutter startup scripts (including
+`main.dart.js`), `version.json`, and `manifest.json` before reusing cached copies.
+Other static assets retain their seven-day cache policy.
+
+Browsers that already cached an older build under the previous policy may still
+use its old API address. After deploying this configuration, hard-refresh the
+page. If needed, clear site data for this domain and reload; this signs you out.
+A private window can confirm whether an error is specific to cached browser data.
+
 ---
 
 ## 🐳 Docker Containerization
@@ -164,7 +175,7 @@ docker compose down
 ---
 
 ### Key Containerization Configuration Files
-- **`Dockerfile`**: Multi-stage build (Flutter SDK compilation builder stage -> Nginx 1.25-alpine production runner).
+- **`Dockerfile`**: Nginx 1.25-alpine image that copies the existing `build/web/` bundle. Build Flutter first; rebuilding the container alone does not update the compiled API address.
 - **`nginx.conf`**: Single Page Application (SPA) `try_files` route fallback, Gzip compression, and asset caching headers.
 - **`docker-compose.yml`**: Loopback-only port mapping `127.0.0.1:8080:80`
   with built-in HTTP healthchecks.

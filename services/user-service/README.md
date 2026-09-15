@@ -41,9 +41,13 @@ The **User Service** manages user authentication, account verification, password
 pip install -r requirements.txt
 
 # Run service
-python run.py
+python app/main.py
 
 # Run test suite
 python -m pytest
 ```
 
+The default tests use SQLite. To verify the PostgreSQL deployment path, set
+`DATABASE_URL` to a disposable test database and `USE_REAL_DB_FOR_TESTS=1`.
+Never use production credentials for this test run: the fixtures reset
+the users and favorites tables.

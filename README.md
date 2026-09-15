@@ -202,6 +202,32 @@ flutter test
 
 ## 7. Deployment Guide
 
+### Backend-only startup
+
+The backend Compose file is in `services/`, not the repository root. All
+three service implementations and the API gateway must be present, including
+each service's `Dockerfile`, `requirements.txt`, and application sources.
+The previously missing User and Itinerary service files have been restored
+from their backend branches.
+
+After uploading the complete backend and configuring `services/.env`, run
+these commands on the VPS:
+
+```bash
+cd ~/yaounde-globe-trotter/services
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+curl -f http://127.0.0.1:5000/health
+```
+
+If startup fails, inspect `docker compose logs --tail=100 user-service
+itinerary-service api-gateway`. A successful image build alone does not verify
+database connectivity; configure the production database URLs and a shared
+`SECRET_KEY` before starting the services.
+
+### Optional frontend hosting and HTTPS
+
 The production target is `185.202.223.228`, served at
 `https://yaoundeglobe.duckdns.org`. The frontend and API bind only to VPS
 loopback; host Nginx owns public ports 80 and 443.

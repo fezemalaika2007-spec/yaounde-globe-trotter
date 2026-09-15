@@ -198,14 +198,9 @@ def init_db(app=None):
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     """)
-    try:
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)")
-    except Exception:
-        pass
-
     # Ensure the new columns exist (safe migration for existing DBs).
+    cur.execute("SELECT * FROM users LIMIT 0")
+    existing_columns = {column[0] for column in cur.description}
     for col, col_def in [
         ("email", "TEXT DEFAULT ''"),
         ("is_verified", "BOOLEAN DEFAULT FALSE"),
@@ -214,10 +209,12 @@ def init_db(app=None):
         ("reset_code", "TEXT DEFAULT ''"),
         ("reset_expires", "TEXT DEFAULT ''"),
     ]:
-        try:
+        if col not in existing_columns:
             cur.execute(f"ALTER TABLE users ADD COLUMN {col} {col_def}")
-        except Exception:
-            pass
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)")
 
     conn.commit()
     cur.close()

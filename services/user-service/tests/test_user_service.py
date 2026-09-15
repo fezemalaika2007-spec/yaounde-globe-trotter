@@ -156,3 +156,76 @@ def test_cors_headers(client):
     # Login is POST, but CORS headers should still be present
     assert "Access-Control-Allow-Origin" in response.headers
 
+
+def _disable_test_schema_reset(app, monkeypatch):
+    # Simulate normal startup rather than the test fixture's table reset.
+    monkeypatch.setitem(app.config, "TESTING", False)
+    for name in ("PYTEST_CURRENT_TEST", "TESTING", "USE_SQLITE"):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_startup_schema_initialization_preserves_existing_users(client, monkeypatch):
+    from app.models import get_user_by_username
+
+    response = client.post(
+        "/register",
+        json={
+            "username": "persistent-user",
+            "email": "persistent-user@example.com",
+            "password": "password123",
+        },
+    )
+    assert response.status_code == 201
+    original = get_user_by_username("persistent-user")
+    assert original is not None
+
+    _disable_test_schema_reset(client.application, monkeypatch)
+
+    with client.application.app_context():
+        init_db(client.application)
+        init_db(client.application)
+        restored = get_user_by_username("persistent-user")
+
+    assert restored is not None
+    assert restored["id"] == original["id"]
+
+
+def test_startup_migrates_legacy_columns_before_creating_indexes(client, monkeypatch):
+    from app.models import get_connection, get_user_by_username, release_connection
+
+    conn = get_connection(client.application)
+    cur = conn.cursor()
+    cur.execute("DROP TABLE favorites")
+    cur.execute("DROP TABLE users")
+    cur.execute("""
+        CREATE TABLE users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            preferences TEXT DEFAULT '[]',
+            created_at TEXT NOT NULL
+        )
+    """)
+    cur.execute(
+        "INSERT INTO users (id, username, password_hash, created_at) "
+        "VALUES (%s, %s, %s, %s)",
+        ("legacy-id", "legacy-user", "unused-test-hash", "2026-01-01T00:00:00+00:00"),
+    )
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+
+    _disable_test_schema_reset(client.application, monkeypatch)
+    with client.application.app_context():
+        init_db(client.application)
+        init_db(client.application)
+        restored = get_user_by_username("legacy-user")
+
+    assert restored is not None
+    assert restored["id"] == "legacy-id"
+    assert restored["email"] == ""
+    assert not restored["is_verified"]
+    assert restored["auth_provider"] == "local"
+    assert restored["verification_code"] == ""
+    assert restored["reset_code"] == ""
+    assert restored["reset_expires"] == ""

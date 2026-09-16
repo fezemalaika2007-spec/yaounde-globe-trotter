@@ -328,6 +328,20 @@ Reopening the app does not clear server-side history. Verify scrollback after
 deployment as well as sending: the frontend and backend must both include the
 history-cursor update. Never remove the persistent data directory during updates.
 
+### Google sign-in compatibility update
+
+Older cached frontend builds used the malformed `/apidocker/` API prefix.
+The Nginx template now internally rewrites it to `/api/`, preserving POST
+bodies, authorization headers, and query strings. This allows cached Google
+sign-in clients to work without weakening the authentication endpoint.
+
+For an existing Certbot-managed installation, add the same legacy location block
+from `deploy/nginx/yaoundeglobe.conf` to the **active HTTPS server block**, then
+validate and reload Nginx. Do not rerun the initial Certbot setup or replace the
+existing TLS configuration. Rebuild the User Service to pick up stale PostgreSQL
+connection recovery and its JSON retry response; account data and chat storage
+must remain intact. Refresh older browser tabs to use the canonical `/api/` URL.
+
 ---
 
 ## 8. License

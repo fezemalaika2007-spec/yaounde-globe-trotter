@@ -13,8 +13,10 @@ import random
 import string
 
 import jwt
+import psycopg2
 import requests
 from flask import Blueprint, request, jsonify, current_app, g
+from psycopg2.pool import PoolError
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.auth_middleware import token_required
@@ -36,6 +38,19 @@ from app.models import (
 )
 
 user_bp = Blueprint("user", __name__)
+
+
+@user_bp.errorhandler(psycopg2.OperationalError)
+@user_bp.errorhandler(psycopg2.InterfaceError)
+@user_bp.errorhandler(PoolError)
+def database_unavailable(error):
+    current_app.logger.warning(
+        "Account database unavailable at %s (%s)",
+        request.endpoint, type(error).__name__,
+    )
+    return jsonify({
+        "error": "The account service is temporarily unavailable. Please try again.",
+    }), 503
 
 
 @user_bp.route("/", methods=["GET"])

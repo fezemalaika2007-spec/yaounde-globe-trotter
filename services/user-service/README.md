@@ -11,7 +11,7 @@ The **User Service** manages user authentication, account verification, password
 - **Email Verification**: 6-digit confirmation codes sent upon registration with code expiration and resend capabilities.
 - **Password Reset**: Automated 6-digit reset code generation, email dispatch, and secure password updates.
 - **Google OAuth Sign-In**: Token exchange and automated profile provisioning with Google ID tokens.
-- **Database Connection Pooling**: Built with `ThreadedConnectionPool` (1–15 connections) and `release_connection` safety wrappers.
+- **Database Connection Pooling**: Built with `ThreadedConnectionPool` (1–15 connections). Connections are checked before reuse; a closed idle connection is discarded and replaced before account queries run.
 - **SQL Indexes**: Includes B-tree indexes `idx_users_username`, `idx_users_email`, and `idx_favorites_user_id`.
 
 ## API Routes
@@ -33,6 +33,14 @@ The **User Service** manages user authentication, account verification, password
 
 ### Health Check
 - `GET /`: Returns service health status and identifier.
+
+### Temporary database failures
+
+When PostgreSQL is configured, connection failures never switch account lookups
+to an empty in-memory SQLite database. The service returns a JSON `503` with a
+retry message if it cannot obtain a working database connection. Only connection
+checkout is retried; account writes and Google token verification are not replayed.
+SQLite remains available for isolated tests and explicitly local operation.
 
 ## Running Locally & Testing
 

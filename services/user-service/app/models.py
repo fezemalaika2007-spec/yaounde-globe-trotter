@@ -117,21 +117,25 @@ def get_connection(app=None):
 
     if db_url.startswith("postgres"):
         if _pool is None:
+            _pool = ThreadedConnectionPool(
+                minconn=1, maxconn=15, dsn=db_url, connect_timeout=10,
+            )
+        for attempt in range(2):
+            conn = _pool.getconn()
             try:
-                _pool = ThreadedConnectionPool(minconn=1, maxconn=15, dsn=db_url)
-            except Exception:
-                _pool = None
-        if _pool:
-            try:
-                return _pool.getconn()
-            except Exception:
-                pass
-        try:
-            return psycopg2.connect(db_url, connect_timeout=10)
-        except Exception as e:
-            print(f"PostgreSQL connection failed ({e}); falling back to local SQLite.")
+                # Idle connections can be closed by PostgreSQL before reuse.
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                conn.rollback()
+                return conn
+            except psycopg2.Error as error:
+                _pool.putconn(conn, close=True)
+                if attempt == 1 or not isinstance(
+                    error, (psycopg2.OperationalError, psycopg2.InterfaceError),
+                ):
+                    raise
 
-    # SQLite fallback
+    # Local SQLite is used only when PostgreSQL was not configured.
     if _test_sqlite_conn is None:
         _test_sqlite_conn = SQLiteWrapper(":memory:")
     return _test_sqlite_conn

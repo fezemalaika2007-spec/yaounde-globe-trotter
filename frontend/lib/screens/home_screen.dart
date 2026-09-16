@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
-import '../services/api_service.dart';
-import '../utils/destination_filters.dart';
-import '../widgets/app_footer.dart';
-import '../widgets/destination_grid.dart';
 
 /// Callback type for requesting a tab switch from within a child widget.
 typedef OnSwitchTab = void Function(int index);
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   final void Function(Locale) onLocaleChanged;
   final OnSwitchTab? onSwitchTab;
   const HomeScreen({
@@ -16,138 +12,6 @@ class HomeScreen extends StatefulWidget {
     required this.onLocaleChanged,
     this.onSwitchTab,
   });
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  final _api = ApiService();
-  List<dynamic> _featuredDestinations = [];
-  bool _featuredLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFeatured();
-  }
-
-  Future<void> _loadFeatured() async {
-    try {
-      final destinations = await _api.getDestinations().timeout(
-        const Duration(seconds: 4),
-      );
-      if (mounted) {
-        setState(() {
-          _featuredDestinations = _selectFeaturedDestinations(destinations);
-        });
-      }
-    } catch (_) {
-      // Silently handle — home will just show no featured destinations.
-    } finally {
-      if (mounted) {
-        setState(() {
-          _featuredLoading = false;
-        });
-      }
-    }
-  }
-
-  List<dynamic> _selectFeaturedDestinations(List<dynamic> destinations) {
-    final seenKeys = <String>{};
-    final filtered = <dynamic>[];
-    for (final destination in destinations) {
-      if (destination is! Map<String, dynamic>) continue;
-      if (!_isFeaturedDestinationValid(destination)) continue;
-
-      final key = _normalizeDestinationKey(destination);
-      if (key.isEmpty || seenKeys.contains(key)) continue;
-      seenKeys.add(key);
-      filtered.add(destination);
-      if (filtered.length >= 4) break;
-    }
-    return filtered;
-  }
-
-  bool _isFeaturedDestinationValid(Map<String, dynamic> destination) {
-    final name = (destination['name'] ?? '').toString().trim();
-    if (name.isEmpty || !_hasGoodName(name)) return false;
-    if (!_hasValidImage(destination)) return false;
-    if (!_hasGoodLocation(destination)) return false;
-
-    final desc = (destination['description'] ?? '').toString().trim();
-    if (desc.isEmpty) return false;
-    if (desc.length < 30) return false;
-
-    return true;
-  }
-
-  bool _hasGoodName(String name) {
-    final normalized = name.toLowerCase();
-    if (normalized.length < 4) return false;
-    final badPatterns = [
-      'unnamed',
-      'no name',
-      'road',
-      'street',
-      'path',
-      'route',
-      'way',
-      'voie',
-      'chemin',
-      'ligne',
-      'line',
-      'unknown',
-      'null',
-      'drainage',
-      'track',
-      'roundabout',
-      'bridge',
-      'interchange',
-      'poi',
-      'point of interest',
-    ];
-    return !badPatterns.any(normalized.contains);
-  }
-
-  bool _hasValidImage(Map<String, dynamic> destination) {
-    final image = (destination['image'] ?? '').toString().trim();
-    if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('assets/')) {
-      return true;
-    }
-    final name = (destination['name'] ?? '').toString();
-    return getLocalAssetFallback(name).isNotEmpty;
-  }
-
-  bool _hasGoodLocation(Map<String, dynamic> destination) {
-    final area = (destination['area'] ?? '').toString().toLowerCase();
-    final city = (destination['city'] ?? '').toString().toLowerCase();
-    final tags = ((destination['tags'] as List<dynamic>?) ?? [])
-        .map((tag) => tag.toString().toLowerCase())
-        .toList();
-    final name = (destination['name'] ?? '').toString().toLowerCase();
-
-    if (area.contains('yaound') || city.contains('yaound')) return true;
-    if (name.contains('yaound')) return true;
-    if (tags.any((tag) => tag.contains('yaound') || tag.contains('cameroon'))) {
-      return true;
-    }
-    return false;
-  }
-
-  String _normalizeDestinationKey(Map<String, dynamic> destination) {
-    final id = destination['id']?.toString().trim();
-    if (id?.isNotEmpty == true) return id!;
-    final name = (destination['name'] ?? '').toString().trim();
-    final image = (destination['image'] ?? '').toString().trim();
-    if (name.isNotEmpty && image.isNotEmpty) {
-      return '${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim()}|${image.toLowerCase()}';
-    }
-    if (name.isNotEmpty) {
-      return name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
-    }
-    return image;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -231,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 16),
                           FilledButton.icon(
-                            onPressed: () => widget.onSwitchTab?.call(1),
+                            onPressed: () => onSwitchTab?.call(1),
                             icon: const Icon(Icons.explore),
                             label: Text(l10n.startExploring),
                             style: FilledButton.styleFrom(
@@ -252,7 +116,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-
               // --- Feature Cards (What you can do) ---
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
@@ -271,73 +134,49 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.explore,
                       title: l10n.homeFeatureDiscoverTitle,
                       description: l10n.homeFeatureDiscoverDesc,
-                      onTap: () => widget.onSwitchTab?.call(1),
+                      onTap: () => onSwitchTab?.call(1),
                     ),
                     _FeatureCard(
                       icon: Icons.star,
                       title: l10n.homeFeatureRecommendTitle,
                       description: l10n.homeFeatureRecommendDesc,
-                      onTap: () => widget.onSwitchTab?.call(2),
+                      onTap: () => onSwitchTab?.call(2),
                     ),
                     _FeatureCard(
                       icon: Icons.map,
                       title: l10n.homeFeaturePlanTitle,
                       description: l10n.homeFeaturePlanDesc,
-                      onTap: () => widget.onSwitchTab?.call(4),
+                      onTap: () => onSwitchTab?.call(4),
                     ),
                     _FeatureCard(
                       icon: Icons.favorite,
                       title: l10n.homeFeatureSaveTitle,
                       description: l10n.homeFeatureSaveDesc,
-                      onTap: () => widget.onSwitchTab?.call(3),
+                      onTap: () => onSwitchTab?.call(3),
                     ),
                     const _FeatureCard(
                       icon: Icons.forum_outlined,
                       title: 'Live Community Chatroom',
-                      description: 'Connect, chat live, and share travel tips with fellow travelers in real-time (open from the top-right 3-dots menu).',
+                      description:
+                          'Connect, chat live, and share travel tips with fellow travelers in real-time (open from the top-right 3-dots menu).',
                     ),
                     const _FeatureCard(
                       icon: Icons.feedback_outlined,
                       title: 'Feedback & Bug Reporting',
-                      description: 'Submit app feedback, report issues, and send feature suggestions directly to the developer team.',
+                      description:
+                          'Submit app feedback, report issues, and send feature suggestions directly to the developer team.',
                     ),
                     const _FeatureCard(
                       icon: Icons.analytics_outlined,
                       title: 'Live Analytics Dashboard',
-                      description: 'Track real-time platform usage, destination popularity trends, and live community stats.',
+                      description:
+                          'Track real-time platform usage, destination popularity trends, and live community stats.',
                     ),
                   ],
                 ),
               ),
 
-              // --- Featured Destinations ---
-              if (_featuredLoading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_featuredDestinations.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
-                  child: Text(
-                    l10n.featuredDestinations,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                DestinationGrid(
-                  destinations: _featuredDestinations
-                      .cast<Map<String, dynamic>>(),
-                  shrinkWrap: true,
-                  scrollable: false,
-                ),
-              ],
-
               const SizedBox(height: 32),
-
-              // --- Footer ---
-              AppFooter(onNavigate: widget.onSwitchTab),
             ],
           ),
         ),

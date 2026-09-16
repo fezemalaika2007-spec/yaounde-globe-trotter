@@ -10,7 +10,6 @@ import 'package:yaounde_trip/services/notification_provider.dart';
 import 'chat_test_helpers.dart';
 
 Future<void> _pumpNavigation(WidgetTester tester) async {
-  // The home footer animates continuously, so this screen never settles.
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 500));
 }

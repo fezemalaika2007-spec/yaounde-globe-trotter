@@ -37,12 +37,21 @@ The **Recommendation & Live Chat Service** is a core Python Flask microservice p
 - `POST /chat/uploads` — Upload media first, then pass the returned `media_url` and `media_type` to the message endpoint.
 - `GET /chat/media/<filename>` — Read or stream an attachment.
 
-All readers share the same latest 100 messages. Newly uploaded files are stored
-separately instead of being embedded in every polling response. Existing inline
-attachments remain readable for compatibility.
+All readers share the same conversation. `GET /chat/messages` initially returns
+the latest 100 messages, with `limit` capped at 100 per request. To load an older
+page, pass both `before_created_at` and `before_id` from the oldest loaded message.
+Each page is chronological. The stable timestamp/ID cursor works even when new
+messages arrive or the boundary message is deleted. An empty page marks the end.
+Pagination does not delete history or impose a total retention limit.
+
+Newly uploaded files are stored separately instead of being embedded in every
+polling response. Existing inline attachments remain readable for compatibility.
 
 `SQLITE_DATABASE_PATH` chooses the database file; `CHAT_MEDIA_DIR` chooses the
 upload directory. Compose persists both under `services/data/recommendation/`.
+An existing persistent database is never replaced by the seed database on restart.
+Reopening the frontend or recreating a container with this bind mount does not
+reset conversations. Back up both the database and media directory together.
 The PostgreSQL driver is not needed by this SQLite-backed service.
 Follow the [first-upgrade backup steps](../../README.md#upgrading-shared-chat-without-losing-existing-data)
 before replacing an old container, or its existing chat history can be lost.

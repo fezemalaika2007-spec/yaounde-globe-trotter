@@ -5,7 +5,7 @@ import 'package:yaounde_trip/config/api_config.dart';
 void main() {
   const expectedBaseUrl = String.fromEnvironment(
     'EXPECTED_API_BASE_URL',
-    defaultValue: 'http://185.202.223.228/api',
+    defaultValue: 'https://yaoundeglobe.duckdns.org/api',
   );
 
   tearDown(() {

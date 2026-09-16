@@ -232,15 +232,13 @@ The production target is `185.202.223.228`, served at
 `https://yaoundeglobe.duckdns.org`. The frontend and API bind only to VPS
 loopback; host Nginx owns public ports 80 and 443.
 
-For a frontend running locally on your PC, all Flutter platforms default to
-`http://185.202.223.228/api`, including community chat. The IP-specific Nginx
-server in `deploy/nginx/yaoundeglobe.conf` proxies `/api/` to the private
-gateway on port 5000, independently of the domain's HTTPS redirect.
-
-HTTP API traffic is unencrypted. The HTTPS-hosted frontend build below uses
-an explicit HTTPS API override to protect credentials and avoid mixed-content
-blocking. The loopback addresses in Compose, health checks, and host Nginx
-are intentional server-internal connections, not browser API URLs.
+All Flutter platforms default to `https://yaoundeglobe.duckdns.org/api`,
+including local development and community chat. This protects credentials and
+avoids browser mixed-content blocking and native cleartext-HTTP restrictions.
+Host Nginx proxies `/api/` to the private gateway on port 5000. The explicit
+HTTPS build override below remains supported. The loopback addresses in Compose,
+health checks, and host Nginx are intentional server-internal connections, not
+browser API URLs.
 Rebuild the frontend bundle after changing API configuration, and add
 `https://yaoundeglobe.duckdns.org` to the Google OAuth web client's
 Authorized JavaScript origins.
@@ -324,6 +322,12 @@ within the next refresh and be able to play the video, but not edit/delete the
 first account's messages. A signed-out browser can read, but cannot send.
 After this first upgrade, hard-refresh any browser still using an older bundle.
 
+Chat opens at the latest messages; scrolling upward retrieves earlier pages
+without replacing the conversation or moving the reader to the newest message.
+Reopening the app does not clear server-side history. Verify scrollback after
+deployment as well as sending: the frontend and backend must both include the
+history-cursor update. Never remove the persistent data directory during updates.
+
 ---
 
 ## 8. License
@@ -387,7 +391,7 @@ This project is released under the [MIT License](LICENSE).
 
 - 💬 **Live Global Community Chat**:
   - Real-time global chat room open to all users (authenticated & guests with custom display names).
-  - Uses the VPS gateway at `http://185.202.223.228/api`, with no local host fallbacks.
+  - Uses the VPS gateway at `https://yaoundeglobe.duckdns.org/api`, with no local host fallbacks.
   - Rich media attachments: photo uploading, video links, interactive emoji picker, and sticker gallery.
   - Message interaction capabilities: inline message editing (✏️), deletion (🗑️), and threaded quote replies.
 - 👤 **Profile Display Name Management**:

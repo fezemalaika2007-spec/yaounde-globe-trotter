@@ -207,6 +207,80 @@ def test_invalid_feed_limits(app, limit):
     assert app.test_client().get("/chat/messages?limit=" + limit).status_code == 400
 
 
+def test_older_pages_survive_reopening_with_identical_timestamps(app, config):
+    timestamp = "2026-09-01T12:00:00Z"
+    with sqlite3.connect(config["SQLITE_DATABASE_PATH"]) as connection:
+        connection.executemany(
+            "INSERT INTO chat_messages (id, user_id, username, message, created_at) "
+            "VALUES (?, 'alice', 'alice', ?, ?)",
+            [(f"message-{i:03}", f"Saved conversation {i}", timestamp) for i in range(205)],
+        )
+    client = create_app(config).test_client()
+    latest = client.get("/chat/messages").json
+    assert len(latest) == 100
+    assert latest[0]["id"] == "message-105"
+    cursor = latest[0]
+    # A deleted boundary message must not make its older history unreachable.
+    assert client.delete("/chat/messages/" + cursor["id"], headers=auth("alice")).status_code == 200
+    assert send(client, "bob", "A new message while scrolling").status_code == 201
+    middle = client.get("/chat/messages", query_string={
+        "before_created_at": cursor["created_at"], "before_id": cursor["id"],
+    }).json
+    assert [message["id"] for message in middle] == [f"message-{i:03}" for i in range(5, 105)]
+    oldest = client.get("/chat/messages", query_string={
+        "before_created_at": middle[0]["created_at"], "before_id": middle[0]["id"],
+    }).json
+    assert [message["id"] for message in oldest] == [f"message-{i:03}" for i in range(5)]
+    exhausted = client.get("/chat/messages", query_string={
+        "before_created_at": oldest[0]["created_at"], "before_id": oldest[0]["id"],
+    }).json
+    assert exhausted == []
+    again = create_app(config).test_client().get("/chat/messages", query_string={
+        "before_created_at": middle[0]["created_at"], "before_id": middle[0]["id"],
+    }).json
+    assert again == oldest
+
+
+@pytest.mark.parametrize("cursor", [
+    {"before_created_at": "2026-09-01T12:00:00Z"},
+    {"before_id": "message-100"},
+    {"before_created_at": "", "before_id": "message-100"},
+    {"before_created_at": "not-a-date", "before_id": "message-100"},
+    {"before_created_at": "2026-09-01T12:00:00Z", "before_id": ""},
+])
+def test_invalid_history_cursor_returns_json_error(app, cursor):
+    response = app.test_client().get("/chat/messages", query_string=cursor)
+    assert response.status_code == 400
+    assert response.is_json
+
+
+def test_existing_persistent_history_is_never_reseeded(config, tmp_path, monkeypatch):
+    from app import models
+
+    seed_root = tmp_path / "seed-service"
+    seed_root.mkdir()
+    monkeypatch.setattr(models, "__file__", str(seed_root / "app" / "models.py"))
+    with sqlite3.connect(seed_root / "destinations.db") as connection:
+        connection.execute(
+            "CREATE TABLE chat_messages (id TEXT PRIMARY KEY, user_id TEXT, "
+            "username TEXT, message TEXT, created_at TEXT)"
+        )
+        connection.execute(
+            "INSERT INTO chat_messages VALUES "
+            "('seed', 'alice', 'alice', 'Original history', '2026-09-01T00:00:00Z')"
+        )
+    config["COPY_SEED_DATABASE"] = True
+    client = create_app(config).test_client()
+    assert client.get("/chat/messages").json[0]["id"] == "seed"
+    assert send(client, "bob", "Added after deployment").status_code == 201
+    with sqlite3.connect(seed_root / "destinations.db") as connection:
+        connection.execute("DELETE FROM chat_messages")
+    restarted = create_app(config).test_client()
+    assert [message["message"] for message in restarted.get("/chat/messages").json] == [
+        "Original history", "Added after deployment",
+    ]
+
+
 def test_old_schema_is_upgraded_without_losing_history(config):
     with sqlite3.connect(config["SQLITE_DATABASE_PATH"]) as connection:
         connection.execute(

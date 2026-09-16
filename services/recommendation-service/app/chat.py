@@ -2,6 +2,7 @@
 import re
 import sqlite3
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from flask import Blueprint, abort, current_app, g, jsonify, request, send_file
@@ -107,7 +108,18 @@ def list_messages():
         abort(400, description="limit must be a positive integer")
     if limit < 1:
         abort(400, description="limit must be a positive integer")
-    response = jsonify(get_chat_messages(limit=min(limit, 100)))
+    before_created_at = request.args.get("before_created_at")
+    before_id = request.args.get("before_id")
+    if before_created_at is not None or before_id is not None:
+        if not before_created_at or not before_id or len(before_created_at) > 64 or len(before_id) > 128:
+            abort(400, description="A complete history cursor is required")
+        try:
+            datetime.fromisoformat(before_created_at.replace("Z", "+00:00"))
+        except ValueError:
+            abort(400, description="The history cursor timestamp is invalid")
+    response = jsonify(get_chat_messages(
+        limit=min(limit, 100), before_created_at=before_created_at, before_id=before_id,
+    ))
     response.headers["Cache-Control"] = "no-store"
     return response
 

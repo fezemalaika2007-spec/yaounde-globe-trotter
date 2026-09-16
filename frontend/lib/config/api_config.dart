@@ -1,8 +1,9 @@
 /// API configuration for the GlobeTrotter backend.
 ///
-/// The local frontend connects to the VPS through Nginx on port 80.
+/// All platforms connect to the VPS through its public HTTPS gateway.
 class ApiConfig {
-  static const String _productionBaseUrl = 'http://185.202.223.228/api';
+  static const String _productionBaseUrl =
+      'https://yaoundeglobe.duckdns.org/api';
 
   static const String _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',

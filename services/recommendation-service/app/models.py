@@ -857,14 +857,20 @@ def delete_chat_message(msg_id, username, app=None):
         return cur.rowcount == 1
 
 
-def get_chat_messages(limit=100, app=None):
-    """Return recent chat messages ordered chronologically."""
+def get_chat_messages(limit=100, app=None, *, before_created_at=None, before_id=None):
+    """Return a chronological page without offset drift when new messages arrive."""
+    where = ""
+    params = ()
+    if before_created_at is not None and before_id is not None:
+        where = "WHERE (created_at, id) < (%s, %s) "
+        params = (before_created_at, before_id)
     with chat_transaction(app) as cur:
         cur.execute(
             "SELECT id, user_id, username, message, COALESCE(media_url, ''), COALESCE(media_type, ''), "
             "COALESCE(reply_to_id, ''), COALESCE(reply_to_username, ''), COALESCE(reply_to_message, ''), COALESCE(is_edited, 0), created_at "
-            "FROM (SELECT * FROM chat_messages ORDER BY created_at DESC, id DESC LIMIT %s) sub ORDER BY created_at ASC, id ASC",
-            (limit,)
+            "FROM (SELECT * FROM chat_messages " + where
+            + "ORDER BY created_at DESC, id DESC LIMIT %s) sub ORDER BY created_at ASC, id ASC",
+            (*params, limit)
         )
         rows = cur.fetchall()
     cols = ['id', 'user_id', 'username', 'message', 'media_url', 'media_type', 'reply_to_id', 'reply_to_username', 'reply_to_message', 'is_edited', 'created_at']

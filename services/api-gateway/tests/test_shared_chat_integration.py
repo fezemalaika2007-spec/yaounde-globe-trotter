@@ -132,3 +132,29 @@ def test_two_accounts_share_messages_and_media_through_real_http(gateway):
     assert guest.post("/chat/messages", json={"message": "No sign-in"}).status_code == 401
     assert alice.delete("/chat/messages/" + text.json["id"], headers=_auth("alice")).status_code == 200
     assert len(bob.get("/chat/messages").json) == 2
+
+
+def test_scroll_history_cursor_is_forwarded_without_skips_or_duplicates(gateway):
+    client = gateway.test_client()
+    messages = []
+    for index in range(5):
+        response = client.post(
+            "/chat/messages", json={"message": f"Saved message {index}"},
+            headers=_auth("alice"),
+        )
+        assert response.status_code == 201
+        messages.append(response.json)
+    latest = client.get("/chat/messages?limit=2").json
+    assert [message["id"] for message in latest] == [message["id"] for message in messages[-2:]]
+    assert client.post(
+        "/chat/messages", json={"message": "New while reading history"}, headers=_auth("bob"),
+    ).status_code == 201
+    older = gateway.test_client().get("/chat/messages", query_string={
+        "limit": 2, "before_created_at": latest[0]["created_at"], "before_id": latest[0]["id"],
+    }).json
+    oldest = client.get("/chat/messages", query_string={
+        "limit": 2, "before_created_at": older[0]["created_at"], "before_id": older[0]["id"],
+    }).json
+    assert [message["id"] for message in oldest + older + latest] == [
+        message["id"] for message in messages
+    ]

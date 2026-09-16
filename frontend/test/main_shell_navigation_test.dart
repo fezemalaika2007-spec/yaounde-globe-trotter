@@ -21,7 +21,7 @@ void main() {
     addTearDown(NotificationProvider().stopPolling);
   });
 
-  for (final width in [360.0, 844.0, 1200.0]) {
+  for (final width in [320.0, 360.0, 390.0, 844.0, 1200.0]) {
     testWidgets('navigation works without a bottom bar at width $width', (
       tester,
     ) async {

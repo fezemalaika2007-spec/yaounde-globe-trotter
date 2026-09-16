@@ -58,19 +58,12 @@ class ApiService {
     } on _TimeoutSignal {
       throw ApiException(
         408,
-        'Connection timed out. Please check that the server is running '
-        'and reachable.',
+        'The server took too long to respond. Please try again.',
       );
     } on http.ClientException {
       throw ApiException(
         0,
-        'Could not reach the server. Is it running? Check that the backend '
-        'is started and the API URL is correct.',
-      );
-    } catch (e) {
-      throw ApiException(
-        0,
-        'Could not connect to the server. Please try again. ($e)',
+        'Cannot connect right now. Check your internet connection and try again.',
       );
     }
   }
@@ -887,21 +880,42 @@ class ApiService {
     return body;
   }
 
-  /// Fetch recent live community chat messages through the API gateway.
-  Future<List<Map<String, dynamic>>> getChatMessages({int limit = 100}) async {
+  /// Fetch a chronological page, optionally before an existing history cursor.
+  Future<List<Map<String, dynamic>>> getChatMessages({
+    int limit = 100,
+    String? beforeCreatedAt,
+    String? beforeId,
+  }) async {
+    if ((beforeCreatedAt == null) != (beforeId == null) ||
+        beforeCreatedAt == '' ||
+        beforeId == '') {
+      throw ApiException(400, 'A complete history cursor is required.');
+    }
     final token = await getToken();
     final headers = token != null ? _authHeaders(token) : <String, String>{};
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.chat}?limit=$limit');
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.chat}').replace(
+      queryParameters: {
+        'limit': '$limit',
+        'before_created_at': ?beforeCreatedAt,
+        'before_id': ?beforeId,
+      },
+    );
     final body = _chatResponse(await _get(uri, headers: headers), 200);
     if (body is! List) {
-      throw ApiException(502, 'The chat server returned an invalid message list.');
+      throw ApiException(
+        502,
+        'The chat server returned an invalid message list.',
+      );
     }
     return [
       for (final message in body)
         if (message is Map<String, dynamic>)
           message
         else
-          throw ApiException(502, 'The chat server returned an invalid message.'),
+          throw ApiException(
+            502,
+            'The chat server returned an invalid message.',
+          ),
     ];
   }
 
@@ -917,12 +931,15 @@ class ApiService {
     }
     final headers = await _chatWriteHeaders();
     headers.remove('Content-Type');
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('${ApiConfig.baseUrl}${ApiConfig.chatUploads}'),
-    )
-      ..headers.addAll(headers)
-      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final request =
+        http.MultipartRequest(
+            'POST',
+            Uri.parse('${ApiConfig.baseUrl}${ApiConfig.chatUploads}'),
+          )
+          ..headers.addAll(headers)
+          ..files.add(
+            http.MultipartFile.fromBytes('file', bytes, filename: filename),
+          );
     final client = http.Client();
     try {
       final response = await _guard(
@@ -939,7 +956,10 @@ class ApiService {
           return ChatAttachment(url: url, type: type as String);
         }
       }
-      throw ApiException(502, 'The chat server returned an invalid attachment.');
+      throw ApiException(
+        502,
+        'The chat server returned an invalid attachment.',
+      );
     } finally {
       client.close();
     }

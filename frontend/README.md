@@ -6,7 +6,7 @@ The **GlobeTrotter Frontend** is a modern, responsive cross-platform client buil
 
 - 💬 **Live Global Community Chat (`LiveChatScreen`)**:
   - Global real-time community chat room accessible to all app users (authenticated users & guests).
-  - Uses the VPS API gateway at `http://185.202.223.228/api`, without local host fallbacks.
+  - Uses the VPS API gateway at `https://yaoundeglobe.duckdns.org/api`, without local host fallbacks.
   - Quick action controls for message authors: inline message editing (✏️), message deletion (🗑️), and quote replies with target message preview.
   - Rich media capabilities: photo upload preview, video URL rendering, interactive emoji picker, and sticker gallery.
 - 👤 **Profile Display Name Management (`ProfileScreen`)**:
@@ -76,11 +76,12 @@ Authorized JavaScript origins before using Google sign-in in production.
 
 ### API Configuration
 
-The frontend runs locally on your PC and defaults to
-`http://185.202.223.228/api`. On the VPS, the IP-specific Nginx server in
-`../deploy/nginx/yaoundeglobe.conf` must forward port 80 `/api/` requests to
-the API gateway on `127.0.0.1:5000`. Port 5000 stays private. This API
-endpoint does not require DuckDNS or a domain certificate.
+All frontend platforms, including local development, default to
+`https://yaoundeglobe.duckdns.org/api`. Host Nginx terminates HTTPS and forwards
+`/api/` to the gateway on `127.0.0.1:5000`; the gateway port stays private.
+Using the public HTTPS domain avoids browser mixed-content blocking and native
+cleartext-HTTP restrictions. Keep the domain's DNS and certificate valid.
+An explicit `API_BASE_URL` build override is still supported for development.
 
 Chat uses this same gateway for listing, sending, editing, and deleting
 messages, including when a request fails; it never retries against the
@@ -90,20 +91,32 @@ visitor's local machine.
 
 - Everyone can read the community feed. Sign-in is required to send text,
   emojis, stickers, photos, or videos; only the sender can edit or delete a message.
-- The latest 100 messages refresh every three seconds. Failed refreshes keep
-  the last loaded messages visible and show an error instead of an empty room.
+- The latest 100 messages refresh every three seconds. Scroll upward to load
+  earlier conversations automatically, 100 messages at a time. Loading older
+  history keeps your reading position; live refreshes keep loaded history.
+  Failed requests preserve the conversation and expose a retry action.
+- Conversations are stored on the server, not just in the current screen.
+  Reopening the app or signing in as another user does not reset the shared
+  history. Older messages remain accessible by scrolling up.
 - Attach one JPEG, PNG, GIF, WebP, MP4, or WebM file per message, up to 20 MB.
   Videos have play/pause and seek controls and load only when tapped.
   Playback depends on the browser/device supporting the video's codec.
 - Files upload through `/api/chat/uploads` and are shared through
   `/api/chat/media/...`; messages contain a URL instead of embedding the whole
   file in every refresh. Failed sends retain the draft and uploaded attachment
-  for retry.
+  for an explicit retry; writes are not automatically replayed after a network
+  failure. A timeout does not prove that the server rejected a message, so check
+  the refreshed conversation before retrying.
 - This is a public community space, not private messaging. Other visitors can
   read the messages and open the attachments.
 
 Backend storage and the first-upgrade database preservation steps are documented
 in the root [deployment guide](../README.md#upgrading-shared-chat-without-losing-existing-data).
+
+If chat still shows a connection error, check `/api/health` and confirm the
+deployed frontend was rebuilt after pulling the latest source. A successful
+health check does not verify authenticated sending or media storage. Confirm
+those using two accounts after deployment, then hard-refresh older browser tabs.
 
 ### Mobile navigation
 

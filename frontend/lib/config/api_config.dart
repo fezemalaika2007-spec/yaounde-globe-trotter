@@ -36,4 +36,5 @@ class ApiConfig {
   static const String notifications = '/notifications';
   static const String feedback = '/feedback';
   static const String chat = '/chat/messages';
+  static const String chatUploads = '/chat/uploads';
 }

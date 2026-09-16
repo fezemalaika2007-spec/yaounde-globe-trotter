@@ -12,10 +12,12 @@ The **Recommendation & Live Chat Service** is a core Python Flask microservice p
 
 - 💬 **Live Global Community Chat API**:
   - `GET /chat/messages`: Retrieves historical chat messages sorted chronologically.
-  - `POST /chat/messages`: Posts new chat messages with support for custom display names, photo attachments, video links, emojis, stickers, and quote reply references (`reply_to_id`).
+  - `POST /chat/messages`: Posts text, uploaded photos/videos, emojis, stickers, and quote reply references (`reply_to_id`). The sender comes from the verified JWT, not a client-supplied name.
   - `PUT /chat/messages/<message_id>`: Updates existing chat message content (author verification).
   - `DELETE /chat/messages/<message_id>`: Deletes chat messages (author verification).
-  - Guest-friendly `@optional_token` decorator supporting both authenticated JWT users and guest users with custom display aliases.
+  - Anyone can read; posting, uploading, editing, and deleting require a valid JWT.
+  - `POST /chat/uploads`: Accepts one multipart `file`, up to 20 MB. Supported types are JPEG, PNG, GIF, WebP, MP4, and WebM.
+  - `GET /chat/media/<filename>`: Serves uploaded media publicly, including HTTP Range/206 responses for video playback.
 - ✉️ **Direct Email Feedback Dispatcher**:
   - `POST /feedback`: Receives feedback tickets from users, formats structured issue reports, and triggers background dispatch to developer `fezemalaika2007@gmail.com` via FormSubmit and SMTP email worker threads.
 - 🎯 **Preference & Ranking Engine**: Matches destinations based on user interest tags, rating counts, average ratings, and category filters (Nature & Parks, Culture & History, Food & Dining, Shopping, Nightlife & Entertainment, Entertainment & Amusement, Leisure & Wellness, Health & Pharmacy, Travel & Transport, Nature & Adventure).
@@ -32,6 +34,18 @@ The **Recommendation & Live Chat Service** is a core Python Flask microservice p
 - `POST /chat/messages` — Send a new chat message (supports photo attachments, video links, emojis, stickers, and reply quotes).
 - `PUT /chat/messages/<message_id>` — Edit a previously sent chat message.
 - `DELETE /chat/messages/<message_id>` — Delete a chat message.
+- `POST /chat/uploads` — Upload media first, then pass the returned `media_url` and `media_type` to the message endpoint.
+- `GET /chat/media/<filename>` — Read or stream an attachment.
+
+All readers share the same latest 100 messages. Newly uploaded files are stored
+separately instead of being embedded in every polling response. Existing inline
+attachments remain readable for compatibility.
+
+`SQLITE_DATABASE_PATH` chooses the database file; `CHAT_MEDIA_DIR` chooses the
+upload directory. Compose persists both under `services/data/recommendation/`.
+The PostgreSQL driver is not needed by this SQLite-backed service.
+Follow the [first-upgrade backup steps](../../README.md#upgrading-shared-chat-without-losing-existing-data)
+before replacing an old container, or its existing chat history can be lost.
 
 ---
 
@@ -81,4 +95,3 @@ python parse_and_sync_destinations.py
 # Run test suite
 python -m pytest
 ```
-

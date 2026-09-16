@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +17,13 @@ class RecommendationSection {
     required this.type,
     required this.items,
   });
+}
+
+class ChatAttachment {
+  final String url;
+  final String type;
+
+  const ChatAttachment({required this.url, required this.type});
 }
 
 /// Centralized service for all HTTP calls to the GlobeTrotter backend.
@@ -36,10 +44,13 @@ class ApiService {
   /// Wraps a [Future] HTTP call so that connection errors (server down /
   /// unreachable) and timeouts produce clear, actionable `ApiException`s
   /// instead of cryptic socket errors.
-  Future<http.Response> _guard(Future<http.Response> future) async {
+  Future<http.Response> _guard(
+    Future<http.Response> future, {
+    Duration timeout = _requestTimeout,
+  }) async {
     try {
       return await future.timeout(
-        _requestTimeout,
+        timeout,
         onTimeout: () => throw const _TimeoutSignal(),
       );
     } on ApiException {
@@ -84,8 +95,12 @@ class ApiService {
     return _guard(http.put(uri, headers: headers, body: body));
   }
 
-  Future<http.Response> _delete(Uri uri, {Map<String, String>? headers}) {
-    return _guard(http.delete(uri, headers: headers));
+  Future<http.Response> _delete(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    return _guard(http.delete(uri, headers: headers, body: body));
   }
 
   // Token management
@@ -811,28 +826,134 @@ class ApiService {
     }
   }
 
-  static final List<String> _chatCandidateHosts = [ApiConfig.baseUrl];
+  static const int maxChatMediaBytes = 20 * 1024 * 1024;
+
+  /// Only used for display and ownership controls; the server verifies the JWT.
+  Future<String?> getChatUsername() async {
+    final token = await getToken();
+    if (token == null) return null;
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) throw const FormatException('Invalid JWT');
+      final claims = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      if (claims is! Map<String, dynamic> ||
+          claims['sub'] is! String ||
+          (claims['sub'] as String).isEmpty ||
+          claims['exp'] is! num) {
+        throw const FormatException('Invalid session claims');
+      }
+      if ((claims['exp'] as num) <=
+          DateTime.now().millisecondsSinceEpoch / 1000) {
+        return null;
+      }
+      return claims['sub'] as String;
+    } on FormatException {
+      debugPrint('Chat session is malformed; sign in again.');
+      return null;
+    }
+  }
+
+  Future<Map<String, String>> _chatWriteHeaders() async {
+    final token = await getToken();
+    if (token == null) {
+      throw ApiException(401, 'Please sign in to send community messages.');
+    }
+    return {'Content-Type': 'application/json', ..._authHeaders(token)};
+  }
+
+  dynamic _chatResponse(http.Response response, int expectedStatus) {
+    if (response.statusCode == 413) {
+      throw ApiException(413, 'Photos and videos must be 20 MB or smaller.');
+    }
+    dynamic body;
+    try {
+      body = jsonDecode(utf8.decode(response.bodyBytes));
+    } on FormatException {
+      throw ApiException(
+        response.statusCode,
+        'The chat server returned an invalid response '
+        '(HTTP ${response.statusCode}). Please try again.',
+      );
+    }
+    if (response.statusCode != expectedStatus) {
+      final error = body is Map ? body['error'] : null;
+      throw ApiException(
+        response.statusCode,
+        error is String ? error : 'Chat request failed. Please try again.',
+      );
+    }
+    return body;
+  }
 
   /// Fetch recent live community chat messages through the API gateway.
   Future<List<Map<String, dynamic>>> getChatMessages({int limit = 100}) async {
     final token = await getToken();
     final headers = token != null ? _authHeaders(token) : <String, String>{};
-
-    for (final host in _chatCandidateHosts) {
-      try {
-        final uri = Uri.parse('$host${ApiConfig.chat}?limit=$limit');
-        final response = await http
-            .get(uri, headers: headers)
-            .timeout(const Duration(seconds: 4));
-        final body = _decode(response);
-        if (response.statusCode == 200 && body is List) {
-          return List<Map<String, dynamic>>.from(body);
-        }
-      } catch (e) {
-        debugPrint('getChatMessages host $host failed: $e');
-      }
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.chat}?limit=$limit');
+    final body = _chatResponse(await _get(uri, headers: headers), 200);
+    if (body is! List) {
+      throw ApiException(502, 'The chat server returned an invalid message list.');
     }
-    return [];
+    return [
+      for (final message in body)
+        if (message is Map<String, dynamic>)
+          message
+        else
+          throw ApiException(502, 'The chat server returned an invalid message.'),
+    ];
+  }
+
+  Future<ChatAttachment> uploadChatMedia(
+    Uint8List bytes, {
+    required String filename,
+  }) async {
+    if (bytes.isEmpty || bytes.length > maxChatMediaBytes) {
+      throw ApiException(
+        413,
+        'Choose a non-empty photo or video of 20 MB or smaller.',
+      );
+    }
+    final headers = await _chatWriteHeaders();
+    headers.remove('Content-Type');
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiConfig.baseUrl}${ApiConfig.chatUploads}'),
+    )
+      ..headers.addAll(headers)
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final client = http.Client();
+    try {
+      final response = await _guard(
+        client.send(request).then(http.Response.fromStream),
+        timeout: const Duration(minutes: 2),
+      );
+      final body = _chatResponse(response, 201);
+      if (body is Map<String, dynamic>) {
+        final url = body['media_url'];
+        final type = body['media_type'];
+        if (url is String &&
+            url.startsWith('/chat/media/') &&
+            (type == 'image' || type == 'video')) {
+          return ChatAttachment(url: url, type: type as String);
+        }
+      }
+      throw ApiException(502, 'The chat server returned an invalid attachment.');
+    } finally {
+      client.close();
+    }
+  }
+
+  static Uri chatMediaUri(String mediaUrl) {
+    if (mediaUrl.startsWith('/chat/media/')) {
+      return Uri.parse('${ApiConfig.baseUrl}$mediaUrl');
+    }
+    final uri = Uri.parse(mediaUrl);
+    if (uri.scheme == 'https' || uri.scheme == 'http' || uri.scheme == 'data') {
+      return uri;
+    }
+    throw const FormatException('Unsupported chat attachment URL');
   }
 
   /// Send a new message or media/reply through the API gateway.
@@ -845,11 +966,7 @@ class ApiService {
     String? replyToUsername,
     String? replyToMessage,
   }) async {
-    final token = await getToken();
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      if (token != null) ..._authHeaders(token),
-    };
+    final headers = await _chatWriteHeaders();
     final payload = jsonEncode({
       'username': username ?? '',
       'message': message,
@@ -860,25 +977,13 @@ class ApiService {
       'reply_to_message': replyToMessage ?? '',
     });
 
-    String lastErr = 'Could not reach server';
-    for (final host in _chatCandidateHosts) {
-      try {
-        final uri = Uri.parse('$host${ApiConfig.chat}');
-        final response = await http
-            .post(uri, headers: headers, body: payload)
-            .timeout(const Duration(seconds: 5));
-        final body = _decode(response);
-        if (response.statusCode == 201 && body is Map) {
-          return Map<String, dynamic>.from(body);
-        }
-        if (body is Map && body.containsKey('error')) {
-          lastErr = body['error'].toString();
-        }
-      } catch (e) {
-        debugPrint('sendChatMessage host $host failed: $e');
-      }
-    }
-    throw ApiException(0, lastErr);
+    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.chat}');
+    final body = _chatResponse(
+      await _post(uri, headers: headers, body: payload),
+      201,
+    );
+    if (body is Map<String, dynamic> && body['id'] is String) return body;
+    throw ApiException(502, 'The chat server did not confirm your message.');
   }
 
   /// Edit an existing chat message.
@@ -887,47 +992,29 @@ class ApiService {
     String newText, {
     String? username,
   }) async {
-    final token = await getToken();
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      if (token != null) ..._authHeaders(token),
-    };
+    final headers = await _chatWriteHeaders();
     final payload = jsonEncode({
       'message': newText,
       'username': username ?? '',
     });
 
-    for (final host in _chatCandidateHosts) {
-      try {
-        final uri = Uri.parse('$host${ApiConfig.chat}/$msgId');
-        final response = await http
-            .put(uri, headers: headers, body: payload)
-            .timeout(const Duration(seconds: 4));
-        if (response.statusCode == 200) return true;
-      } catch (_) {}
-    }
-    return false;
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.chat}/${Uri.encodeComponent(msgId)}',
+    );
+    _chatResponse(await _put(uri, headers: headers, body: payload), 200);
+    return true;
   }
 
   /// Delete a chat message.
   Future<bool> deleteChatMessage(String msgId, {String? username}) async {
-    final token = await getToken();
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      if (token != null) ..._authHeaders(token),
-    };
+    final headers = await _chatWriteHeaders();
     final payload = jsonEncode({'username': username ?? ''});
 
-    for (final host in _chatCandidateHosts) {
-      try {
-        final uri = Uri.parse('$host${ApiConfig.chat}/$msgId');
-        final response = await http
-            .delete(uri, headers: headers, body: payload)
-            .timeout(const Duration(seconds: 4));
-        if (response.statusCode == 200) return true;
-      } catch (_) {}
-    }
-    return false;
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}${ApiConfig.chat}/${Uri.encodeComponent(msgId)}',
+    );
+    _chatResponse(await _delete(uri, headers: headers, body: payload), 200);
+    return true;
   }
 
   // Helpers

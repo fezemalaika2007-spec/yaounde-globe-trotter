@@ -86,6 +86,32 @@ Chat uses this same gateway for listing, sending, editing, and deleting
 messages, including when a request fails; it never retries against the
 visitor's local machine.
 
+### Shared community chat
+
+- Everyone can read the community feed. Sign-in is required to send text,
+  emojis, stickers, photos, or videos; only the sender can edit or delete a message.
+- The latest 100 messages refresh every three seconds. Failed refreshes keep
+  the last loaded messages visible and show an error instead of an empty room.
+- Attach one JPEG, PNG, GIF, WebP, MP4, or WebM file per message, up to 20 MB.
+  Videos have play/pause and seek controls and load only when tapped.
+  Playback depends on the browser/device supporting the video's codec.
+- Files upload through `/api/chat/uploads` and are shared through
+  `/api/chat/media/...`; messages contain a URL instead of embedding the whole
+  file in every refresh. Failed sends retain the draft and uploaded attachment
+  for retry.
+- This is a public community space, not private messaging. Other visitors can
+  read the messages and open the attachments.
+
+Backend storage and the first-upgrade database preservation steps are documented
+in the root [deployment guide](../README.md#upgrading-shared-chat-without-losing-existing-data).
+
+### Mobile navigation
+
+On screens narrower than 850 pixels, use the top-left menu to switch between
+Home, Destinations, Recommendations, Favorites, and Itineraries. There is no
+bottom navigation bar. Wider screens keep the permanent sidebar. The chat's
+message composer remains available at the bottom of the conversation.
+
 HTTP does not encrypt passwords, tokens, or other traffic. For real
 credentials or a frontend hosted over HTTPS, use the HTTPS domain override
 below once the domain and certificate are configured; browsers block HTTP

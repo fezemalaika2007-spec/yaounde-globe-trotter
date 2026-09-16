@@ -249,6 +249,15 @@ class _LoginScreenState extends State<LoginScreen> {
             },
             child: Text(l10n.noAccount),
           ),
+          TextButton.icon(
+            onPressed: () => Navigator.pushNamed(
+              context,
+              '/chat',
+              arguments: widget.onLocaleChanged,
+            ),
+            icon: const Icon(Icons.forum_outlined),
+            label: const Text('Read community chat'),
+          ),
         ],
       ),
     );

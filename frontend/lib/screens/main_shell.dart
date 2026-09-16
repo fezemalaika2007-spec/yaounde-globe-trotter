@@ -16,10 +16,8 @@ import 'itineraries_screen.dart';
 import 'favorites_screen.dart';
 import 'feedback_screen.dart';
 import 'analytics_dashboard_screen.dart';
-import 'chat_screen.dart';
 import '../services/analytics_service.dart';
 import '../widgets/notification_bell.dart';
-
 
 /// Breakpoint at which the sidebar switches from drawer to permanent.
 const double _sidebarBreakpoint = 850;
@@ -147,11 +145,10 @@ class _MainShellState extends State<MainShell> {
           if (value == 'profile') {
             _showProfileSheet();
           } else if (value == 'chat') {
-            Navigator.push(
+            Navigator.pushNamed(
               context,
-              MaterialPageRoute(
-                builder: (_) => ChatScreen(onLocaleChanged: widget.onLocaleChanged),
-              ),
+              '/chat',
+              arguments: widget.onLocaleChanged,
             );
           } else if (value == 'feedback') {
             Navigator.push(
@@ -161,7 +158,9 @@ class _MainShellState extends State<MainShell> {
           } else if (value == 'analytics') {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AnalyticsDashboardScreen()),
+              MaterialPageRoute(
+                builder: (_) => const AnalyticsDashboardScreen(),
+              ),
             );
           } else if (value == 'logout') {
             _logout();
@@ -247,7 +246,6 @@ class _MainShellState extends State<MainShell> {
     ];
   }
 
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -319,7 +317,7 @@ class _MainShellState extends State<MainShell> {
             ),
           );
         } else {
-          // --- Narrow layout: bottom navigation bar + drawer ---
+          // --- Narrow layout: drawer navigation ---
           return Scaffold(
             appBar: AppBar(
               title: Text('Yaounde.Trip · ${titles[_currentIndex]}'),
@@ -327,20 +325,8 @@ class _MainShellState extends State<MainShell> {
             ),
             drawer: _buildDrawer(l10n, navItems),
             body: IndexedStack(index: _currentIndex, children: _stackChildren),
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (idx) => _switchTo(idx),
-              destinations: navItems.map((item) {
-                return NavigationDestination(
-                  icon: Icon(item.icon),
-                  selectedIcon: Icon(item.selectedIcon),
-                  label: item.label,
-                );
-              }).toList(),
-            ),
           );
         }
-
       },
     );
   }
@@ -350,7 +336,8 @@ class _MainShellState extends State<MainShell> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -361,7 +348,10 @@ class _MainShellState extends State<MainShell> {
                 end: Alignment.bottomRight,
               ),
             ),
-            child: Column(
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -392,6 +382,7 @@ class _MainShellState extends State<MainShell> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+              ),
             ),
           ),
           ...List.generate(navItems.length, (i) {
@@ -416,7 +407,7 @@ class _MainShellState extends State<MainShell> {
               ),
               selected: _currentIndex == i,
               onTap: () {
-                setState(() => _currentIndex = i);
+                _switchTo(i);
                 Navigator.of(context).pop();
               },
             );
@@ -469,109 +460,115 @@ class _SidebarPanel extends StatelessWidget {
     return Container(
       width: 260,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
         border: Border(
           right: BorderSide(
             color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
           ),
         ),
       ),
-      child: Column(
-        children: [
-          // Header — same gradient style as the drawer header
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  theme.colorScheme.primary,
-                  theme.colorScheme.primary.withValues(alpha: 0.8),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.travel_explore,
-                  size: 36,
-                  color: theme.colorScheme.onPrimary,
+      child: Material(
+        color: theme.colorScheme.surfaceContainerLow,
+        child: Column(
+          children: [
+            // Header — same gradient style as the drawer header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.primary.withValues(alpha: 0.8),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Yaounde.Trip',
-                  style: TextStyle(
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.travel_explore,
+                    size: 36,
                     color: theme.colorScheme.onPrimary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.exploreSubtitle,
-                  style: TextStyle(
-                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
-                    fontSize: 11,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Yaounde.Trip',
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          // Navigation items
-          ...List.generate(navItems.length, (i) {
-            final item = navItems[i];
-            final isSelected = currentIndex == i;
-            return ListTile(
-              leading: Icon(
-                isSelected ? item.selectedIcon : item.icon,
-                color: isSelected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.exploreSubtitle,
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
+                      fontSize: 11,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              title: Text(
-                item.label,
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+            // Navigation items
+            ...List.generate(navItems.length, (i) {
+              final item = navItems[i];
+              final isSelected = currentIndex == i;
+              return ListTile(
+                leading: Icon(
+                  isSelected ? item.selectedIcon : item.icon,
                   color: isSelected
                       ? theme.colorScheme.primary
                       : theme.colorScheme.onSurfaceVariant,
                 ),
+                title: Text(
+                  item.label,
+                  style: TextStyle(
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                selected: isSelected,
+                selectedTileColor: theme.colorScheme.primaryContainer
+                    .withValues(alpha: 0.3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                onTap: () => onNavigate(i),
+              );
+            }),
+            const Spacer(),
+            const Divider(),
+            ListTile(
+              leading: Icon(
+                Icons.person_outline,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              selected: isSelected,
-              selectedTileColor: theme.colorScheme.primaryContainer.withValues(
-                alpha: 0.3,
+              title: Text(
+                l10n.profile,
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              onTap: () => onNavigate(i),
-            );
-          }),
-          const Spacer(),
-          const Divider(),
-          ListTile(
-            leading: Icon(
-              Icons.person_outline,
-              color: theme.colorScheme.onSurfaceVariant,
+              onTap: onProfile,
             ),
-            title: Text(
-              l10n.profile,
-              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: Text(
+                l10n.logout,
+                style: const TextStyle(color: Colors.red),
+              ),
+              onTap: onLogout,
             ),
-            onTap: onProfile,
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
-            onTap: onLogout,
-          ),
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -757,42 +754,57 @@ class _DestinationsTabState extends State<_DestinationsTab> {
   }
 
   List<dynamic> get _visibleDestinations {
-    final source = _liveResults.isEmpty ? _filteredDestinations : () {
-      final seenKeys = <String>{};
-      final merged = <dynamic>[];
-      for (final d in _filteredDestinations) {
-        if (d is! Map<String, dynamic>) continue;
-        final key = normalizeDestinationKey(d);
-        if (key.isNotEmpty) seenKeys.add(key);
-        merged.add(d);
-      }
-      for (final d in _liveResults) {
-        if (d is! Map<String, dynamic>) continue;
-        final key = normalizeDestinationKey(d);
-        if (key.isNotEmpty && seenKeys.contains(key)) continue;
-        if (key.isNotEmpty) seenKeys.add(key);
-        merged.add(d);
-      }
-      return merged;
-    }();
+    final source = _liveResults.isEmpty
+        ? _filteredDestinations
+        : () {
+            final seenKeys = <String>{};
+            final merged = <dynamic>[];
+            for (final d in _filteredDestinations) {
+              if (d is! Map<String, dynamic>) continue;
+              final key = normalizeDestinationKey(d);
+              if (key.isNotEmpty) seenKeys.add(key);
+              merged.add(d);
+            }
+            for (final d in _liveResults) {
+              if (d is! Map<String, dynamic>) continue;
+              final key = normalizeDestinationKey(d);
+              if (key.isNotEmpty && seenKeys.contains(key)) continue;
+              if (key.isNotEmpty) seenKeys.add(key);
+              merged.add(d);
+            }
+            return merged;
+          }();
 
     // 1. Filter by category
     var result = source.where((d) {
       if (d is! Map<String, dynamic>) return false;
       if (_selectedCategory == 'All') return true;
       final category = (d['category'] ?? '').toString().toLowerCase();
-      final tags = ((d['tags'] as List<dynamic>?) ?? []).map((t) => t.toString().toLowerCase()).toList();
+      final tags = ((d['tags'] as List<dynamic>?) ?? [])
+          .map((t) => t.toString().toLowerCase())
+          .toList();
       final catTarget = _selectedCategory.toLowerCase();
-      return category.contains(catTarget) || tags.any((t) => catTarget.contains(t) || t.contains(catTarget));
+      return category.contains(catTarget) ||
+          tags.any((t) => catTarget.contains(t) || t.contains(catTarget));
     }).toList();
 
     // 2. Sort
     if (_sortBy == 'Rating') {
-      result.sort((a, b) => ((b['average_rating'] ?? 0) as num).compareTo((a['average_rating'] ?? 0) as num));
+      result.sort(
+        (a, b) => ((b['average_rating'] ?? 0) as num).compareTo(
+          (a['average_rating'] ?? 0) as num,
+        ),
+      );
     } else if (_sortBy == 'Price') {
-      result.sort((a, b) => ((a['cost'] ?? 999999) as num).compareTo((b['cost'] ?? 999999) as num));
+      result.sort(
+        (a, b) => ((a['cost'] ?? 999999) as num).compareTo(
+          (b['cost'] ?? 999999) as num,
+        ),
+      );
     } else if (_sortBy == 'Name') {
-      result.sort((a, b) => (a['name'] ?? '').toString().compareTo(b['name'] ?? ''));
+      result.sort(
+        (a, b) => (a['name'] ?? '').toString().compareTo(b['name'] ?? ''),
+      );
     }
 
     return result;
@@ -825,7 +837,10 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                     )
                   : null,
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
             ),
           ),
         ),
@@ -863,21 +878,26 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                 ),
               ),
               const SizedBox(width: 8),
-              DropdownButton<String>(
+              Expanded(
+                child: DropdownButton<String>(
                 value: _sortBy,
                 isDense: true,
+                isExpanded: true,
                 underline: const SizedBox.shrink(),
                 items: const [
                   DropdownMenuItem(value: 'Featured', child: Text('Featured')),
-                  DropdownMenuItem(value: 'Rating', child: Text('Highest Rated')),
+                  DropdownMenuItem(
+                    value: 'Rating',
+                    child: Text('Highest Rated'),
+                  ),
                   DropdownMenuItem(value: 'Price', child: Text('Lowest Price')),
                   DropdownMenuItem(value: 'Name', child: Text('Name A-Z')),
                 ],
                 onChanged: (val) {
                   if (val != null) setState(() => _sortBy = val);
                 },
+                ),
               ),
-              const Spacer(),
               if (_selectedCategory != 'All' || query.isNotEmpty)
                 TextButton.icon(
                   onPressed: () {
@@ -956,7 +976,8 @@ class _DestinationsTabState extends State<_DestinationsTab> {
                       const LinearProgressIndicator(minHeight: 2),
                     Expanded(
                       child: DestinationGrid(
-                        destinations: _visibleDestinations.cast<Map<String, dynamic>>(),
+                        destinations: _visibleDestinations
+                            .cast<Map<String, dynamic>>(),
                       ),
                     ),
                   ],
@@ -966,4 +987,3 @@ class _DestinationsTabState extends State<_DestinationsTab> {
     );
   }
 }
-

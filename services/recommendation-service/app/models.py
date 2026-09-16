@@ -1,56 +1,39 @@
 """recommendation-service/models.py
 
-PostgreSQL database models for the Recommendation Service.
+SQLite database models for the Recommendation Service.
 
 Owns:
   - destinations table (id, fsq_id, name, area, tags, description, cost,
     image, image_source, average_rating, rating_count, last_synced_at)
   - ratings table (id, destination_id, user_id, rating, created_at)
+  - shared community chat messages and uploaded media metadata
 
 Destinations are sourced from the Foursquare Places API and periodically
 refreshed. Ratings are keyed by destination_id (the row's primary key).
-The database connection string is read from the DATABASE_URL environment
-variable and is never hardcoded.
+SQLITE_DATABASE_PATH selects the persistent database file.
 """
 import os
 import uuid
 import datetime
 import json
 import logging
+import sqlite3
+from contextlib import closing, contextmanager
+from pathlib import Path
+
+from flask import current_app, has_app_context
 
 logger = logging.getLogger(__name__)
-
-import psycopg2
-import psycopg2.extras
-from psycopg2.pool import ThreadedConnectionPool
-
-_pool = None
-
-
-def _get_database_url(app=None):
-    """Return the PostgreSQL connection string from env or app config."""
-    url = ""
-    if app and app.config.get("DATABASE"):
-        url = app.config["DATABASE"]
-    if not url:
-        url = os.environ.get("DATABASE_URL", "")
-    if "-pooler" in url:
-        url = url.replace("-pooler", "")
-    if not url:
-        raise RuntimeError(
-            "DATABASE_URL environment variable is required to connect to "
-            "the online PostgreSQL database."
-        )
-    return url
-
-
-import sqlite3
 
 class SQLiteCursorWrapper:
     def __init__(self, cur):
         self.cur = cur
         self.description = None
         self._rows = None
+
+    @property
+    def rowcount(self):
+        return self.cur.rowcount
 
     def execute(self, sql, params=()):
         sql = sql.replace("%s", "?")
@@ -127,34 +110,39 @@ class SQLiteWrapper:
 
 def get_connection(app=None):
     """Return local SQLite database wrapper as single source of truth."""
-    return SQLiteWrapper()
+    if app is None and has_app_context():
+        app = current_app
+    path = app.config.get("SQLITE_DATABASE_PATH") if app is not None else None
+    return SQLiteWrapper(path or os.environ.get("SQLITE_DATABASE_PATH") or None)
+
+
+def prepare_database(app):
+    """Seed a new persistent database once without replacing existing data."""
+    path = app.config.get("SQLITE_DATABASE_PATH")
+    if not path or path == ":memory:":
+        return
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    seed = Path(__file__).resolve().parents[1] / "destinations.db"
+    if (app.config.get("COPY_SEED_DATABASE", True) and not target.exists()
+            and seed.exists() and seed.resolve() != target.resolve()):
+        with closing(sqlite3.connect(seed.as_uri() + "?mode=ro", uri=True)) as source:
+            with closing(sqlite3.connect(str(target))) as destination:
+                source.backup(destination)
 
 
 def release_connection(conn):
-    """Release a connection back to the pool."""
-    global _pool
-    if isinstance(conn, SQLiteWrapper):
+    """Close a database connection."""
+    if conn is not None:
         conn.close()
-        return
-    if _pool and conn:
-        try:
-            _pool.putconn(conn)
-            return
-        except Exception:
-            pass
-    if conn:
-        try:
-            conn.close()
-        except Exception:
-            pass
 
 
 
 def init_db(app=None):
     """Create the destinations and ratings tables and seed initial data if empty."""
+    conn = get_connection(app)
+    cur = conn.cursor()
     try:
-        conn = get_connection(app)
-        cur = conn.cursor()
         cur.execute("""
             CREATE TABLE IF NOT EXISTS destinations (
                 id TEXT PRIMARY KEY,
@@ -270,23 +258,22 @@ def init_db(app=None):
             )
         """)
         # Ensure new columns exist on chat_messages (safe migrations for existing DBs)
-        try:
-            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='chat_messages'")
-            chat_cols = {r[0] for r in cur.fetchall()}
-            if "media_url" not in chat_cols:
-                cur.execute("ALTER TABLE chat_messages ADD COLUMN media_url TEXT DEFAULT ''")
-            if "media_type" not in chat_cols:
-                cur.execute("ALTER TABLE chat_messages ADD COLUMN media_type TEXT DEFAULT ''")
-            if "reply_to_id" not in chat_cols:
-                cur.execute("ALTER TABLE chat_messages ADD COLUMN reply_to_id TEXT DEFAULT ''")
-            if "reply_to_username" not in chat_cols:
-                cur.execute("ALTER TABLE chat_messages ADD COLUMN reply_to_username TEXT DEFAULT ''")
-            if "reply_to_message" not in chat_cols:
-                cur.execute("ALTER TABLE chat_messages ADD COLUMN reply_to_message TEXT DEFAULT ''")
-            if "is_edited" not in chat_cols:
-                cur.execute("ALTER TABLE chat_messages ADD COLUMN is_edited INTEGER DEFAULT 0")
-        except Exception as e:
-            logger.warning(f"chat_messages migration error: {e}")
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='chat_messages'")
+        chat_cols = {r[0] for r in cur.fetchall()}
+        for column in ("media_url", "media_type", "reply_to_id", "reply_to_username", "reply_to_message"):
+            if column not in chat_cols:
+                cur.execute(f"ALTER TABLE chat_messages ADD COLUMN {column} TEXT DEFAULT ''")
+        if "is_edited" not in chat_cols:
+            cur.execute("ALTER TABLE chat_messages ADD COLUMN is_edited INTEGER DEFAULT 0")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(created_at, id)")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chat_uploads (
+                filename TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                media_type TEXT NOT NULL,
+                content_type TEXT NOT NULL
+            )
+        """)
 
         # Ensure the fsq_id column exists (safe migration for existing DBs).
         try:
@@ -298,14 +285,13 @@ def init_db(app=None):
             pass
 
         conn.commit()
+    finally:
         cur.close()
         release_connection(conn)
-    except Exception as e:
-        print(f"Warning: init_db connection issue: {e}")
 
 
 def _row_to_dict(row, cursor):
-    """Convert a psycopg2 row to a dict, parsing JSON columns."""
+    """Convert a database row to a dict, parsing JSON columns."""
     if row is None:
         return None
     cols = [d[0] for d in cursor.description]
@@ -804,20 +790,38 @@ def mark_feedback_resolved(feedback_id, app=None):
     release_connection(conn)
 
 
+@contextmanager
+def chat_transaction(app=None):
+    conn = get_connection(app)
+    cur = conn.cursor()
+    try:
+        yield cur
+        conn.commit()
+    except sqlite3.Error:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        release_connection(conn)
+
+
+def get_chat_message(msg_id, app=None):
+    with chat_transaction(app) as cur:
+        cur.execute("SELECT * FROM chat_messages WHERE id = %s", (msg_id,))
+        row = cur.fetchone()
+        return dict(zip((column[0] for column in cur.description), row)) if row else None
+
+
 def create_chat_message(user_id, username, message, media_url='', media_type='', reply_to_id='', reply_to_username='', reply_to_message='', app=None):
     """Post a message to the live community chatroom."""
     msg_id = str(uuid.uuid4())
-    now = datetime.datetime.utcnow().isoformat() + "Z"
-    conn = get_connection(app)
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO chat_messages (id, user_id, username, message, media_url, media_type, reply_to_id, reply_to_username, reply_to_message, is_edited, created_at) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s)",
-        (msg_id, user_id, username, message, media_url or '', media_type or '', reply_to_id or '', reply_to_username or '', reply_to_message or '', now)
-    )
-    conn.commit()
-    cur.close()
-    release_connection(conn)
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+    with chat_transaction(app) as cur:
+        cur.execute(
+            "INSERT INTO chat_messages (id, user_id, username, message, media_url, media_type, reply_to_id, reply_to_username, reply_to_message, is_edited, created_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s)",
+            (msg_id, user_id, username, message, media_url or '', media_type or '', reply_to_id or '', reply_to_username or '', reply_to_message or '', now)
+        )
     return {
         "id": msg_id,
         "user_id": user_id,
@@ -835,46 +839,34 @@ def create_chat_message(user_id, username, message, media_url='', media_type='',
 
 def update_chat_message(msg_id, username, new_text, app=None):
     """Edit an existing chat message."""
-    conn = get_connection(app)
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE chat_messages SET message = %s, is_edited = 1 WHERE id = %s AND username = %s",
-        (new_text, msg_id, username)
-    )
-    conn.commit()
-    cur.close()
-    release_connection(conn)
-    return True
+    with chat_transaction(app) as cur:
+        cur.execute(
+            "UPDATE chat_messages SET message = %s, is_edited = 1 WHERE id = %s AND user_id = %s",
+            (new_text, msg_id, username)
+        )
+        return cur.rowcount == 1
 
 
 def delete_chat_message(msg_id, username, app=None):
     """Delete a chat message."""
-    conn = get_connection(app)
-    cur = conn.cursor()
-    cur.execute(
-        "DELETE FROM chat_messages WHERE id = %s AND username = %s",
-        (msg_id, username)
-    )
-    conn.commit()
-    cur.close()
-    release_connection(conn)
-    return True
+    with chat_transaction(app) as cur:
+        cur.execute(
+            "DELETE FROM chat_messages WHERE id = %s AND user_id = %s",
+            (msg_id, username)
+        )
+        return cur.rowcount == 1
 
 
 def get_chat_messages(limit=100, app=None):
     """Return recent chat messages ordered chronologically."""
-    conn = get_connection(app)
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT id, user_id, username, message, COALESCE(media_url, ''), COALESCE(media_type, ''), "
-        "COALESCE(reply_to_id, ''), COALESCE(reply_to_username, ''), COALESCE(reply_to_message, ''), COALESCE(is_edited, 0), created_at "
-        "FROM (SELECT * FROM chat_messages ORDER BY created_at DESC LIMIT %s) sub ORDER BY created_at ASC",
-        (limit,)
-    )
-    rows = cur.fetchall()
+    with chat_transaction(app) as cur:
+        cur.execute(
+            "SELECT id, user_id, username, message, COALESCE(media_url, ''), COALESCE(media_type, ''), "
+            "COALESCE(reply_to_id, ''), COALESCE(reply_to_username, ''), COALESCE(reply_to_message, ''), COALESCE(is_edited, 0), created_at "
+            "FROM (SELECT * FROM chat_messages ORDER BY created_at DESC, id DESC LIMIT %s) sub ORDER BY created_at ASC, id ASC",
+            (limit,)
+        )
+        rows = cur.fetchall()
     cols = ['id', 'user_id', 'username', 'message', 'media_url', 'media_type', 'reply_to_id', 'reply_to_username', 'reply_to_message', 'is_edited', 'created_at']
     results = [dict(zip(cols, r)) for r in rows]
-    cur.close()
-    release_connection(conn)
     return results
-

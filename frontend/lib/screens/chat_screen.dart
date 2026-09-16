@@ -1,15 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../services/analytics_service.dart';
+import '../widgets/chat_media.dart';
 
 /// Rich Live Community Chatroom with Simple Edit, Delete & Custom Display Name support.
 class ChatScreen extends StatefulWidget {
   final void Function(Locale)? onLocaleChanged;
-  const ChatScreen({super.key, this.onLocaleChanged});
+  final ImagePicker? imagePicker;
+  const ChatScreen({super.key, this.onLocaleChanged, this.imagePicker});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -18,23 +20,32 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
-  final ImagePicker _picker = ImagePicker();
+  late final ImagePicker _picker;
 
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
+  bool _isPicking = false;
+  bool _isFetching = false;
   bool _showEmojiDrawer = false;
   Timer? _pollingTimer;
+  String? _currentUsername;
+  String? _loadError;
+  int _messageRevision = 0;
 
   // Active state for Reply & Edit
   Map<String, String>? _replyingTo;
   String? _editingMsgId;
-  String? _attachedMediaBase64;
+  XFile? _attachment;
   String? _attachedMediaType;
+  ChatAttachment? _uploadedAttachment;
 
   @override
   void initState() {
     super.initState();
+    _picker = widget.imagePicker ?? ImagePicker();
+    AuthProvider().addListener(_loadSession);
+    _loadSession();
     _loadMessages(initial: true);
     // Poll for live community updates every 3 seconds
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
@@ -45,40 +56,56 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    AuthProvider().removeListener(_loadSession);
     _textCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
 
   String _getMyDisplayName() {
-    final name = AuthProvider().username?.trim() ?? '';
-    return name.isNotEmpty ? name : 'GlobeTrotter User';
+    return _currentUsername ?? 'Guest';
+  }
+
+  Future<void> _loadSession() async {
+    final username = await ApiService().getChatUsername();
+    if (mounted) setState(() => _currentUsername = username);
   }
 
   Future<void> _loadMessages({bool initial = false}) async {
+    if (_isFetching) return;
+    _isFetching = true;
+    final revision = _messageRevision;
     try {
       final list = await ApiService().getChatMessages();
-      if (!mounted) return;
+      if (!mounted || revision != _messageRevision) return;
 
-      final previousCount = _messages.length;
+      final previousLastId = _messages.isEmpty ? null : _messages.last['id'];
+      final nearBottom =
+          !_scrollCtrl.hasClients || _scrollCtrl.position.extentAfter < 100;
       setState(() {
         _messages = list;
-        if (initial) _isLoading = false;
+        _loadError = null;
       });
 
-      if (initial || list.length > previousCount) {
+      if (initial ||
+          (nearBottom &&
+              list.isNotEmpty &&
+              list.last['id'] != previousLastId)) {
         _scrollToBottom();
       }
-    } catch (e) {
-      if (mounted && initial) {
-        setState(() => _isLoading = false);
+    } on ApiException catch (error) {
+      if (mounted && revision == _messageRevision) {
+        setState(() => _loadError = error.message);
       }
+    } finally {
+      _isFetching = false;
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
+      if (mounted && _scrollCtrl.hasClients) {
         _scrollCtrl.animateTo(
           _scrollCtrl.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
@@ -88,83 +115,136 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _sendMessage() async {
-    final text = _textCtrl.text.trim();
-    if ((text.isEmpty && _attachedMediaBase64 == null) || _isSending) return;
+  Future<void> _sendMessage({String? sticker}) async {
+    if (_isSending || _isPicking) return;
+    if (_currentUsername == null) {
+      _showError('Please sign in to send community messages.');
+      return;
+    }
+    final text = sticker == null ? _textCtrl.text.trim() : '';
+    if (text.isEmpty && _attachment == null && sticker == null) return;
 
     final myName = _getMyDisplayName();
-    final mediaUrl = _attachedMediaBase64;
-    final mediaType = _attachedMediaType;
-    final replyId = _replyingTo?['id'];
-    final replyUser = _replyingTo?['username'];
-    final replyText = _replyingTo?['message'];
-    final editingId = _editingMsgId;
+    final reply = sticker == null ? _replyingTo : null;
+    final editingId = sticker == null ? _editingMsgId : null;
 
-    _textCtrl.clear();
-    setState(() {
-      _isSending = true;
-      _attachedMediaBase64 = null;
-      _attachedMediaType = null;
-      _replyingTo = null;
-      _editingMsgId = null;
-    });
+    setState(() => _isSending = true);
 
     try {
       if (editingId != null) {
-        // Edit mode
         await ApiService().editChatMessage(editingId, text, username: myName);
+        if (!mounted) return;
+        _messageRevision++;
+        setState(() {
+          _messages = [
+            for (final message in _messages)
+              if (message['id'] == editingId)
+                {...message, 'message': text, 'is_edited': 1}
+              else
+                message,
+          ];
+        });
       } else {
-        // Send mode
+        final attachment = _attachment;
+        if (sticker == null &&
+            attachment != null &&
+            _uploadedAttachment == null) {
+          final bytes = await attachment.readAsBytes();
+          _uploadedAttachment = await ApiService().uploadChatMedia(
+            bytes,
+            filename: attachment.name,
+          );
+          if (!mounted) return;
+        }
         final newMsg = await ApiService().sendChatMessage(
           text,
           username: myName,
-          mediaUrl: mediaUrl,
-          mediaType: mediaType,
-          replyToId: replyId,
-          replyToUsername: replyUser,
-          replyToMessage: replyText,
+          mediaUrl: sticker ?? _uploadedAttachment?.url,
+          mediaType: sticker != null ? 'sticker' : _uploadedAttachment?.type,
+          replyToId: reply?['id'],
+          replyToUsername: reply?['username'],
+          replyToMessage: reply?['message'],
         );
-        _messages.add(newMsg);
-        AnalyticsService().logSendChatMessage();
+        if (!mounted) return;
+        _messageRevision++;
+        setState(() {
+          _messages = [
+            ..._messages.where((message) => message['id'] != newMsg['id']),
+            newMsg,
+          ];
+        });
+        unawaited(AnalyticsService().logSendChatMessage());
       }
-      await _loadMessages(initial: false);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sending message: $e')),
-      );
+      if (sticker == null) {
+        _textCtrl.clear();
+        setState(() {
+          _attachment = null;
+          _uploadedAttachment = null;
+          _attachedMediaType = null;
+          _replyingTo = null;
+          _editingMsgId = null;
+        });
+      }
+      _scrollToBottom();
+    } on ApiException catch (error) {
+      _showError(error.message);
+    } on PlatformException {
+      _showError('The attachment could not be read. Please select it again.');
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
-        _scrollToBottom();
       }
     }
   }
 
   Future<void> _pickAttachment(ImageSource source, bool isVideo) async {
+    if (_isSending || _isPicking) return;
+    setState(() => _isPicking = true);
     try {
       XFile? file;
       if (isVideo) {
         file = await _picker.pickVideo(source: source);
       } else {
-        file = await _picker.pickImage(source: source, maxWidth: 1024, maxHeight: 1024);
+        file = await _picker.pickImage(
+          source: source,
+          maxWidth: 1024,
+          maxHeight: 1024,
+        );
       }
       if (file == null) return;
 
-      final bytes = await file.readAsBytes();
-      final mime = isVideo ? 'video/mp4' : 'image/png';
-      final base64Str = 'data:$mime;base64,${base64Encode(bytes)}';
-
+      final length = await file.length();
+      if (!mounted) return;
+      if (length == 0 || length > ApiService.maxChatMediaBytes) {
+        _showError('Choose a non-empty photo or video of 20 MB or smaller.');
+        return;
+      }
       setState(() {
-        _attachedMediaBase64 = base64Str;
+        _attachment = file;
+        _uploadedAttachment = null;
         _attachedMediaType = isVideo ? 'video' : 'image';
       });
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not attach file: $e')),
-      );
+    } on PlatformException catch (error) {
+      _showError(error.message ?? 'Could not attach this file.');
+    } on UnsupportedError {
+      _showError('This attachment source is not supported on this device.');
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
     }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          onPressed: messenger.hideCurrentSnackBar,
+        ),
+      ),
+    );
   }
 
   void _showAttachmentMenu() {
@@ -177,7 +257,10 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_camera_rounded, color: Colors.teal),
+              leading: const Icon(
+                Icons.photo_camera_rounded,
+                color: Colors.teal,
+              ),
               title: const Text('Take Photo'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -185,7 +268,10 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_rounded, color: Colors.blue),
+              leading: const Icon(
+                Icons.photo_library_rounded,
+                color: Colors.blue,
+              ),
               title: const Text('Choose Photo from Gallery'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -213,7 +299,10 @@ class _ChatScreenState extends State<ChatScreen> {
         title: const Text('Delete Message'),
         content: const Text('Are you sure you want to delete this message?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
@@ -222,13 +311,25 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
-    if (confirm == true) {
-      await ApiService().deleteChatMessage(msgId, username: _getMyDisplayName());
-      _loadMessages(initial: false);
+    if (confirm == true && mounted) {
+      try {
+        await ApiService().deleteChatMessage(
+          msgId,
+          username: _getMyDisplayName(),
+        );
+        if (!mounted) return;
+        _messageRevision++;
+        setState(() {
+          _messages.removeWhere((message) => message['id'] == msgId);
+        });
+      } on ApiException catch (error) {
+        _showError(error.message);
+      }
     }
   }
 
   void _startReply(Map<String, dynamic> msg) {
+    if (_isSending || _currentUsername == null) return;
     setState(() {
       _replyingTo = {
         'id': msg['id'] ?? '',
@@ -240,22 +341,19 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _startEdit(Map<String, dynamic> msg) {
+    if (_isSending || _isPicking) return;
     setState(() {
       _editingMsgId = msg['id'];
       _textCtrl.text = msg['message'] ?? '';
       _replyingTo = null;
+      _attachment = null;
+      _uploadedAttachment = null;
+      _attachedMediaType = null;
     });
   }
 
   void _sendSticker(String stickerLabel) {
-    ApiService().sendChatMessage(
-      '',
-      username: _getMyDisplayName(),
-      mediaUrl: stickerLabel,
-      mediaType: 'sticker',
-    ).then((_) {
-      _loadMessages(initial: false);
-    });
+    _sendMessage(sticker: stickerLabel);
   }
 
   String _formatTime(String rawDate) {
@@ -273,6 +371,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final myDisplayName = _getMyDisplayName();
+    final canCompose = _currentUsername != null && !_isSending && !_isPicking;
 
     return Scaffold(
       appBar: AppBar(
@@ -283,12 +382,20 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Icon(Icons.forum_outlined, color: Colors.teal, size: 22),
                 SizedBox(width: 8),
-                Text('Live Community Chat'),
+                Expanded(
+                  child: Text(
+                    'Live Community Chat',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             Text(
               'Chatting as: $myDisplayName',
               style: const TextStyle(fontSize: 11, color: Colors.teal),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -313,18 +420,27 @@ class _ChatScreenState extends State<ChatScreen> {
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.green,
+                  decoration: BoxDecoration(
+                    color: _loadError != null || _isLoading
+                        ? Colors.orange
+                        : Colors.green,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'Connected as $myDisplayName · Tap ✏️ to edit or 🗑️ to delete your messages',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.teal.shade900,
-                    fontWeight: FontWeight.w500,
+                Expanded(
+                  child: Text(
+                    _loadError ??
+                        (_isLoading
+                            ? 'Loading community messages...'
+                            : _currentUsername == null
+                            ? 'Everyone can read. Sign in to send messages and attachments.'
+                            : 'Shared community chat · Photos and videos up to 20 MB'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.teal.shade900,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -336,239 +452,318 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _messages.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              size: 64,
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No messages yet',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Say hi to the community as $myDisplayName!',
-                              style: const TextStyle(fontSize: 13, color: Colors.grey),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 64,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.3,
+                          ),
                         ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollCtrl,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = _messages[index];
-                          final msgId = msg['id'] ?? '';
-                          final sender = msg['username'] ?? 'Anonymous';
-                          final isMe = myDisplayName.toLowerCase() == sender.toLowerCase() ||
-                              sender.toLowerCase() == 'traveler' ||
-                              sender.toLowerCase() == 'globetrotter user';
-                          final text = msg['message'] ?? '';
-                          final mediaUrl = msg['media_url'] ?? '';
-                          final mediaType = msg['media_type'] ?? '';
-                          final replyUser = msg['reply_to_username'] ?? '';
-                          final replyText = msg['reply_to_message'] ?? '';
-                          final isEdited = (msg['is_edited'] ?? 0) == 1;
-                          final timeStr = _formatTime(msg['created_at'] ?? '');
+                        const SizedBox(height: 16),
+                        Text(
+                          _loadError == null
+                              ? 'No messages yet'
+                              : 'Unable to load messages',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _currentUsername == null
+                              ? 'Sign in to join the conversation.'
+                              : 'Say hi to the community as $myDisplayName!',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    controller: _scrollCtrl,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = _messages[index];
+                      final msgId = msg['id'] ?? '';
+                      final sender = msg['username'] ?? 'Anonymous';
+                      final isMe =
+                          _currentUsername != null &&
+                          msg['user_id'] == _currentUsername;
+                      final text = msg['message'] ?? '';
+                      final mediaUrl = msg['media_url'] ?? '';
+                      final mediaType = msg['media_type'] ?? '';
+                      final replyUser = msg['reply_to_username'] ?? '';
+                      final replyText = msg['reply_to_message'] ?? '';
+                      final isEdited = (msg['is_edited'] ?? 0) == 1;
+                      final timeStr = _formatTime(msg['created_at'] ?? '');
 
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Row(
-                              mainAxisAlignment: isMe
-                                  ? MainAxisAlignment.end
-                                  : MainAxisAlignment.start,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                if (!isMe) ...[
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: Colors.teal.shade100,
-                                    child: Text(
-                                      sender.isNotEmpty ? sender[0].toUpperCase() : '?',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.teal.shade800,
+                      return Padding(
+                        key: ValueKey('chat-message-$msgId'),
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisAlignment: isMe
+                              ? MainAxisAlignment.end
+                              : MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            if (!isMe) ...[
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Colors.teal.shade100,
+                                child: Text(
+                                  sender.isNotEmpty
+                                      ? sender[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.teal.shade800,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+
+                            // Quick Action Buttons for MY messages (Left side of my bubble)
+                            if (isMe) ...[
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  size: 18,
+                                  color: Colors.redAccent,
+                                ),
+                                tooltip: 'Delete message',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: _isSending
+                                    ? null
+                                    : () => _deleteMessage(msgId),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit_outlined,
+                                  size: 18,
+                                  color: Colors.blueAccent,
+                                ),
+                                tooltip: 'Edit message',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: canCompose
+                                    ? () => _startEdit(msg)
+                                    : null,
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+
+                            Flexible(
+                              child: GestureDetector(
+                                onLongPress: () => _showMsgActions(msg, isMe),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isMe
+                                        ? theme.colorScheme.primary
+                                        : theme
+                                              .colorScheme
+                                              .surfaceContainerHighest,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(16),
+                                      topRight: const Radius.circular(16),
+                                      bottomLeft: Radius.circular(
+                                        isMe ? 16 : 4,
+                                      ),
+                                      bottomRight: Radius.circular(
+                                        isMe ? 4 : 16,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                ],
-
-                                // Quick Action Buttons for MY messages (Left side of my bubble)
-                                if (isMe) ...[
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
-                                    tooltip: 'Delete message',
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    onPressed: () => _deleteMessage(msgId),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.blueAccent),
-                                    tooltip: 'Edit message',
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    onPressed: () => _startEdit(msg),
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-
-                                Flexible(
-                                  child: GestureDetector(
-                                    onLongPress: () => _showMsgActions(msg, isMe),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 14, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: isMe
-                                            ? theme.colorScheme.primary
-                                            : theme.colorScheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.only(
-                                          topLeft: const Radius.circular(16),
-                                          topRight: const Radius.circular(16),
-                                          bottomLeft: Radius.circular(isMe ? 16 : 4),
-                                          bottomRight: Radius.circular(isMe ? 4 : 16),
+                                  child: Column(
+                                    crossAxisAlignment: isMe
+                                        ? CrossAxisAlignment.end
+                                        : CrossAxisAlignment.start,
+                                    children: [
+                                      // Display Name Header
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 4,
+                                        ),
+                                        child: Text(
+                                          sender,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: isMe
+                                                ? theme.colorScheme.onPrimary
+                                                      .withValues(alpha: 0.9)
+                                                : theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant
+                                                      .withValues(alpha: 0.8),
+                                          ),
                                         ),
                                       ),
-                                      child: Column(
-                                        crossAxisAlignment: isMe
-                                            ? CrossAxisAlignment.end
-                                            : CrossAxisAlignment.start,
-                                        children: [
-                                          // Display Name Header
-                                          Padding(
-                                            padding: const EdgeInsets.only(bottom: 4),
-                                            child: Text(
-                                              isMe ? myDisplayName : sender,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: isMe
-                                                    ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
-                                                    : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+
+                                      // Quoted reply block
+                                      if (replyUser.isNotEmpty)
+                                        Container(
+                                          margin: const EdgeInsets.only(
+                                            bottom: 6,
+                                          ),
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: const Border(
+                                              left: BorderSide(
+                                                color: Colors.tealAccent,
+                                                width: 3,
                                               ),
                                             ),
                                           ),
-
-                                          // Quoted reply block
-                                          if (replyUser.isNotEmpty)
-                                            Container(
-                                              margin: const EdgeInsets.only(bottom: 6),
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: const Border(
-                                                  left: BorderSide(
-                                                    color: Colors.tealAccent,
-                                                    width: 3,
-                                                  ),
-                                                ),
-                                              ),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    'Replying to $replyUser',
-                                                    style: const TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    replyText,
-                                                    style: const TextStyle(fontSize: 11),
-                                                    maxLines: 2,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-
-                                          // Media attachment renderer
-                                          if (mediaUrl.isNotEmpty) ...[
-                                            _buildMediaBubble(mediaUrl, mediaType),
-                                            const SizedBox(height: 6),
-                                          ],
-
-                                          // Text body
-                                          if (text.isNotEmpty)
-                                            Text(
-                                              text,
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: isMe
-                                                    ? theme.colorScheme.onPrimary
-                                                    : theme.colorScheme.onSurfaceVariant,
-                                              ),
-                                            ),
-
-                                          const SizedBox(height: 4),
-
-                                          // Footer time & edited status + Quick reply icon
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              if (isEdited)
-                                                Padding(
-                                                  padding: const EdgeInsets.only(right: 4),
-                                                  child: Text(
-                                                    '(edited)',
-                                                    style: TextStyle(
-                                                      fontSize: 9,
-                                                      fontStyle: FontStyle.italic,
-                                                      color: isMe
-                                                          ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
-                                                          : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                                                    ),
-                                                  ),
-                                                ),
                                               Text(
-                                                timeStr,
-                                                style: TextStyle(
+                                                'Replying to $replyUser',
+                                                style: const TextStyle(
                                                   fontSize: 10,
-                                                  color: isMe
-                                                      ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
-                                                      : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                                  fontWeight: FontWeight.bold,
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
-                                              InkWell(
-                                                onTap: () => _startReply(msg),
-                                                child: Icon(
-                                                  Icons.reply_rounded,
-                                                  size: 14,
-                                                  color: isMe
-                                                      ? theme.colorScheme.onPrimary.withValues(alpha: 0.8)
-                                                      : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                              Text(
+                                                replyText,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
                                                 ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ],
                                           ),
+                                        ),
+
+                                      // Media attachment renderer
+                                      if (mediaUrl.isNotEmpty) ...[
+                                        ChatMedia(
+                                          url: mediaUrl,
+                                          type: mediaType,
+                                        ),
+                                        const SizedBox(height: 6),
+                                      ],
+
+                                      // Text body
+                                      if (text.isNotEmpty)
+                                        Text(
+                                          text,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: isMe
+                                                ? theme.colorScheme.onPrimary
+                                                : theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                          ),
+                                        ),
+
+                                      const SizedBox(height: 4),
+
+                                      // Footer time & edited status + Quick reply icon
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isEdited)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                right: 4,
+                                              ),
+                                              child: Text(
+                                                '(edited)',
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontStyle: FontStyle.italic,
+                                                  color: isMe
+                                                      ? theme
+                                                            .colorScheme
+                                                            .onPrimary
+                                                            .withValues(
+                                                              alpha: 0.7,
+                                                            )
+                                                      : theme
+                                                            .colorScheme
+                                                            .onSurfaceVariant
+                                                            .withValues(
+                                                              alpha: 0.6,
+                                                            ),
+                                                ),
+                                              ),
+                                            ),
+                                          Text(
+                                            timeStr,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: isMe
+                                                  ? theme.colorScheme.onPrimary
+                                                        .withValues(alpha: 0.7)
+                                                  : theme
+                                                        .colorScheme
+                                                        .onSurfaceVariant
+                                                        .withValues(alpha: 0.6),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          InkWell(
+                                            onTap: () => _startReply(msg),
+                                            child: Icon(
+                                              Icons.reply_rounded,
+                                              size: 14,
+                                              color: isMe
+                                                  ? theme.colorScheme.onPrimary
+                                                        .withValues(alpha: 0.8)
+                                                  : theme
+                                                        .colorScheme
+                                                        .onSurfaceVariant
+                                                        .withValues(alpha: 0.7),
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                    ),
+                                    ],
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
-                          );
-                        },
-                      ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ),
 
           // Active Reply / Edit Header Banner
-          if (_replyingTo != null || _editingMsgId != null || _attachedMediaBase64 != null)
+          if (_replyingTo != null ||
+              _editingMsgId != null ||
+              _attachment != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
@@ -577,9 +772,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   Icon(
                     _editingMsgId != null
                         ? Icons.edit_rounded
-                        : _attachedMediaBase64 != null
-                            ? Icons.attach_file_rounded
-                            : Icons.reply_rounded,
+                        : _attachment != null
+                        ? Icons.attach_file_rounded
+                        : Icons.reply_rounded,
                     size: 18,
                     color: theme.colorScheme.primary,
                   ),
@@ -588,23 +783,29 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Text(
                       _editingMsgId != null
                           ? 'Editing message...'
-                          : _attachedMediaBase64 != null
-                              ? 'Media attached ($_attachedMediaType)'
-                              : 'Replying to ${_replyingTo!['username']}: ${_replyingTo!['message']}',
-                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                          : _attachment != null
+                          ? '$_attachedMediaType attached: ${_attachment!.name}'
+                          : 'Replying to ${_replyingTo!['username']}: ${_replyingTo!['message']}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 18),
-                    onPressed: () {
-                      setState(() {
-                        _replyingTo = null;
-                        _editingMsgId = null;
-                        _attachedMediaBase64 = null;
-                        _attachedMediaType = null;
-                      });
-                    },
+                    tooltip: 'Clear attachment or reply',
+                    onPressed: _isSending
+                        ? null
+                        : () {
+                            setState(() {
+                              _replyingTo = null;
+                              _editingMsgId = null;
+                              _attachment = null;
+                              _uploadedAttachment = null;
+                              _attachedMediaType = null;
+                            });
+                          },
                   ),
                 ],
               ),
@@ -631,29 +832,43 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       // Emoji & Sticker button
                       IconButton(
+                        tooltip: 'Emojis and stickers',
                         icon: Icon(
                           _showEmojiDrawer
                               ? Icons.keyboard_hide_rounded
                               : Icons.emoji_emotions_outlined,
                           color: Colors.amber.shade700,
                         ),
-                        onPressed: () {
-                          setState(() => _showEmojiDrawer = !_showEmojiDrawer);
-                        },
+                        onPressed: canCompose
+                            ? () {
+                                setState(
+                                  () => _showEmojiDrawer = !_showEmojiDrawer,
+                                );
+                              }
+                            : null,
                       ),
                       // Media attachment button
                       IconButton(
-                        icon: const Icon(Icons.attach_file_rounded, color: Colors.teal),
-                        onPressed: _showAttachmentMenu,
+                        tooltip: 'Attach photo or video',
+                        icon: const Icon(
+                          Icons.attach_file_rounded,
+                          color: Colors.teal,
+                        ),
+                        onPressed: canCompose && _editingMsgId == null
+                            ? _showAttachmentMenu
+                            : null,
                       ),
                       Expanded(
                         child: TextField(
                           controller: _textCtrl,
+                          enabled: canCompose,
                           textCapitalization: TextCapitalization.sentences,
                           textInputAction: TextInputAction.send,
                           onSubmitted: (_) => _sendMessage(),
                           decoration: InputDecoration(
-                            hintText: _editingMsgId != null
+                            hintText: _currentUsername == null
+                                ? 'Sign in to send messages'
+                                : _editingMsgId != null
                                 ? 'Edit your message...'
                                 : 'Type a message as $myDisplayName...',
                             border: OutlineInputBorder(
@@ -672,7 +887,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const SizedBox(width: 8),
                       IconButton.filled(
-                        onPressed: _isSending ? null : _sendMessage,
+                        tooltip: 'Send message',
+                        onPressed: canCompose ? _sendMessage : null,
                         icon: _isSending
                             ? const SizedBox(
                                 width: 18,
@@ -682,7 +898,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : Icon(_editingMsgId != null ? Icons.check_rounded : Icons.send_rounded),
+                            : Icon(
+                                _editingMsgId != null
+                                    ? Icons.check_rounded
+                                    : Icons.send_rounded,
+                              ),
                         style: IconButton.styleFrom(
                           backgroundColor: theme.colorScheme.primary,
                           foregroundColor: theme.colorScheme.onPrimary,
@@ -729,7 +949,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete_forever_rounded, color: Colors.red),
+                leading: const Icon(
+                  Icons.delete_forever_rounded,
+                  color: Colors.red,
+                ),
                 title: const Text('Delete Message'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -743,69 +966,28 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMediaBubble(String mediaUrl, String mediaType) {
-    if (mediaType == 'sticker') {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.amber.shade100,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          mediaUrl,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-      );
-    }
-
-    if (mediaUrl.startsWith('data:image')) {
-      try {
-        final base64Data = mediaUrl.split(',').last;
-        final bytes = base64Decode(base64Data);
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.memory(bytes, height: 180, fit: BoxFit.cover),
-        );
-      } catch (_) {}
-    }
-
-    if (mediaType == 'video') {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.purple.shade50,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.play_circle_fill_rounded, color: Colors.purple, size: 28),
-            SizedBox(width: 8),
-            Text('Video Attachment', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        mediaUrl,
-        height: 180,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 40),
-      ),
-    );
-  }
-
   Widget _buildEmojiStickerDrawer(ThemeData theme) {
     final emojis = [
-      '😊', '😂', '😍', '🔥', '👍', '❤️', '🎉', '🚀', '🇨🇲', '✨',
-      '⭐', '🙌', '🤩', '🥳', '👏', '💯', '🌴', '✈️', '🗺️', '📸',
+      '😊',
+      '😂',
+      '😍',
+      '🔥',
+      '👍',
+      '❤️',
+      '🎉',
+      '🚀',
+      '🇨🇲',
+      '✨',
+      '⭐',
+      '🙌',
+      '🤩',
+      '🥳',
+      '👏',
+      '💯',
+      '🌴',
+      '✈️',
+      '🗺️',
+      '📸',
     ];
     final stickers = [
       '🇨🇲 Yaoundé Explorer',
@@ -839,19 +1021,41 @@ class _ChatScreenState extends State<ChatScreen> {
                   // Emojis Grid
                   GridView.builder(
                     padding: const EdgeInsets.all(8),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 6,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 6,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                        ),
                     itemCount: emojis.length,
                     itemBuilder: (ctx, i) {
                       return InkWell(
-                        onTap: () {
-                          _textCtrl.text += emojis[i];
-                        },
+                        onTap: _isSending
+                            ? null
+                            : () {
+                                final selection = _textCtrl.selection;
+                                final start = selection.isValid
+                                    ? selection.start
+                                    : _textCtrl.text.length;
+                                final end = selection.isValid
+                                    ? selection.end
+                                    : start;
+                                _textCtrl.value = TextEditingValue(
+                                  text: _textCtrl.text.replaceRange(
+                                    start,
+                                    end,
+                                    emojis[i],
+                                  ),
+                                  selection: TextSelection.collapsed(
+                                    offset: start + emojis[i].length,
+                                  ),
+                                );
+                              },
                         child: Center(
-                          child: Text(emojis[i], style: const TextStyle(fontSize: 24)),
+                          child: Text(
+                            emojis[i],
+                            style: const TextStyle(fontSize: 24),
+                          ),
                         ),
                       );
                     },
@@ -861,14 +1065,26 @@ class _ChatScreenState extends State<ChatScreen> {
                     padding: const EdgeInsets.all(8),
                     itemCount: stickers.length,
                     itemBuilder: (ctx, i) {
-                      return ListTile(
-                        dense: true,
-                        title: Text(stickers[i], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        trailing: const Icon(Icons.send_rounded, size: 16, color: Colors.teal),
-                        onTap: () {
-                          setState(() => _showEmojiDrawer = false);
-                          _sendSticker(stickers[i]);
-                        },
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          dense: true,
+                          title: Text(
+                            stickers[i],
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          trailing: const Icon(
+                            Icons.send_rounded,
+                            size: 16,
+                            color: Colors.teal,
+                          ),
+                          onTap: _isSending
+                              ? null
+                              : () {
+                                  setState(() => _showEmojiDrawer = false);
+                                  _sendSticker(stickers[i]);
+                                },
+                        ),
                       );
                     },
                   ),

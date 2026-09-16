@@ -10,6 +10,7 @@ import 'screens/register_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/analytics_dashboard_screen.dart';
+import 'screens/chat_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -107,6 +108,10 @@ class _YaoundeTripAppState extends State<YaoundeTripApp> {
           case '/analytics':
             return MaterialPageRoute(
               builder: (_) => const AnalyticsDashboardScreen(),
+            );
+          case '/chat':
+            return MaterialPageRoute(
+              builder: (_) => ChatScreen(onLocaleChanged: localeCallback),
             );
           default:
             return MaterialPageRoute(

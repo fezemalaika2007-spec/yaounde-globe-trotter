@@ -38,7 +38,6 @@ from app.models import (
     mark_all_notifications_read,
     create_comment, get_comments_for_destination, update_comment, delete_comment,
     create_feedback, get_all_feedback, mark_feedback_resolved,
-    create_chat_message, get_chat_messages, update_chat_message, delete_chat_message,
     ADMIN_USERNAME,
 )
 from app.recommendations import get_sectioned_recommendations as _section_recommendations
@@ -539,80 +538,3 @@ def proxy_image():
     except Exception as e:
         logger.warning(f"Image proxy failed for {image_url}: {e}")
         return jsonify({"error": str(e)}), 500
-
-
-# ---------------------------------------------------------------------------
-# Live Community Chatroom Routes
-# ---------------------------------------------------------------------------
-
-@recommendation_bp.route("/chat/messages", methods=["GET", "OPTIONS"])
-@optional_token
-def list_chat_messages():
-    """List recent chat messages."""
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-    limit = request.args.get("limit", 100, type=int)
-    messages = get_chat_messages(limit=limit)
-    return jsonify(messages), 200
-
-
-@recommendation_bp.route("/chat/messages", methods=["POST", "OPTIONS"])
-@optional_token
-def send_chat_message():
-    """Send a new message to the live community chatroom."""
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-    data = request.get_json() or {}
-    message_text = (data.get("message") or "").strip()
-    media_url = (data.get("media_url") or "").strip()
-    media_type = (data.get("media_type") or "").strip()
-    reply_to_id = (data.get("reply_to_id") or "").strip()
-    reply_to_username = (data.get("reply_to_username") or "").strip()
-    reply_to_message = (data.get("reply_to_message") or "").strip()
-
-    if not message_text and not media_url:
-        return jsonify({"error": "Message content or media attachment is required"}), 400
-
-    custom_name = (data.get("username") or "").strip()
-    username = custom_name if custom_name else (g.current_user if (g.current_user and g.current_user != "Traveler") else "GlobeTrotter User")
-
-    msg = create_chat_message(
-        user_id=username,
-        username=username,
-        message=message_text,
-        media_url=media_url,
-        media_type=media_type,
-        reply_to_id=reply_to_id,
-        reply_to_username=reply_to_username,
-        reply_to_message=reply_to_message,
-    )
-    return jsonify(msg), 201
-
-
-@recommendation_bp.route("/chat/messages/<msg_id>", methods=["PUT", "OPTIONS"])
-@optional_token
-def edit_chat_message_route(msg_id):
-    """Edit an existing chat message."""
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-    data = request.get_json() or {}
-    new_text = (data.get("message") or "").strip()
-    if not new_text:
-        return jsonify({"error": "Message content cannot be empty"}), 400
-    custom_name = (data.get("username") or "").strip()
-    username = custom_name if custom_name else (g.current_user or "GlobeTrotter User")
-    update_chat_message(msg_id, username, new_text)
-    return jsonify({"success": True, "message": "Message edited"}), 200
-
-
-@recommendation_bp.route("/chat/messages/<msg_id>", methods=["DELETE", "OPTIONS"])
-@optional_token
-def delete_chat_message_route(msg_id):
-    """Delete a chat message."""
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-    data = request.get_json() or {}
-    custom_name = (data.get("username") or "").strip()
-    username = custom_name if custom_name else (g.current_user or "GlobeTrotter User")
-    delete_chat_message(msg_id, username)
-    return jsonify({"success": True, "message": "Message deleted"}), 200

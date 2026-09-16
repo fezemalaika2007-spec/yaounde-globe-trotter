@@ -15,6 +15,7 @@ from flask_cors import CORS
 def create_app():
     """Create and configure the API Gateway application."""
     app = Flask(__name__)
+    app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
     CORS(app)
 
     # Register the proxy routes blueprint
@@ -22,4 +23,3 @@ def create_app():
     app.register_blueprint(gateway_bp)
 
     return app
-

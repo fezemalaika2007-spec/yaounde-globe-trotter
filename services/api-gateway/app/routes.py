@@ -6,9 +6,11 @@ Contains no business logic, only routing/forwarding.
 """
 
 import os
+from urllib.parse import quote
 
 import requests
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, request, jsonify, Response, stream_with_context
+from werkzeug.exceptions import RequestEntityTooLarge
 
 gateway_bp = Blueprint("gateway", __name__)
 
@@ -230,6 +232,73 @@ def chat_messages():
 @gateway_bp.route("/chat/messages/<msg_id>", methods=["PUT", "DELETE", "OPTIONS"])
 def chat_message_detail(msg_id):
     return _proxy("DYNAMIC", f"{RECOMMENDATION_SERVICE_URL}/chat/messages/{msg_id}")
+
+
+@gateway_bp.errorhandler(RequestEntityTooLarge)
+def request_too_large(error):
+    return jsonify({"error": "Photos and videos must be 20 MB or smaller"}), 413
+
+
+def _proxy_chat_media(target_url):
+    if request.method == "OPTIONS":
+        response = Response(status=200)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Authorization, Content-Type, Range, If-Range, If-None-Match, If-Modified-Since"
+        )
+        return response
+    headers = {"Accept-Encoding": "identity"}
+    for name in ("Authorization", "Content-Type", "Range", "If-Range",
+                 "If-None-Match", "If-Modified-Since"):
+        if name in request.headers:
+            headers[name] = request.headers[name]
+    try:
+        upstream = requests.request(
+            method=request.method,
+            url=target_url,
+            headers=headers,
+            data=request.get_data() if request.method == "POST" else None,
+            stream=True,
+            allow_redirects=False,
+            timeout=(5, 60),
+        )
+    except requests.exceptions.ConnectionError:
+        return jsonify({"error": "service unavailable"}), 503
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "service timeout"}), 504
+
+    def stream_body():
+        try:
+            yield from upstream.iter_content(chunk_size=64 * 1024)
+        finally:
+            upstream.close()
+
+    response = Response(
+        stream_with_context(stream_body()),
+        status=upstream.status_code,
+        content_type=upstream.headers.get("Content-Type", "application/octet-stream"),
+    )
+    for name in ("Content-Length", "Content-Range", "Accept-Ranges", "Content-Disposition",
+                 "Cache-Control", "ETag", "Last-Modified", "X-Content-Type-Options"):
+        if name in upstream.headers:
+            response.headers[name] = upstream.headers[name]
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Expose-Headers"] = "Content-Range, Accept-Ranges, Content-Length"
+    response.call_on_close(upstream.close)
+    return response
+
+
+@gateway_bp.route("/chat/uploads", methods=["POST", "OPTIONS"])
+def chat_uploads():
+    return _proxy_chat_media(f"{RECOMMENDATION_SERVICE_URL}/chat/uploads")
+
+
+@gateway_bp.route("/chat/media/<filename>", methods=["GET", "HEAD", "OPTIONS"])
+def chat_media(filename):
+    return _proxy_chat_media(
+        f"{RECOMMENDATION_SERVICE_URL}/chat/media/{quote(filename, safe='')}"
+    )
 
 
 # ---------------------------------------------------------------------------

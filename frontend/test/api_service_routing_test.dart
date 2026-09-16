@@ -70,6 +70,7 @@ void main() {
   for (final connectionFailure in [false, true]) {
     test('chat never falls back to local hosts on '
         '${connectionFailure ? 'connection failure' : 'HTTP error'}', () async {
+      SharedPreferences.setMockInitialValues({'jwt_token_prefs': 'test-token'});
       final requests = <http.Request>[];
       final client = MockClient((request) async {
         requests.add(request);
@@ -81,13 +82,19 @@ void main() {
 
       await http.runWithClient(() async {
         final api = ApiService();
-        expect(await api.getChatMessages(), isEmpty);
+        await expectLater(api.getChatMessages(), throwsA(isA<ApiException>()));
         await expectLater(
           api.sendChatMessage('Hello'),
           throwsA(isA<ApiException>()),
         );
-        expect(await api.editChatMessage('message-1', 'Updated'), isFalse);
-        expect(await api.deleteChatMessage('message-1'), isFalse);
+        await expectLater(
+          api.editChatMessage('message-1', 'Updated'),
+          throwsA(isA<ApiException>()),
+        );
+        await expectLater(
+          api.deleteChatMessage('message-1'),
+          throwsA(isA<ApiException>()),
+        );
       }, () => client);
 
       expect(

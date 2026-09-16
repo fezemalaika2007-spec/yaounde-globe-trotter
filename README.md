@@ -268,6 +268,62 @@ The script verifies DNS, installs Nginx and Certbot, enables the virtual host,
 redirects HTTP to HTTPS, enables certificate renewal, and performs a dry-run
 renewal. Replace `admin@example.com` with the certificate renewal email.
 
+### Upgrading shared chat without losing existing data
+
+Chat belongs to the Recommendation Service, not the Itinerary Service.
+The recommendation database is SQLite, regardless of the legacy PostgreSQL
+comments above. Its database and uploaded media must be kept in persistent
+storage; a container's writable layer is lost when it is recreated.
+
+After committing/pushing the changes and pulling them on the VPS, preserve the
+old database **before the first upgrade** if it is still stored at
+`/recommendation-service/destinations.db` inside the existing container:
+
+```bash
+cd /root/yaounde-globe-trotter/services
+test ! -e data/recommendation/destinations.db &&
+mkdir -p data/recommendation &&
+docker compose stop recommendation-service &&
+docker cp recommendation-service:/recommendation-service/destinations.db \
+  data/recommendation/destinations.db
+```
+
+The first command refuses to overwrite an existing persistent database. Do not
+remove that database or repeat this migration on later updates. If copying fails,
+keep the old container and resolve the copy error before recreating it.
+
+Then rebuild the changed backend services:
+
+```bash
+docker compose up -d --build recommendation-service api-gateway
+docker compose ps
+curl -f https://yaoundeglobe.duckdns.org/api/health
+```
+
+The Compose bind mount keeps the database and chat media under
+`services/data/recommendation/`. Back up this directory together; do not commit it
+to Git or delete it when updating the application.
+
+Recompile the frontend (its Docker image only copies the existing build):
+
+```bash
+cd /root/yaounde-globe-trotter/frontend &&
+docker run --rm -v "$PWD:/app" -w /app ghcr.io/cirruslabs/flutter:stable \
+  bash -c 'flutter pub get && flutter build web --release --no-tree-shake-icons --dart-define=API_BASE_URL=https://yaoundeglobe.duckdns.org/api' &&
+docker compose up -d --build
+```
+
+Keep `client_max_body_size 25m;` in the host Nginx HTTPS server or its `/api/`
+location so a 20 MB multipart upload fits. The supplied deployment template
+already uses this limit. The same `/api/` proxy handles uploads and video range
+requests; no extra public backend ports or certificates are needed.
+
+Verify with two different accounts or browsers: send text, an emoji, a sticker,
+a photo, and a short MP4/WebM video from one account; the other should see them
+within the next refresh and be able to play the video, but not edit/delete the
+first account's messages. A signed-out browser can read, but cannot send.
+After this first upgrade, hard-refresh any browser still using an older bundle.
+
 ---
 
 ## 8. License

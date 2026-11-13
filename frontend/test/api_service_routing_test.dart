@@ -67,6 +67,24 @@ void main() {
     },
   );
 
+  test('destination search uses the gateway destinations contract', () async {
+    final requests = <http.Request>[];
+    final client = MockClient((request) async {
+      requests.add(request);
+      return http.Response('[{"id":"destination-1"}]', 200);
+    });
+
+    await http.runWithClient(() async {
+      final api = ApiService();
+      expect(await api.searchDestinations('museum', limit: 7), isNotEmpty);
+    }, () => client);
+
+    expect(requests, hasLength(1));
+    expect(requests.single.method, 'GET');
+    expect(requests.single.url.path, '/api/destinations');
+    expect(requests.single.url.queryParameters, {'q': 'museum', 'limit': '7'});
+  });
+
   for (final connectionFailure in [false, true]) {
     test('chat never falls back to local hosts on '
         '${connectionFailure ? 'connection failure' : 'HTTP error'}', () async {

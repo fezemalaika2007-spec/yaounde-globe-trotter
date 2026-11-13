@@ -1,20 +1,31 @@
 @echo off
 REM ============================================================
 REM  GlobeTrotter Web Launcher & Service Runner
-REM  Starts Backend Recommendation Service & Serves Web App.
+REM  Builds and serves the Flutter Web App.
 REM ============================================================
 setlocal
 cd /d "%~dp0"
 
 echo.
-echo === Starting GlobeTrotter Backend Service (Port 5003) ===
-start "GlobeTrotter Backend" /B python services\recommendation-service\app\main.py
+set "API_BASE_URL=http://localhost:5000"
 
-cd frontend
+cd services
+echo === Starting local API services ===
+call docker compose up --build -d user-service itinerary-service recommendation-service api-gateway
+
+if errorlevel 1 (
+    echo.
+    echo Backend startup FAILED. Check Docker and services\.env configuration.
+    pause
+    exit /b 1
+)
+
+cd ..\frontend
 
 echo.
+echo === API Gateway: %API_BASE_URL% ===
 echo === Building web bundle ===
-call flutter build web --base-href / --no-tree-shake-icons
+call flutter build web --base-href / --no-tree-shake-icons --dart-define=API_BASE_URL=%API_BASE_URL%
 
 if errorlevel 1 (
     echo.

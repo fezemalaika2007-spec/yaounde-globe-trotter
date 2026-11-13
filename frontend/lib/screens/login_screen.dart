@@ -92,7 +92,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final accessToken = auth.accessToken;
       if ((idToken == null || idToken.isEmpty) &&
           (accessToken == null || accessToken.isEmpty)) {
-        throw ApiException(400, 'Could not retrieve authentication token from Google.');
+        throw ApiException(
+          400,
+          'Could not retrieve authentication token from Google.',
+        );
       }
       await AuthProvider().googleLogin(
         idToken: idToken,
@@ -120,6 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundPath: ImagePaths.loginBackground,
       title: 'Yaounde.Trip · ${l10n.login}',
       onLocaleChanged: widget.onLocaleChanged,
+      alignLeftOnWideScreen: true,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -248,15 +252,6 @@ class _LoginScreenState extends State<LoginScreen> {
               );
             },
             child: Text(l10n.noAccount),
-          ),
-          TextButton.icon(
-            onPressed: () => Navigator.pushNamed(
-              context,
-              '/chat',
-              arguments: widget.onLocaleChanged,
-            ),
-            icon: const Icon(Icons.forum_outlined),
-            label: const Text('Read community chat'),
           ),
         ],
       ),

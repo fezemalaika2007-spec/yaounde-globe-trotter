@@ -1,9 +1,7 @@
-# Flutter & Dart tool build directories
+# Flutter & Dart tool directories; include build/web for the Nginx image
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-build/*
-!build/web
 
 # IDE & Editor files
 .idea/

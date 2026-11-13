@@ -323,12 +323,7 @@ class ApiService {
     throw ApiException(response.statusCode, _errorMessage(body));
   }
 
-  /// Live internet search for destinations in Yaoundé.
-  ///
-  /// Queries the backend `/search` endpoint, which live-searches Foursquare
-  /// for places matching [query] whose names match a real, photo-bearing
-  /// Yaoundé destination. This lets users find places that are not yet in the
-  /// local database.
+  /// Search the destination catalog for [query].
   Future<List<dynamic>> searchDestinations(
     String query, {
     int limit = 12,
@@ -336,7 +331,7 @@ class ApiService {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return [];
     final uri = Uri.parse(
-      '${ApiConfig.baseUrl}${ApiConfig.search}',
+      '${ApiConfig.baseUrl}${ApiConfig.destinations}',
     ).replace(queryParameters: {'q': trimmed, 'limit': limit.toString()});
     final response = await _get(uri);
     final body = _decode(response);

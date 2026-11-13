@@ -5,6 +5,6 @@
 /// category-based placeholders via the Recommendation Service).
 /// Home page images also come from live destination records.
 class ImagePaths {
-  static const String loginBackground = 'assets/images/auth/Yaounde_0.jpg';
-  static const String registerBackground = 'assets/images/auth/Yaounde_0.jpg';
+  static const String loginBackground = 'assets/images/auth/78.jpg';
+  static const String registerBackground = 'assets/images/auth/78.jpg';
 }

@@ -7,6 +7,7 @@ class AuthBackground extends StatelessWidget {
   final String title;
   final Widget child;
   final void Function(Locale) onLocaleChanged;
+  final bool alignLeftOnWideScreen;
 
   const AuthBackground({
     super.key,
@@ -14,6 +15,7 @@ class AuthBackground extends StatelessWidget {
     required this.title,
     required this.child,
     required this.onLocaleChanged,
+    this.alignLeftOnWideScreen = false,
   });
 
   @override
@@ -68,20 +70,32 @@ class AuthBackground extends StatelessWidget {
             fallbackIcon: Icons.travel_explore,
           ),
           SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 440),
-                  child: Card(
-                    elevation: 8,
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: child,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final alignLeft =
+                    alignLeftOnWideScreen && constraints.maxWidth >= 600;
+                return SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: alignLeft ? 48 : 24,
+                    vertical: 24,
+                  ),
+                  child: Align(
+                    alignment: alignLeft
+                        ? Alignment.centerLeft
+                        : Alignment.center,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 440),
+                      child: Card(
+                        elevation: 8,
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: child,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],

@@ -15,7 +15,7 @@ services:
       - "5001"
     environment:
       - PORT=5001
-      - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in services/.env}
       - DATABASE_URL=${USER_DATABASE_URL:-${DATABASE_URL}}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/').read()"]
@@ -34,7 +34,7 @@ services:
       - "5002"
     environment:
       - PORT=5002
-      - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in services/.env}
       - DATABASE_URL=${ITINERARY_DATABASE_URL:-${DATABASE_URL}}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5002/').read()"]
@@ -53,7 +53,7 @@ services:
       - "5003"
     environment:
       - PORT=5003
-      - SECRET_KEY=${SECRET_KEY:-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e}
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in services/.env}
       - DATABASE_URL=${RECOMMENDATION_DATABASE_URL:-${DATABASE_URL}}
       - USER_SERVICE_URL=http://user-service:5001
       - SQLITE_DATABASE_PATH=/recommendation-service/data/destinations.db

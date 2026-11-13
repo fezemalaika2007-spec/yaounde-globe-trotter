@@ -1,7 +1,5 @@
-# =========================================================
-# Flutter Web Frontend - Nginx Production Container
-# =========================================================
-
+# Serve the Flutter web bundle built by run_docker.bat or the documented
+# Flutter build command.
 FROM nginx:1.25-alpine
 
 LABEL name="globetrotter-frontend" \
@@ -11,7 +9,6 @@ LABEL name="globetrotter-frontend" \
 # Remove default Nginx website
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy the Flutter web build into Nginx
 COPY build/web /usr/share/nginx/html
 
 # Custom Nginx configuration for Flutter SPA routing

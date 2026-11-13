@@ -136,12 +136,14 @@ def search_destinations():
         q          – free-text search against name, description
         tag        – filter by a single interest tag (e.g. "food")
         max_cost   – filter by maximum cost (integer, XAF)
+        limit      – maximum number of results to return
 
     Returns a JSON list of matching destination objects.
     """
     q = request.args.get("q", "").strip().lower()
     tag = request.args.get("tag", "").strip().lower()
     max_cost_str = request.args.get("max_cost", "").strip()
+    limit_str = request.args.get("limit", "").strip()
 
     max_cost = None
     if max_cost_str:
@@ -149,6 +151,15 @@ def search_destinations():
             max_cost = int(max_cost_str)
         except ValueError:
             return jsonify({"error": "max_cost must be an integer"}), 400
+
+    limit = None
+    if limit_str:
+        try:
+            limit = int(limit_str)
+            if limit < 1:
+                raise ValueError
+        except ValueError:
+            return jsonify({"error": "limit must be a positive integer"}), 400
 
     destinations = get_all_destinations()
     results = []
@@ -178,7 +189,7 @@ def search_destinations():
 
         results.append(dest)
 
-    return jsonify(results), 200
+    return jsonify(results[:limit] if limit is not None else results), 200
 
 
 # ---------------------------------------------------------------------------

@@ -560,32 +560,19 @@ void main() {
     );
   });
 
-  testWidgets(
-    'signed-out visitors can open community chat from the login screen',
-    (tester) async {
-      SharedPreferences.setMockInitialValues({});
-      await http.runWithClient(
-        () async {
-          await tester.pumpWidget(const YaoundeTripApp());
-          await tester.pumpAndSettle();
-          await tester.ensureVisible(find.text('Read community chat'));
-          await tester.tap(find.text('Read community chat'));
-          await tester.pumpAndSettle();
-          expect(find.byType(ChatScreen), findsOneWidget);
-          expect(find.text('Welcome, visitors'), findsOneWidget);
-          expect(
-            tester.widget<TextField>(find.byType(TextField)).enabled,
-            isFalse,
-          );
-          await _closeChat(tester);
-        },
-        () => MockClient(
-          (_) async =>
-              chatResponse([chatMessage('public', 'bob', 'Welcome, visitors')]),
-        ),
-      );
-    },
-  );
+  testWidgets('login screen does not expose community chat', (tester) async {
+    tester.view.physicalSize = const Size(615, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const YaoundeTripApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Read community chat'), findsNothing);
+    expect(find.byType(ChatScreen), findsNothing);
+    expect(tester.getRect(find.byType(Card).first).left, lessThan(70));
+  });
 
   testWidgets('failed refresh retains messages and displays the error', (
     tester,

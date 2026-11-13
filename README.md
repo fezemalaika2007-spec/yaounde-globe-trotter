@@ -116,7 +116,7 @@ yaounde-globe-trotter/
 │       ├── requirements.txt
 │       └── README.md
 ├── destinations.txt              # Primary destination dataset source
-├── run_web.bat                   # Automated Windows launcher (starts backend 5003 + Chrome)
+├── run_web.bat                   # Windows Flutter Web build and browser launcher
 ├── sync_destinations.bat         # Batch script to update destinations database
 └── README.md                     # Project root documentation
 ```
@@ -133,7 +133,7 @@ yaounde-globe-trotter/
    ```bash
    cp .env.example .env
    ```
-3. Configure environment variables in `.env`:
+3. Configure environment variables in `.env`. Replace the secret placeholder with a unique random value; Compose refuses to start without it:
    ```env
    FOURSQUARE_API_KEY=your_foursquare_api_key
    SECRET_KEY=your_random_256bit_secret_key
@@ -145,16 +145,17 @@ yaounde-globe-trotter/
 
 ## 5. How to Run Locally
 
-### Automated Launch (Windows Web Client + Backend)
+### Automated Launch (Windows Web Client)
 
 Double-click `run_web.bat` in the project root, or execute:
 ```cmd
 .\run_web.bat
 ```
-This launcher starts a local Recommendation Service and serves the Flutter
-web bundle locally. The frontend still connects to the online VPS API by
-default; the local service is not used unless `API_BASE_URL` is explicitly
-overridden when building the bundle.
+This launcher starts the four local API services with Docker Compose, then
+builds and serves the Flutter web bundle on `http://localhost:8080`. It connects
+to the local gateway at `http://localhost:5000`. Docker Desktop and a configured
+`services/.env` are required. Set `API_BASE_URL` before launching to use a
+different gateway.
 
 ---
 
@@ -177,9 +178,14 @@ overridden when building the bundle.
 
 To run microservices inside Docker containers:
 ```bash
+cd frontend
+flutter build web --release --base-href / --no-tree-shake-icons --dart-define=API_BASE_URL=http://localhost:5000
 cd services
-docker-compose up --build
+docker compose up --build
 ```
+Build the Flutter bundle before starting Compose; the frontend image packages
+that bundle with Nginx. Use the appropriate `API_BASE_URL` at build time for
+the environment where the browser will run.
 This exposes:
 - API Gateway: `http://localhost:5000`
 - Recommendation & Chat Service: `http://localhost:5003`
@@ -219,4 +225,3 @@ flutter test
 ## 7. License
 
 This project is released under the [MIT License](LICENSE).
->>>>>>> frontend

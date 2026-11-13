@@ -175,14 +175,22 @@ The frontend application can be built and run as an isolated containerized servi
 
 ### Option A: Using Docker Compose (Recommended)
 
-Run directly from within the `frontend/` directory:
+Use the Windows launcher to start the local API services and rebuild the frontend:
 ```bash
-cd frontend
-docker compose up -d --build
+run_docker.bat
 ```
-Access the application locally at `http://localhost:8080`. On the production
-VPS, host Nginx proxies `https://yaoundeglobe.duckdns.org` to this loopback
-port.
+Access the application locally at `http://localhost:8080`; the browser bundle
+uses the local API gateway at `http://localhost:5000`. The launcher rebuilds and
+recreates the frontend container so source changes are included.
+
+For manual startup, run the backend services first, then rebuild the frontend:
+```bash
+cd services
+docker compose up --build -d user-service itinerary-service recommendation-service api-gateway
+cd ../frontend
+flutter build web --release --base-href / --no-tree-shake-icons --dart-define=API_BASE_URL=http://localhost:5000
+docker compose up --build -d --force-recreate globetrotter-frontend
+```
 
 To stop the container:
 ```bash
